@@ -1,0 +1,88 @@
+{
+  "common": {
+    "back": "⬅️ Назад",
+    "refresh": "🔄 Обновить",
+    "refreshed_toast": "⚡ Данные обновлены в реальном времени с сайта!",
+    "status_available": "🟢 Доступно",
+    "status_limited": "🟡 Мало мест",
+    "status_sold_out": "🔴 Распродано (Sold out)",
+    "block_asia": "🌏 Азия",
+    "block_europe": "🌍 Европа",
+    "block_americas": "🌎 Америка",
+    "hours_suffix": "UTC",
+    "currency_month": "мес",
+    "currency_day": "день",
+    "help": "ℹ️ Справка",
+    "btn_contact_author": "👨‍💻 Написать автору (@grizlizora)",
+    "unknown": "Неизвестно"
+  },
+  "onboarding": {
+    "welcome_title": "👋 <b>Добро пожаловать в CheapestInference Slot Monitor!</b>\n\nЭтот бот отслеживает появление и закрытие слотов в тарифах <b>Flagship, Frontier и Core</b> на сайте <a href=\"https://cheapestinference.com/pools\">cheapestinference.com</a> в реальном времени.\n\nПожалуйста, выберите удобный язык интерфейса:",
+    "language_selected": "✅ Язык установлен: <b>Русский 🇷🇺</b>"
+  },
+  "menu": {
+    "dashboard_title": "📊 <b>CheapestInference — Мониторинг слотов</b>\n\nТекущий статус пулов и 8-часовых региональных блоков:\n\n{pool_summaries}\n\n🕒 <i>Последняя проверка: {updated_at}</i>",
+    "pool_summary_card": "• <b>{pool_name}</b> {status_badge}\n  🤖 Модели: <code>{models}</code>\n  💵 От <b>${min_price}/мес</b> ({available_count}/3 блоков свободно)\n  🔗 <a href=\"{url}\">Страница пула</a>",
+    "loading_data": "⏳ <i>Загрузка данных с сайта...</i>",
+    "btn_flagship": "🚀 Flagship Пул",
+    "btn_frontier": "⚡ Frontier Пул",
+    "btn_core": "🧠 Core Пул",
+    "btn_subscriptions": "🔔 Мои уведомления",
+    "btn_language": "🌐 Изменить язык",
+    "btn_refresh": "🔄 Обновить данные",
+    "btn_help": "ℹ️ Инструкция"
+  },
+  "pool_detail": {
+    "title": "🏷️ <b>Пул {pool_name}</b>\n\n📝 <b>Описание:</b> {description}\n\n🤖 <b>Включенные модели (безлимит токенов):</b>\n{models_list}\n\n💰 <b>Стоимость:</b>\n• От <b>${min_price}/мес</b> (~${min_price_day}/день)\n• Скидка при оплате за год: <b>{annual_discount}%</b>\n\n🕒 <b>Региональные 8-часовые блоки (UTC):</b>\n{blocks_list}\n\n🔗 <b>Официальная ссылка:</b> <a href=\"{url}\">{url}</a>",
+    "no_data": "⚠️ Данные для <b>{pool}</b> еще загружаются. Попробуйте обновить через минуту.",
+    "model_item": "  • <code>{model_name}</code>",
+    "block_row": "{block_icon} <b>{block_name}</b> ({hours_utc}): {status_badge} — <b>${price}/мес</b>",
+    "btn_subscribe_pool": "🔔 Подписаться на весь пул {pool_name}",
+    "btn_unsubscribe_pool": "🔕 Отписаться от пула {pool_name}",
+    "btn_open_site": "🛒 Заказать на сайте"
+  },
+  "subscriptions": {
+    "title": "🔔 <b>Управление персональными уведомлениями</b>\n\nНастройте получение мгновенных уведомлений по нужным тарифам и регионам.\n\n🌐 <b>Глобальные уведомления (любой слот):</b> {global_status}\n🔊 <b>Режим звука:</b> {sound_status}",
+    "global_enabled": "ВКЛЮЧЕНО ✅",
+    "global_disabled": "ВЫКЛЮЧЕНО ❌",
+    "sound_enabled": "Звук включен 🔊",
+    "sound_muted": "Без звука (Тихие) 🔇",
+    "btn_toggle_global_on": "🌐 Глобальные уведомления: [ВКЛ]",
+    "btn_toggle_global_off": "🌐 Глобальные уведомления: [ВЫКЛ]",
+    "btn_toggle_sound_on": "🔊 Звук: Включен",
+    "btn_toggle_sound_off": "🔇 Звук: Без звука",
+    "toast_global_on": "🌐 Глобальные уведомления включены",
+    "toast_global_off": "🌐 Глобальные уведомления выключены",
+    "toast_sound_enabled": "🔊 Звуковые уведомления включены",
+    "toast_sound_muted": "🔇 Уведомления без звука (тихий режим)",
+    "toast_pool_on": "🔔 Подписка на {pool} включена",
+    "toast_pool_off": "🔕 Подписка на {pool} выключена",
+    "toast_slot_on": "✅ Уведомления {pool} ({block}) включены",
+    "toast_slot_off": "❌ Уведомления {pool} ({block}) выключены",
+    "pool_section_header": "\n📦 <b>Тариф {pool_name}:</b>",
+    "slot_active": "✅ {name}",
+    "slot_inactive": "❌ {name}",
+    "pool_active": "✅ Весь пул {name}",
+    "pool_inactive": "❌ Весь пул {name}"
+  },
+  "alerts": {
+    "slot_appeared_header": "🚨 <b>ПОЯВИЛСЯ СВОБОДНЫЙ СЛОТ!</b>",
+    "slot_appeared_body": "В тарифе <b>{pool_name}</b> только что открылся свободный слот!\n\n🏷️ <b>Тариф:</b> {pool_name}\n🌐 <b>Регион:</b> {block_name} (<code>{hours_utc}</code>)\n🤖 <b>Включенные модели:</b> <code>{models}</code>\n💰 <b>Цена:</b> <b>${price}/мес</b>\n⏱ <b>Время появления:</b> {timestamp} UTC\n\n⚡ <i>Слоты разбирают за считанные минуты! Нажмите кнопку ниже для оформления:</i>",
+    "slot_disappeared_header": "🔒 <b>СЛОТ РАСПРОДАН</b>",
+    "slot_disappeared_body": "Слот в тарифе <b>{pool_name}</b> (регион <b>{block_name}</b>) перешел в статус <b>Sold Out</b>.\n\n⏱ <b>Время:</b> {timestamp} UTC\n🔔 <i>Мы пришлем уведомление, как только появится следующий свободный слот!</i>",
+    "price_changed_header": "🏷️ <b>ИЗМЕНЕНИЕ ЦЕНЫ ТАРИФА</b>",
+    "price_changed_body": "В тарифе <b>{pool_name}</b> ({block_name}) изменилась цена:\n\n💵 Старая цена: <s>${old_price}/мес</s>\n💰 Новая цена: <b>${new_price}/мес</b>\n⏱ <b>Время:</b> {timestamp} UTC",
+    "catalog_updated_header": "🆕 <b>ОБНОВЛЕНИЕ МОДЕЛЕЙ</b>",
+    "catalog_updated_body": "В тарифе <b>{pool_name}</b> обновился список моделей!\n\n🤖 <b>Актуальные модели:</b>\n<code>{models}</code>",
+    "batch_title": "🚨 <b>Обновления CheapestInference ({count})</b>",
+    "batch_price_update": "🏷️ Изменение цены",
+    "btn_claim_slot": "🚀 Оформить слот на сайте",
+    "btn_open_pool": "🔎 Посмотреть пул в боте"
+  },
+  "admin": {
+    "stats_title": "📊 <b>Панель администратора & Телеметрия</b>\n\n🟢 <b>Статус системы:</b> {status}\n⏱ <b>Аптайм:</b> {uptime}\n\n👥 <b>Пользователи:</b>\n• Всего зарегистрировано: <b>{total_users}</b>\n• Активных наблюдателей: <b>{active_users}</b>\n• Заблокировали бота: <b>{blocked_users}</b>\n• Активных правил подписок: <b>{active_subscriptions}</b>\n\n🕷 <b>Скрейпер & Anti-Ban:</b>\n• Последний запрос: <b>{last_scrape_ago}с назад</b> (Задержка: {latency}мс)\n• Источник данных: <code>{source}</code>\n• Ошибок подряд: <b>{consecutive_failures}</b>\n• Режим Tor / Прокси: <b>{proxy_status}</b>\n\n💾 <b>Память процесса:</b> <b>{memory_mb} MB</b>",
+    "unauthorized": "⛔ Доступ ограничен. Команда только для администраторов.",
+    "btn_test_alert": "🧪 Отправить тестовое уведомление"
+  },
+  "help_text": "ℹ️ <b>Как работает этот бот?</b>\n\n1. Бот круглосуточно опрашивает сайт <a href=\"https://cheapestinference.com/pools\">cheapestinference.com/pools</a> через защищенный анонимный Tor/прокси канал.\n2. Каждый тариф разделен на три ежедневных 8-часовых блока (Азия, Европа, Америка).\n3. Актуальное наличие всегда доступно через кнопки главного меню.\n4. В разделе <b>🔔 Мои уведомления</b> настройте оповещения по нужным вам тарифам или отдельным регионам.\n5. Как только слот становится доступен — вы получаете мгновенное уведомление с прямой ссылкой на оплату!\n\n👨‍💻 <b>Связь с автором / Поддержка:</b>\nTelegram: <a href=\"https://t.me/grizlizora\">@grizlizora</a>"
+}

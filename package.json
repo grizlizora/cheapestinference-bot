@@ -1,0 +1,52 @@
+{
+  "name": "cheapestinference-telegram-bot",
+  "version": "1.0.0",
+  "description": "24/7 Telegram bot monitoring GPU/LLM slot availability on cheapestinference.com with Tor/proxy anti-ban, multi-user subscriptions, multi-language i18n, and free cloud deployment.",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": [
+    "telegram-bot",
+    "cheapestinference",
+    "gpu-monitor",
+    "tor",
+    "anti-ban",
+    "i18n",
+    "sqlite",
+    "grammy"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@grammyjs/auto-retry": "^2.0.2",
+    "@grammyjs/menu": "^1.3.0",
+    "@grammyjs/runner": "^2.0.3",
+    "@grammyjs/transformer-throttler": "^1.2.1",
+    "better-sqlite3": "^11.8.1",
+    "cheerio": "^1.0.0",
+    "dotenv": "^16.4.7",
+    "grammy": "^1.35.0",
+    "https-proxy-agent": "^7.0.6",
+    "p-queue": "^8.1.0",
+    "socks": "^2.8.4",
+    "socks-proxy-agent": "^8.0.5",
+    "undici": "^6.21.1",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.13.5",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.6"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

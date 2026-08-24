@@ -1,0 +1,88 @@
+{
+  "common": {
+    "back": "⬅️ Назад",
+    "refresh": "🔄 Оновити",
+    "refreshed_toast": "⚡ Дані щойно оновлено з сайту!",
+    "status_available": "🟢 Доступно",
+    "status_limited": "🟡 Мало місць",
+    "status_sold_out": "🔴 Розпродано (Sold out)",
+    "block_asia": "🌏 Азія",
+    "block_europe": "🌍 Європа",
+    "block_americas": "🌎 Америка",
+    "hours_suffix": "UTC",
+    "currency_month": "міс",
+    "currency_day": "день",
+    "help": "ℹ️ Довідка",
+    "btn_contact_author": "👨‍💻 Написати автору (@grizlizora)",
+    "unknown": "Невідомо"
+  },
+  "onboarding": {
+    "welcome_title": "👋 <b>Ласкаво просимо до CheapestInference Slot Monitor!</b>\n\nЦей бот у реальному часі відстежує появу та зникнення вільних слотів у тарифах <b>Flagship, Frontier та Core</b> на сайті <a href=\"https://cheapestinference.com/pools\">cheapestinference.com</a>.\n\nБудь ласка, оберіть зручну мову для продовження:",
+    "language_selected": "✅ Мову встановлено: <b>Українська 🇺🇦</b>"
+  },
+  "menu": {
+    "dashboard_title": "📊 <b>CheapestInference — Моніторинг слотів</b>\n\nАктуальний стан тарифів та регіональних блоків:\n\n{pool_summaries}\n\n🕒 <i>Останнє оновлення: {updated_at}</i>",
+    "pool_summary_card": "• <b>{pool_name}</b> {status_badge}\n  🤖 Моделі: <code>{models}</code>\n  💵 Від <b>${min_price}/міс</b> ({available_count}/3 блоків вільно)\n  🔗 <a href=\"{url}\">Сторінка пулу</a>",
+    "loading_data": "⏳ <i>Завантаження даних із сайту...</i>",
+    "btn_flagship": "🚀 Flagship Пул",
+    "btn_frontier": "⚡ Frontier Пул",
+    "btn_core": "🧠 Core Пул",
+    "btn_subscriptions": "🔔 Мої сповіщення",
+    "btn_language": "🌐 Змінити мову",
+    "btn_refresh": "🔄 Оновити дані",
+    "btn_help": "ℹ️ Інструкція"
+  },
+  "pool_detail": {
+    "title": "🏷️ <b>Пул {pool_name}</b>\n\n📝 <b>Опис:</b> {description}\n\n🤖 <b>Включені моделі (безліміт):</b>\n{models_list}\n\n💰 <b>Вартість:</b>\n• Від <b>${min_price}/міс</b> (~${min_price_day}/день)\n• Знижка при оплаті за рік: <b>{annual_discount}%</b>\n\n🕒 <b>Регіональні 8-годинні блоки (UTC):</b>\n{blocks_list}\n\n🔗 <b>Офіційне посилання:</b> <a href=\"{url}\">{url}</a>",
+    "no_data": "⚠️ Дані для <b>{pool}</b> ще завантажуються. Спробуйте оновити за мить.",
+    "model_item": "  • <code>{model_name}</code>",
+    "block_row": "{block_icon} <b>{block_name}</b> ({hours_utc}): {status_badge} — <b>${price}/міс</b>",
+    "btn_subscribe_pool": "🔔 Підписатися на весь пул {pool_name}",
+    "btn_unsubscribe_pool": "🔕 Відписатися від пулу {pool_name}",
+    "btn_open_site": "🛒 Замовити на сайті"
+  },
+  "subscriptions": {
+    "title": "🔔 <b>Керування персональними сповіщеннями</b>\n\nОберіть, про які пули та регіони ви хочете отримувати миттєві сповіщення.\n\n🌐 <b>Глобальні сповіщення (на всі слоти):</b> {global_status}\n🔊 <b>Режим звуку:</b> {sound_status}",
+    "global_enabled": "УВІМКНЕНО ✅",
+    "global_disabled": "ВИМКНЕНО ❌",
+    "sound_enabled": "Звук увімкнено 🔊",
+    "sound_muted": "Без звуку 🔇",
+    "btn_toggle_global_on": "🌐 Глобальні сповіщення: [УВІМК]",
+    "btn_toggle_global_off": "🌐 Глобальні сповіщення: [ВИМК]",
+    "btn_toggle_sound_on": "🔊 Звук: Увімкнено",
+    "btn_toggle_sound_off": "🔇 Звук: Без звуку (Тихі)",
+    "toast_global_on": "🌐 Глобальні сповіщення увімкнено",
+    "toast_global_off": "🌐 Глобальні сповіщення вимкнено",
+    "toast_sound_enabled": "🔊 Звукові сповіщення увімкнено",
+    "toast_sound_muted": "🔇 Сповіщення без звуку (тихий режим)",
+    "toast_pool_on": "🔔 Підписку на {pool} увімкнено",
+    "toast_pool_off": "🔕 Підписку на {pool} вимкнено",
+    "toast_slot_on": "✅ Сповіщення {pool} ({block}) увімкнено",
+    "toast_slot_off": "❌ Сповіщення {pool} ({block}) вимкнено",
+    "pool_section_header": "\n📦 <b>Тариф {pool_name}:</b>",
+    "slot_active": "✅ {name}",
+    "slot_inactive": "❌ {name}",
+    "pool_active": "✅ Весь пул {name}",
+    "pool_inactive": "❌ Весь пул {name}"
+  },
+  "alerts": {
+    "slot_appeared_header": "🚨 <b>З'ЯВИВСЯ ВІЛЬНИЙ СЛОТ!</b>",
+    "slot_appeared_body": "У тарифі <b>{pool_name}</b> щойно з'явився доступний слот!\n\n🏷️ <b>Тариф:</b> {pool_name}\n🌐 <b>Регіональний блок:</b> {block_name} (<code>{hours_utc}</code>)\n🤖 <b>Включені моделі:</b> <code>{models}</code>\n💰 <b>Ціна:</b> <b>${price}/міс</b>\n⏱ <b>Час появи:</b> {timestamp} UTC\n\n⚡ <i>Слоти розбирають за кілька хвилин! Натисніть кнопку нижче для оформлення:</i>",
+    "slot_disappeared_header": "🔒 <b>СЛОТ РОЗПРОДАНО</b>",
+    "slot_disappeared_body": "Слот у тарифі <b>{pool_name}</b> (регіон <b>{block_name}</b>) щойно перейшов у статус <b>Sold Out</b>.\n\n⏱ <b>Час зникнення:</b> {timestamp} UTC\n🔔 <i>Ми надішлемо вам сповіщення, як тільки слот знову стане доступним!</i>",
+    "price_changed_header": "🏷️ <b>ЗМІНА ЦІНИ ТАРИФУ</b>",
+    "price_changed_body": "У тарифі <b>{pool_name}</b> ({block_name}) змінилася ціна:\n\n💵 Стара ціна: <s>${old_price}/міс</s>\n💰 Нова ціна: <b>${new_price}/міс</b>\n⏱ <b>Час:</b> {timestamp} UTC",
+    "catalog_updated_header": "🆕 <b>ОНОВЛЕННЯ МОДЕЛЕЙ НА САЙТІ</b>",
+    "catalog_updated_body": "У тарифі <b>{pool_name}</b> оновлено список підтримуваних моделей!\n\n🤖 <b>Актуальні моделі:</b>\n<code>{models}</code>",
+    "batch_title": "🚨 <b>Оновлення CheapestInference ({count})</b>",
+    "batch_price_update": "🏷️ Зміна ціни",
+    "btn_claim_slot": "🚀 Оформити слот на сайті",
+    "btn_open_pool": "🔎 Переглянути пул у боті"
+  },
+  "admin": {
+    "stats_title": "📊 <b>Панель адміністратора & Телеметрія</b>\n\n🟢 <b>Статус системи:</b> {status}\n⏱ <b>Аптайм:</b> {uptime}\n\n👥 <b>Користувачі:</b>\n• Всього зареєстровано: <b>{total_users}</b>\n• Активних спостерігачів: <b>{active_users}</b>\n• Заблокували бота: <b>{blocked_users}</b>\n• Активних правил підписок: <b>{active_subscriptions}</b>\n\n🕷 <b>Скрейпер & Anti-Ban:</b>\n• Останнє опитування: <b>{last_scrape_ago}с тому</b> (Затримка: {latency}мс)\n• Джерело даних: <code>{source}</code>\n• Помилок поспіль: <b>{consecutive_failures}</b>\n• Режим Tor / Проксі: <b>{proxy_status}</b>\n\n💾 <b>Пам'ять процесу:</b> <b>{memory_mb} MB</b>",
+    "unauthorized": "⛔ Доступ обмежено. Команда лише для адміністраторів.",
+    "btn_test_alert": "🧪 Надіслати тестове сповіщення"
+  },
+  "help_text": "ℹ️ <b>Як працює цей бот?</b>\n\n1. Бот цілодобово перевіряє сторінку <a href=\"https://cheapestinference.com/pools\">cheapestinference.com/pools</a> через захищений анонімний Tor/проксі канал.\n2. Кожен тариф ділиться на три щоденні 8-годинні часові блоки (Азія, Європа, Америка).\n3. Ви можете переглядати актуальну наявність слотів у реальному часі за допомогою кнопок меню.\n4. У розділі <b>🔔 Мої сповіщення</b> налаштуйте персональні сповіщення на потрібні вам тарифи або окремі регіони.\n5. Щойно слот з'являється — ви миттєво отримуєте повідомлення з прямим посиланням на покупку!\n\n👨‍💻 <b>Зв'язок з автором / Підтримка:</b>\nTelegram: <a href=\"https://t.me/grizlizora\">@grizlizora</a>"
+}

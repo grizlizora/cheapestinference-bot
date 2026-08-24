@@ -1,0 +1,41 @@
+version: "3.8"
+
+services:
+  cheapestinference-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cheapestinference-telegram-bot
+    restart: unless-stopped
+    ports:
+      - "7860:7860" # Health check endpoint
+    environment:
+      - NODE_ENV=production
+      - BOT_TOKEN=${BOT_TOKEN}
+      - ADMIN_USER_IDS=${ADMIN_USER_IDS:-}
+      - DB_PATH=/app/data/bot.db
+      - TOR_ENABLED=true
+      - TOR_SOCKS_HOST=127.0.0.1
+      - TOR_SOCKS_PORT=9050
+      - TOR_CONTROL_HOST=127.0.0.1
+      - TOR_CONTROL_PORT=9051
+      - PORT=7860
+    volumes:
+      - bot_data:/app/data
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 128M
+        reservations:
+          memory: 64M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7860/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  bot_data:
+    driver: local

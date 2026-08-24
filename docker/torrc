@@ -1,0 +1,11 @@
+SocksPort 127.0.0.1:9050
+ControlPort 127.0.0.1:9051
+CookieAuthentication 0
+DataDirectory /var/lib/tor
+Log notice stdout
+ClientOnly 1
+AvoidDiskWrites 1
+MaxMemInQueues 16 MB
+DisableDebuggerAttachment 1
+MaxCircuitDirtiness 30
+CircuitBuildTimeout 10
