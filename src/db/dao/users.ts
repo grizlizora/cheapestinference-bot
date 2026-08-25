@@ -18,38 +18,6 @@ export class UserDAO {
   private stmtGetStats: Database.Statement;
 
   constructor(public readonly db: Database.Database) {
-    // Run schema migration for user preference columns
-    try {
-      db.exec(`
-        ALTER TABLE users ADD COLUMN notify_available_global INTEGER NOT NULL DEFAULT 1;
-      `);
-    } catch {}
-    try {
-      db.exec(`
-        ALTER TABLE users ADD COLUMN notify_sold_out_global INTEGER NOT NULL DEFAULT 0;
-      `);
-    } catch {}
-    try {
-      db.exec(`
-        ALTER TABLE users ADD COLUMN notify_models_global INTEGER NOT NULL DEFAULT 1;
-      `);
-    } catch {}
-    try {
-      db.exec(`
-        ALTER TABLE users ADD COLUMN notify_prices_global INTEGER NOT NULL DEFAULT 1;
-      `);
-    } catch {}
-    try {
-      db.exec(`
-        ALTER TABLE users ADD COLUMN notify_admin_new_users INTEGER NOT NULL DEFAULT 1;
-      `);
-    } catch {}
-    try {
-      db.exec(`
-        ALTER TABLE users ADD COLUMN last_active_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP;
-      `);
-    } catch {}
-
     this.stmtGetByTgId = db.prepare("SELECT * FROM users WHERE telegram_id = ?");
     this.stmtGetById = db.prepare("SELECT * FROM users WHERE id = ?");
     this.stmtUpsert = db.prepare(`
@@ -67,22 +35,34 @@ export class UserDAO {
       UPDATE users SET language = ?, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?
     `);
     this.stmtToggleMute = db.prepare(`
-      UPDATE users SET is_muted = CASE WHEN is_muted = 1 THEN 0 ELSE 1 END, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?
+      UPDATE users SET is_muted = CASE WHEN is_muted = 1 THEN 0 ELSE 1 END, updated_at = CURRENT_TIMESTAMP
+      WHERE telegram_id = ?
+      RETURNING is_muted
     `);
     this.stmtToggleAvail = db.prepare(`
-      UPDATE users SET notify_available_global = CASE WHEN notify_available_global = 1 THEN 0 ELSE 1 END, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?
+      UPDATE users SET notify_available_global = CASE WHEN notify_available_global = 1 THEN 0 ELSE 1 END, updated_at = CURRENT_TIMESTAMP
+      WHERE telegram_id = ?
+      RETURNING notify_available_global
     `);
     this.stmtToggleSoldOut = db.prepare(`
-      UPDATE users SET notify_sold_out_global = CASE WHEN notify_sold_out_global = 1 THEN 0 ELSE 1 END, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?
+      UPDATE users SET notify_sold_out_global = CASE WHEN notify_sold_out_global = 1 THEN 0 ELSE 1 END, updated_at = CURRENT_TIMESTAMP
+      WHERE telegram_id = ?
+      RETURNING notify_sold_out_global
     `);
     this.stmtToggleModels = db.prepare(`
-      UPDATE users SET notify_models_global = CASE WHEN notify_models_global = 1 THEN 0 ELSE 1 END, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?
+      UPDATE users SET notify_models_global = CASE WHEN notify_models_global = 1 THEN 0 ELSE 1 END, updated_at = CURRENT_TIMESTAMP
+      WHERE telegram_id = ?
+      RETURNING notify_models_global
     `);
     this.stmtTogglePrices = db.prepare(`
-      UPDATE users SET notify_prices_global = CASE WHEN notify_prices_global = 1 THEN 0 ELSE 1 END, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?
+      UPDATE users SET notify_prices_global = CASE WHEN notify_prices_global = 1 THEN 0 ELSE 1 END, updated_at = CURRENT_TIMESTAMP
+      WHERE telegram_id = ?
+      RETURNING notify_prices_global
     `);
     this.stmtToggleAdminNewUsers = db.prepare(`
-      UPDATE users SET notify_admin_new_users = CASE WHEN notify_admin_new_users = 1 THEN 0 ELSE 1 END, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?
+      UPDATE users SET notify_admin_new_users = CASE WHEN notify_admin_new_users = 1 THEN 0 ELSE 1 END, updated_at = CURRENT_TIMESTAMP
+      WHERE telegram_id = ?
+      RETURNING notify_admin_new_users
     `);
     this.stmtTouchLastActive = db.prepare(`
       UPDATE users SET last_active_at = CURRENT_TIMESTAMP WHERE telegram_id = ?
@@ -96,8 +76,8 @@ export class UserDAO {
     this.stmtGetStats = db.prepare(`
       SELECT 
         COUNT(*) as total,
-        SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active,
-        SUM(CASE WHEN is_active = 0 THEN 1 ELSE 0 END) as blocked
+        COUNT(CASE WHEN is_active = 1 THEN 1 END) as active,
+        COUNT(CASE WHEN is_active = 0 THEN 1 END) as blocked
       FROM users
     `);
   }
@@ -135,39 +115,33 @@ export class UserDAO {
   }
 
   toggleMute(tgId: number): number {
-    this.stmtToggleMute.run(tgId);
-    const user = this.getByTelegramId(tgId);
-    return user ? user.is_muted : 0;
+    const row = this.stmtToggleMute.get(tgId) as { is_muted: number } | undefined;
+    return row ? row.is_muted : 0;
   }
 
   toggleAvailable(tgId: number): number {
-    this.stmtToggleAvail.run(tgId);
-    const user = this.getByTelegramId(tgId);
-    return user ? user.notify_available_global : 1;
+    const row = this.stmtToggleAvail.get(tgId) as { notify_available_global: number } | undefined;
+    return row ? row.notify_available_global : 1;
   }
 
   toggleSoldOut(tgId: number): number {
-    this.stmtToggleSoldOut.run(tgId);
-    const user = this.getByTelegramId(tgId);
-    return user ? user.notify_sold_out_global : 0;
+    const row = this.stmtToggleSoldOut.get(tgId) as { notify_sold_out_global: number } | undefined;
+    return row ? row.notify_sold_out_global : 0;
   }
 
   toggleModels(tgId: number): number {
-    this.stmtToggleModels.run(tgId);
-    const user = this.getByTelegramId(tgId);
-    return user ? user.notify_models_global : 1;
+    const row = this.stmtToggleModels.get(tgId) as { notify_models_global: number } | undefined;
+    return row ? row.notify_models_global : 1;
   }
 
   togglePrices(tgId: number): number {
-    this.stmtTogglePrices.run(tgId);
-    const user = this.getByTelegramId(tgId);
-    return user ? user.notify_prices_global : 1;
+    const row = this.stmtTogglePrices.get(tgId) as { notify_prices_global: number } | undefined;
+    return row ? row.notify_prices_global : 1;
   }
 
   toggleAdminNewUsers(tgId: number): number {
-    this.stmtToggleAdminNewUsers.run(tgId);
-    const user = this.getByTelegramId(tgId);
-    return user ? (user.notify_admin_new_users ?? 1) : 1;
+    const row = this.stmtToggleAdminNewUsers.get(tgId) as { notify_admin_new_users: number } | undefined;
+    return row ? row.notify_admin_new_users : 1;
   }
 
   deactivateUser(tgId: number): void {

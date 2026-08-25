@@ -53,6 +53,11 @@ export class NotificationDispatcher {
   private readonly maxTokens = 25;
   private lastTokenRefill = performance.now();
 
+  // Per-User Rate Limiter & Message Stale Expiration
+  private lastUserDispatchTime = new Map<number, number>();
+  private readonly USER_DISPATCH_GAP_MS = 1050; // 1.05s between messages to same chat
+  private readonly MAX_MESSAGE_AGE_MS = 10 * 60 * 1000; // 10 min TTL for notifications
+
   // Blocked users debounced batch
   private blockedUsersBatch: number[] = [];
   private batchFlushTimer?: NodeJS.Timeout;
@@ -219,6 +224,35 @@ export class NotificationDispatcher {
     setImmediate(processNextTick);
   }
 
+  private popValidCandidate(q: CircularRingBuffer<OutgoingAlertMessage>): OutgoingAlertMessage | undefined {
+    const now = Date.now();
+    const skipped: OutgoingAlertMessage[] = [];
+    let chosen: OutgoingAlertMessage | undefined;
+
+    while (!q.isEmpty()) {
+      const candidate = q.pop()!;
+      // 1. Drop stale alerts (> 10 min old)
+      if (now - candidate.enqueuedAt > this.MAX_MESSAGE_AGE_MS) {
+        continue;
+      }
+      // 2. Check per-user rate limit (1 msg/s)
+      const lastSent = this.lastUserDispatchTime.get(candidate.telegramId) || 0;
+      if (now - lastSent < this.USER_DISPATCH_GAP_MS) {
+        skipped.push(candidate);
+        if (skipped.length > 20) break; // Avoid deep scan on high burst
+        continue;
+      }
+      chosen = candidate;
+      break;
+    }
+
+    // Re-queue skipped candidates back to the front
+    for (let i = skipped.length - 1; i >= 0; i--) {
+      q.unshift(skipped[i]);
+    }
+    return chosen;
+  }
+
   /**
    * Deficit Weighted Round-Robin (DWRR) Item Selection
    * Guarantees that lower-priority alerts (P3 sold out, P2 models) are never starved during P1 bursts
@@ -226,7 +260,7 @@ export class NotificationDispatcher {
   private selectNextItemDWRR(): OutgoingAlertMessage | undefined {
     // P0 Interactive messages always take absolute immediate precedence
     if (!this.p0Queue.isEmpty()) {
-      return this.p0Queue.pop();
+      return this.popValidCandidate(this.p0Queue);
     }
 
     // Allocate deficit quanta if all active queues are depleted of deficit
@@ -238,32 +272,52 @@ export class NotificationDispatcher {
 
     // Drain P1
     if (!this.p1Queue.isEmpty() && this.p1Deficit > 0) {
-      this.p1Deficit--;
-      return this.p1Queue.pop();
+      const item = this.popValidCandidate(this.p1Queue);
+      if (item) {
+        this.p1Deficit--;
+        return item;
+      }
     }
 
     // Drain P2
     if (!this.p2Queue.isEmpty() && this.p2Deficit > 0) {
-      this.p2Deficit--;
-      return this.p2Queue.pop();
+      const item = this.popValidCandidate(this.p2Queue);
+      if (item) {
+        this.p2Deficit--;
+        return item;
+      }
     }
 
     // Drain P3
     if (!this.p3Queue.isEmpty() && this.p3Deficit > 0) {
-      this.p3Deficit--;
-      return this.p3Queue.pop();
+      const item = this.popValidCandidate(this.p3Queue);
+      if (item) {
+        this.p3Deficit--;
+        return item;
+      }
     }
 
-    // Fallback: Return any available message in priority order
-    if (!this.p1Queue.isEmpty()) return this.p1Queue.pop();
-    if (!this.p2Queue.isEmpty()) return this.p2Queue.pop();
-    if (!this.p3Queue.isEmpty()) return this.p3Queue.pop();
+    // Fallback: Return any available valid message in priority order
+    if (!this.p1Queue.isEmpty()) {
+      const item = this.popValidCandidate(this.p1Queue);
+      if (item) return item;
+    }
+    if (!this.p2Queue.isEmpty()) {
+      const item = this.popValidCandidate(this.p2Queue);
+      if (item) return item;
+    }
+    if (!this.p3Queue.isEmpty()) {
+      const item = this.popValidCandidate(this.p3Queue);
+      if (item) return item;
+    }
 
     return undefined;
   }
 
   private async dispatchSingleMessage(msg: OutgoingAlertMessage): Promise<void> {
     try {
+      this.lastUserDispatchTime.set(msg.telegramId, Date.now());
+
       await this.bot.api.sendMessage(msg.telegramId, msg.text, {
         parse_mode: "HTML",
         reply_markup: msg.keyboard,
@@ -335,6 +389,11 @@ export class NotificationDispatcher {
         currency_month: currencyMonth,
       });
     }
+  }
+
+  private truncateToTelegramLimit(text: string, maxLen = 3900): string {
+    if (text.length <= maxLen) return text;
+    return text.substring(0, maxLen - 20) + "\n\n<i>...[truncated]</i>";
   }
 
   private formatAlertMessage(
@@ -570,7 +629,7 @@ export class NotificationDispatcher {
       poolSlug: event.poolSlug,
       blockId: event.block,
       eventType: event.type,
-      text,
+      text: this.truncateToTelegramLimit(text),
       keyboard,
       isMuted: user.isMuted,
       priority,
@@ -615,7 +674,7 @@ export class NotificationDispatcher {
         );
 
         if (buttonCount < 3) {
-          const btnLabel = `⚡ ${escapeHtml(event.poolSlug.toUpperCase())} (${blockName}) • $${escapeHtml(event.newPrice || "0")}`;
+          const btnLabel = `⚡ ${event.poolSlug.toUpperCase()} (${blockName}) • $${event.newPrice || "0"}`;
           keyboard.url(btnLabel, checkoutUrl).row();
           buttonCount++;
         }
@@ -702,7 +761,7 @@ export class NotificationDispatcher {
       poolSlug: firstEvent.poolSlug,
       blockId: "BUNDLE",
       eventType: "BUNDLE_EVENT",
-      text,
+      text: this.truncateToTelegramLimit(text),
       keyboard: buttonCount > 0 ? keyboard : undefined,
       isMuted: user.isMuted,
       priority: highestPriority,

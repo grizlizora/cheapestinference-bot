@@ -256,8 +256,8 @@ export function createSubscriptionsMenu(
               }
 
               const toast = active
-                ? c.t("subscriptions.toast_pool_on", { name: pool.name })
-                : c.t("subscriptions.toast_pool_off", { name: pool.name });
+                ? c.t("subscriptions.toast_pool_on", { pool: pool.name })
+                : c.t("subscriptions.toast_pool_off", { pool: pool.name });
               await c.answerCallbackQuery(toast);
               await safeEditMessageText(c, renderSubscriptionsText(c, subDao));
               try {
@@ -306,8 +306,8 @@ export function createSubscriptionsMenu(
                 }
 
                 const toast = active
-                  ? c.t("subscriptions.toast_slot_on", { name: blockTitle })
-                  : c.t("subscriptions.toast_slot_off", { name: blockTitle });
+                  ? c.t("subscriptions.toast_slot_on", { pool: pool.name, block: blockTitle })
+                  : c.t("subscriptions.toast_slot_off", { pool: pool.name, block: blockTitle });
                 await c.answerCallbackQuery(toast);
                 await safeEditMessageText(c, renderSubscriptionsText(c, subDao));
                 try {

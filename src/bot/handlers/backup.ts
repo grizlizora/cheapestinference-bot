@@ -27,8 +27,8 @@ export function createBackupHandler(
     if (!ctx.from) return;
 
     const isAdmin =
-      config.ADMIN_USER_IDS.length === 0 ||
-      config.ADMIN_USER_IDS.includes(ctx.from.id);
+      (config.ADMIN_USER_IDS.length > 0 && config.ADMIN_USER_IDS.includes(ctx.from.id)) ||
+      (config.NODE_ENV !== "production" && config.ADMIN_USER_IDS.length === 0);
 
     if (!isAdmin) {
       await ctx.reply(ctx.t("admin.unauthorized"));
@@ -52,6 +52,12 @@ export function createBackupHandler(
         try {
           fs.rmSync(tmpBackupPath, { force: true });
         } catch {}
+      }
+
+      // Pre-flight database integrity verification before taking snapshot
+      const integrityCheck = db.pragma("quick_check", { simple: true });
+      if (integrityCheck !== "ok") {
+        throw new Error(`Database integrity check failed: ${integrityCheck}`);
       }
 
       const startTime = Date.now();

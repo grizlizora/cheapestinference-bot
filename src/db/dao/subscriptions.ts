@@ -9,18 +9,11 @@ export class SubscriptionDAO {
   private stmtCountActiveSubs: Database.Statement;
   private stmtHasSub: Database.Statement;
 
-  constructor(public readonly db: Database.Database) {
-    try {
-      db.exec(`
-        ALTER TABLE subscriptions ADD COLUMN notify_on_models INTEGER NOT NULL DEFAULT 1;
-      `);
-    } catch {}
-    try {
-      db.exec(`
-        ALTER TABLE subscriptions ADD COLUMN notify_on_prices INTEGER NOT NULL DEFAULT 1;
-      `);
-    } catch {}
+  private txTogglePool: (userId: number, poolSlug: string, newState: boolean, blockIds: string[]) => void;
+  private txToggleBlock: (userId: number, poolSlug: string, blockId: string, newBlockState: boolean, allBlockIds: string[]) => void;
+  private txToggleGlobal: (userId: number, newState: boolean, pools: Array<{ slug: string; blocks: string[] }>) => void;
 
+  constructor(public readonly db: Database.Database) {
     this.stmtFindSubscribers = db.prepare(`
       SELECT DISTINCT u.telegram_id, u.language, u.is_muted
       FROM subscriptions s
@@ -66,6 +59,54 @@ export class SubscriptionDAO {
     this.stmtHasSub = db.prepare(`
       SELECT id FROM subscriptions WHERE user_id = ? AND pool_slug = ? AND block_id = ?
     `);
+
+    this.txTogglePool = this.db.transaction((userId: number, poolSlug: string, newState: boolean, blockIds: string[]) => {
+      this.setSubscription(userId, poolSlug, "ALL", newState);
+      for (const b of blockIds) {
+        this.setSubscription(userId, poolSlug, b, newState);
+      }
+      if (!newState) {
+        this.setSubscription(userId, "ALL", "ALL", false);
+      }
+    });
+
+    this.txToggleBlock = this.db.transaction((
+      userId: number,
+      poolSlug: string,
+      blockId: string,
+      newBlockState: boolean,
+      allBlockIds: string[]
+    ) => {
+      this.setSubscription(userId, poolSlug, blockId, newBlockState);
+
+      let allActive = true;
+      for (const b of allBlockIds) {
+        const sub = b === blockId ? newBlockState : this.hasSubscription(userId, poolSlug, b);
+        if (!sub) {
+          allActive = false;
+          break;
+        }
+      }
+
+      this.setSubscription(userId, poolSlug, "ALL", allActive);
+      if (!newBlockState) {
+        this.setSubscription(userId, "ALL", "ALL", false);
+      }
+    });
+
+    this.txToggleGlobal = this.db.transaction((
+      userId: number,
+      newState: boolean,
+      pools: Array<{ slug: string; blocks: string[] }>
+    ) => {
+      this.setSubscription(userId, "ALL", "ALL", newState);
+      for (const p of pools) {
+        this.setSubscription(userId, p.slug, "ALL", newState);
+        for (const b of p.blocks) {
+          this.setSubscription(userId, p.slug, b, newState);
+        }
+      }
+    });
   }
 
   findSubscribersForSlot(
@@ -76,6 +117,7 @@ export class SubscriptionDAO {
     return this.stmtFindSubscribers.all(
       poolSlug,
       poolSlug,
+      blockId,
       blockId,
       blockId,
       poolSlug,
@@ -122,18 +164,7 @@ export class SubscriptionDAO {
   togglePoolWithBlocks(userId: number, poolSlug: string, blockIds: string[] = ["asia", "europe", "americas"]): boolean {
     const isCurrentlySubscribed = this.hasSubscription(userId, poolSlug, "ALL");
     const newState = !isCurrentlySubscribed;
-
-    const tx = this.db.transaction(() => {
-      this.setSubscription(userId, poolSlug, "ALL", newState);
-      for (const b of blockIds) {
-        this.setSubscription(userId, poolSlug, b, newState);
-      }
-      if (!newState) {
-        this.setSubscription(userId, "ALL", "ALL", false);
-      }
-    });
-    tx();
-
+    this.txTogglePool(userId, poolSlug, newState, blockIds);
     return newState;
   }
 
@@ -150,27 +181,7 @@ export class SubscriptionDAO {
   ): boolean {
     const isCurrentlySubscribed = this.hasSubscription(userId, poolSlug, blockId);
     const newBlockState = !isCurrentlySubscribed;
-
-    const tx = this.db.transaction(() => {
-      this.setSubscription(userId, poolSlug, blockId, newBlockState);
-
-      // Check if all child blocks are now active
-      let allActive = true;
-      for (const b of allBlockIds) {
-        const sub = b === blockId ? newBlockState : this.hasSubscription(userId, poolSlug, b);
-        if (!sub) {
-          allActive = false;
-          break;
-        }
-      }
-
-      this.setSubscription(userId, poolSlug, "ALL", allActive);
-      if (!newBlockState) {
-        this.setSubscription(userId, "ALL", "ALL", false);
-      }
-    });
-    tx();
-
+    this.txToggleBlock(userId, poolSlug, blockId, newBlockState, allBlockIds);
     return newBlockState;
   }
 
@@ -184,18 +195,7 @@ export class SubscriptionDAO {
   ): boolean {
     const isGlobal = this.hasSubscription(userId, "ALL", "ALL");
     const newState = !isGlobal;
-
-    const tx = this.db.transaction(() => {
-      this.setSubscription(userId, "ALL", "ALL", newState);
-      for (const p of pools) {
-        this.setSubscription(userId, p.slug, "ALL", newState);
-        for (const b of p.blocks) {
-          this.setSubscription(userId, p.slug, b, newState);
-        }
-      }
-    });
-    tx();
-
+    this.txToggleGlobal(userId, newState, pools);
     return newState;
   }
 

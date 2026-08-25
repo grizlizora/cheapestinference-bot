@@ -38,17 +38,17 @@ export class RobustHttpClient {
   constructor(private readonly proxyPool: ProxyPool) {
     this.directAgent = new Agent({
       connect: {
-        timeout: 15_000,
+        timeout: 10_000,
         autoSelectFamily: true,
         keepAlive: true,
         keepAliveInitialDelay: 1000,
         noDelay: true,
       },
-      keepAliveTimeout: 120_000,
-      keepAliveMaxTimeout: 180_000,
-      keepAliveTimeoutThreshold: 2000,
+      keepAliveTimeout: 45_000, // Below Cloudflare 60s idle timeout
+      keepAliveMaxTimeout: 55_000,
+      keepAliveTimeoutThreshold: 1000,
       pipelining: 1,
-      connections: 32,
+      connections: 8, // Optimal memory & socket footprint
       strictContentLength: false,
     });
     this.proxyPool.setHttpClient(this);
@@ -153,19 +153,19 @@ export class RobustHttpClient {
             })
             .catch((err) => callback(err, null));
         },
-        keepAliveTimeout: 120_000,
-        keepAliveMaxTimeout: 180_000,
-        keepAliveTimeoutThreshold: 2000,
-        connections: 32,
+        keepAliveTimeout: 45_000,
+        keepAliveMaxTimeout: 55_000,
+        keepAliveTimeoutThreshold: 1000,
+        connections: 8,
         strictContentLength: false,
       });
     } else {
       dispatcher = new ProxyAgent({
         uri: proxyUrl,
         connect: { timeout: timeoutMs },
-        keepAliveTimeout: 120_000,
-        keepAliveMaxTimeout: 180_000,
-        connections: 32,
+        keepAliveTimeout: 45_000,
+        keepAliveMaxTimeout: 55_000,
+        connections: 8,
       });
     }
 

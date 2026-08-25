@@ -3,6 +3,13 @@ import { SlotHistoryDAO } from "../db/dao/slotHistory.js";
 import { CatalogHistoryDAO } from "../db/dao/catalogHistory.js";
 import { ModelSemanticMatcher } from "./modelSemanticMatcher.js";
 
+function parseCleanPrice(val: string | undefined | null): number {
+  if (!val) return 0;
+  const cleaned = String(val).replace(/[^0-9.-]/g, "");
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? 0 : num;
+}
+
 interface TrackedSlot {
   poolSlug: string;
   poolName: string;
@@ -278,14 +285,15 @@ export class SlotDiffEngine {
         }
 
         // 5. Regional Slot Price Changed (SLOT_PRICE_CHANGED)
-        const oldPriceNum = parseFloat(prevSlot.pricePerMonth || "0");
-        const newPriceNum = parseFloat(block.pricePerMonth || "0");
+        const oldPriceNum = parseCleanPrice(prevSlot.pricePerMonth);
+        const newPriceNum = parseCleanPrice(block.pricePerMonth);
         if (
           prevSlot.pricePerMonth !== block.pricePerMonth &&
           block.pricePerMonth !== "" &&
           block.pricePerMonth !== "0" &&
-          !isNaN(oldPriceNum) &&
-          !isNaN(newPriceNum)
+          oldPriceNum > 0 &&
+          newPriceNum > 0 &&
+          Math.abs(newPriceNum - oldPriceNum) > 0.01
         ) {
           const delta = newPriceNum - oldPriceNum;
           const pct = oldPriceNum > 0 ? (delta / oldPriceNum) * 100 : 0;
@@ -334,11 +342,11 @@ export class SlotDiffEngine {
     // Reconcile and prune vanished pools / slots with K=2 confirmation gate
     for (const [key, slot] of this.inMemorySlots.entries()) {
       if (!incomingSlotKeys.has(key)) {
-        if (slot.status === "available" || slot.status === "limited") {
-          const count = (this.pendingDisappearances.get(key) || 0) + 1;
-          this.pendingDisappearances.set(key, count);
+        const count = (this.pendingDisappearances.get(key) || 0) + 1;
+        this.pendingDisappearances.set(key, count);
 
-          if (count >= 2) {
+        if (count >= 2) {
+          if (slot.status === "available" || slot.status === "limited") {
             events.push({
               id: crypto.randomUUID(),
               type: "SLOT_DISAPPEARED",
@@ -353,10 +361,7 @@ export class SlotDiffEngine {
             });
 
             this.historyDao?.recordSlotClosed(slot.poolSlug, slot.block);
-            this.inMemorySlots.delete(key);
-            this.pendingDisappearances.delete(key);
           }
-        } else {
           this.inMemorySlots.delete(key);
           this.pendingDisappearances.delete(key);
         }

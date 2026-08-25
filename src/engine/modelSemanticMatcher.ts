@@ -46,23 +46,23 @@ export class ModelSemanticMatcher {
       if (m) {
         family = p.family;
         if (m[2]) {
-          versionStr = m[2].replace(/^[vkr]/i, "");
+          versionStr = m[2].replace(/^[vkr]/i, "").replace(/[-_]/g, ".");
         }
         break;
       }
     }
 
     if (!versionStr) {
-      const verMatch = clean.match(/(?:v|k|r)?(\d+)(?:\.(\d+))?/i);
+      const verMatch = clean.match(/(?:v|k|r)?(\d+)(?:[._-](\d+))?/i);
       if (verMatch) {
-        versionStr = verMatch[0].replace(/^[vkr]/i, "");
+        versionStr = verMatch[2] ? `${verMatch[1]}.${verMatch[2]}` : verMatch[1];
         versionMajor = parseInt(verMatch[1], 10) || 0;
-        versionMinor = parseInt(verMatch[2], 10) || 0;
+        versionMinor = parseInt(verMatch[2] || "0", 10) || 0;
       }
     } else {
       const parts = versionStr.split(".");
       versionMajor = parseInt(parts[0], 10) || 0;
-      versionMinor = parseInt(parts[1], 10) || 0;
+      versionMinor = parseInt(parts[1] || "0", 10) || 0;
     }
 
     let variant = "";

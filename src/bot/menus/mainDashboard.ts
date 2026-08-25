@@ -9,6 +9,7 @@ import { AvailabilityIntelligenceEngine } from "../../engine/intelligenceEngine.
 import { createLanguageMenu } from "./language.js";
 import { createPoolDetailMenu, renderPoolDetailText } from "./poolDetail.js";
 import { createSubscriptionsMenu, renderSubscriptionsText } from "./subscriptions.js";
+import { escapeHtml } from "../../i18n/index.js";
 
 /**
  * Safely edit message text ignoring Telegram 400 "message is not modified"
@@ -20,9 +21,6 @@ export async function safeEditMessageText(
 ) {
   try {
     const finalExtra = { ...extra };
-    if (!finalExtra.reply_markup && ctx.callbackQuery?.message?.reply_markup) {
-      finalExtra.reply_markup = ctx.callbackQuery.message.reply_markup;
-    }
     await ctx.editMessageText(text, finalExtra);
   } catch (err: any) {
     if (
@@ -179,9 +177,9 @@ export function renderDashboardText(
       }
 
       return ctx.t("menu.pool_summary_card", {
-        pool_name: p.name,
+        pool_name: escapeHtml(p.name),
         status_badge: statusBadge,
-        models: p.models.join(", ") || "Custom models",
+        models: escapeHtml(p.models.join(", ")) || "Custom models",
         min_price: p.min_price,
         available_count: p.available_count,
         total_blocks: p.total_blocks || 3,

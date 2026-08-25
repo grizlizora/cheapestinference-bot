@@ -3,6 +3,8 @@ import Database from "better-sqlite3";
 export class DatabaseMaintenanceManager {
   private stmtPruneLogsBatch: Database.Statement;
   private stmtPruneSlotHistoryBatch: Database.Statement;
+  private stmtPruneCatalogHistoryBatch: Database.Statement;
+  private stmtPruneSlotPriceHistoryBatch: Database.Statement;
 
   constructor(
     private readonly db: Database.Database,
@@ -13,6 +15,7 @@ export class DatabaseMaintenanceManager {
       WHERE id IN (
         SELECT id FROM notification_logs 
         WHERE sent_at < datetime('now', '-' || ? || ' days')
+        ORDER BY id ASC
         LIMIT 2000
       )
     `);
@@ -23,26 +26,49 @@ export class DatabaseMaintenanceManager {
         SELECT id FROM slot_lifecycle_history 
         WHERE closed_at IS NOT NULL 
           AND closed_at < datetime('now', '-90 days')
+        ORDER BY id ASC
+        LIMIT 2000
+      )
+    `);
+
+    this.stmtPruneCatalogHistoryBatch = db.prepare(`
+      DELETE FROM catalog_history 
+      WHERE id IN (
+        SELECT id FROM catalog_history 
+        WHERE detected_at < datetime('now', '-90 days')
+        ORDER BY id ASC
+        LIMIT 2000
+      )
+    `);
+
+    this.stmtPruneSlotPriceHistoryBatch = db.prepare(`
+      DELETE FROM slot_price_history 
+      WHERE id IN (
+        SELECT id FROM slot_price_history 
+        WHERE changed_at < datetime('now', '-90 days')
+        ORDER BY id ASC
         LIMIT 2000
       )
     `);
   }
 
   /**
-   * Non-blocking chunked rolling purge of logs and slot history older than retention window
+   * Non-blocking chunked rolling purge of logs and historical data
    */
   public pruneOldLogs(): { deletedCount: number; durationMs: number } {
     const start = Date.now();
     let totalDeleted = 0;
 
     // 1. Purge notification logs in chunks of 2,000
-    while (true) {
-      const result = this.stmtPruneLogsBatch.run(this.retentionDays);
-      totalDeleted += result.changes;
-      if (result.changes < 2000) break;
-    }
+    try {
+      while (true) {
+        const result = this.stmtPruneLogsBatch.run(this.retentionDays);
+        totalDeleted += result.changes;
+        if (result.changes < 2000) break;
+      }
+    } catch {}
 
-    // 2. Purge stale closed slot lifecycle history (>90 days) in chunks of 2,000
+    // 2. Purge stale closed slot lifecycle history (>90 days)
     try {
       while (true) {
         const histResult = this.stmtPruneSlotHistoryBatch.run();
@@ -51,14 +77,37 @@ export class DatabaseMaintenanceManager {
       }
     } catch {}
 
-    // 3. Reclaim freed pages back to OS
+    // 3. Purge catalog upgrades (>90 days)
     try {
-      this.db.pragma("incremental_vacuum(500)");
+      while (true) {
+        const catResult = this.stmtPruneCatalogHistoryBatch.run();
+        totalDeleted += catResult.changes;
+        if (catResult.changes < 2000) break;
+      }
     } catch {}
 
-    // 4. Truncate WAL file back to 0 bytes
+    // 4. Purge slot price history (>90 days)
     try {
-      this.db.pragma("wal_checkpoint(TRUNCATE)");
+      while (true) {
+        const priceResult = this.stmtPruneSlotPriceHistoryBatch.run();
+        totalDeleted += priceResult.changes;
+        if (priceResult.changes < 2000) break;
+      }
+    } catch {}
+
+    // 5. Reclaim freed pages back to OS
+    try {
+      this.db.pragma("incremental_vacuum(1000)");
+    } catch {}
+
+    // 6. Non-blocking WAL checkpoint (PASSIVE avoids acquiring EXCLUSIVE lock)
+    try {
+      this.db.pragma("wal_checkpoint(PASSIVE)");
+    } catch {}
+
+    // 7. Update SQLite query optimizer statistics
+    try {
+      this.db.pragma("optimize");
     } catch {}
 
     return {
@@ -76,7 +125,7 @@ export class DatabaseMaintenanceManager {
       try {
         const res = this.pruneOldLogs();
         if (res.deletedCount > 0) {
-          console.log(`🧹 [DB Maintenance] Initial startup prune: cleaned ${res.deletedCount} records.`);
+          console.log(`🧹 [DB Maintenance] Initial startup prune: cleaned ${res.deletedCount} records in ${res.durationMs}ms`);
         }
       } catch (err: any) {
         console.warn("⚠️ [DB Maintenance] Initial startup prune error:", err.message);
@@ -98,3 +147,4 @@ export class DatabaseMaintenanceManager {
     return timer;
   }
 }
+

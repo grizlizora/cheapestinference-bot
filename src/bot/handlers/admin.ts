@@ -87,8 +87,8 @@ export function createAdminHandler(
     if (!ctx.from) return;
 
     const isAdmin =
-      config.ADMIN_USER_IDS.length === 0 ||
-      config.ADMIN_USER_IDS.includes(ctx.from.id);
+      (config.ADMIN_USER_IDS.length > 0 && config.ADMIN_USER_IDS.includes(ctx.from.id)) ||
+      (config.NODE_ENV !== "production" && config.ADMIN_USER_IDS.length === 0);
 
     if (!isAdmin) {
       await ctx.reply(ctx.t("admin.unauthorized"));

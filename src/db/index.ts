@@ -40,8 +40,9 @@ export function getDatabase(): Database.Database {
 }
 
 function initSchema(db: Database.Database): void {
-  // Embedded schema definitions
+  // Embedded authoritative schema definitions
   db.exec(`
+    -- 1. Users Table
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       telegram_id INTEGER NOT NULL UNIQUE,
@@ -60,9 +61,9 @@ function initSchema(db: Database.Database): void {
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
-    CREATE INDEX IF NOT EXISTS idx_users_tgid ON users(telegram_id);
     CREATE INDEX IF NOT EXISTS idx_users_active ON users(is_active);
 
+    -- 2. Subscriptions Table
     CREATE TABLE IF NOT EXISTS subscriptions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
@@ -78,8 +79,8 @@ function initSchema(db: Database.Database): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_subs_covering ON subscriptions(pool_slug, block_id, notify_on_available, notify_on_sold_out, user_id);
-    CREATE INDEX IF NOT EXISTS idx_subs_user ON subscriptions(user_id);
 
+    -- 3. Pool State Snapshot Cache
     CREATE TABLE IF NOT EXISTS pool_state (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       pool_slug TEXT NOT NULL,
@@ -97,8 +98,7 @@ function initSchema(db: Database.Database): void {
       UNIQUE(pool_slug, block_id)
     );
 
-    CREATE INDEX IF NOT EXISTS idx_pool_state_slug ON pool_state(pool_slug, block_id);
-
+    -- 4. Slot Lifecycle History & Analytics
     CREATE TABLE IF NOT EXISTS slot_lifecycle_history (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       pool_slug TEXT NOT NULL,
@@ -111,8 +111,43 @@ function initSchema(db: Database.Database): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_slot_history_active ON slot_lifecycle_history(pool_slug, block_id, closed_at);
-    CREATE INDEX IF NOT EXISTS idx_slot_history_analytics ON slot_lifecycle_history(pool_slug, block_id, duration_seconds) WHERE duration_seconds IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_slot_history_analytics_covering ON slot_lifecycle_history(pool_slug, block_id, duration_seconds, opened_at) WHERE duration_seconds IS NOT NULL;
 
+    -- 5. Catalog & Model Upgrade History
+    CREATE TABLE IF NOT EXISTS catalog_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pool_slug TEXT NOT NULL,
+      pool_name TEXT NOT NULL,
+      event_type TEXT NOT NULL,
+      added_models_json TEXT NOT NULL DEFAULT '[]',
+      upgraded_models_json TEXT NOT NULL DEFAULT '[]',
+      removed_models_json TEXT NOT NULL DEFAULT '[]',
+      all_models_json TEXT NOT NULL,
+      previous_min_price TEXT,
+      new_min_price TEXT,
+      metadata_json TEXT DEFAULT '{}',
+      detected_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_catalog_hist_retention ON catalog_history(detected_at);
+    CREATE INDEX IF NOT EXISTS idx_catalog_hist_slug ON catalog_history(pool_slug, detected_at);
+
+    -- 6. Slot Price Changes History
+    CREATE TABLE IF NOT EXISTS slot_price_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pool_slug TEXT NOT NULL,
+      block_id TEXT NOT NULL,
+      old_price TEXT NOT NULL,
+      new_price TEXT NOT NULL,
+      price_delta REAL NOT NULL,
+      percent_delta REAL NOT NULL,
+      changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_slot_price_hist_retention ON slot_price_history(changed_at);
+    CREATE INDEX IF NOT EXISTS idx_slot_price_hist ON slot_price_history(pool_slug, block_id, changed_at);
+
+    -- 7. Notification Logs Table
     CREATE TABLE IF NOT EXISTS notification_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
@@ -130,6 +165,9 @@ function initSchema(db: Database.Database): void {
 
 export function closeDatabase(): void {
   if (dbInstance) {
+    try {
+      dbInstance.pragma("optimize;");
+    } catch {}
     dbInstance.close();
     dbInstance = null;
   }

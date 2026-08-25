@@ -62,8 +62,8 @@ export function createPoolDetailMenu(
           }
 
           const toast = active
-            ? c.t("subscriptions.toast_pool_on", { name: slug.toUpperCase() })
-            : c.t("subscriptions.toast_pool_off", { name: slug.toUpperCase() });
+            ? c.t("subscriptions.toast_pool_on", { pool: slug.toUpperCase() })
+            : c.t("subscriptions.toast_pool_off", { pool: slug.toUpperCase() });
           await c.answerCallbackQuery(toast);
           await safeEditMessageText(c, renderPoolDetailText(c, poolStateDao, historyDao));
           try {

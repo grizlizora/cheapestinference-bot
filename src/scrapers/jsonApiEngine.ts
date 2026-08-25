@@ -48,9 +48,31 @@ export class JsonApiEngine implements IFetcherEngine {
       throw new Error("Invalid payload format from JSON API");
     }
 
+    const normalizedPools = poolsData.map((rawPool: any) => ({
+      id: String(rawPool.id || rawPool.slug),
+      slug: String(rawPool.slug),
+      modelId: String(rawPool.modelId || rawPool.slug),
+      modelName: String(rawPool.modelName || rawPool.name || rawPool.slug),
+      models: Array.isArray(rawPool.models) ? rawPool.models.map(String) : [],
+      description: String(rawPool.description || ""),
+      status: String(rawPool.status || "active"),
+      minPricePerDay: String(rawPool.minPricePerDay || "0"),
+      annualDiscount: typeof rawPool.annualDiscount === "number" ? rawPool.annualDiscount : 0.15,
+      blocks: Array.isArray(rawPool.blocks)
+        ? rawPool.blocks.map((b: any) => ({
+            block: String(b.block),
+            hoursUtc: String(b.hoursUtc || ""),
+            pricePerMonth: String(b.pricePerMonth || "0"),
+            status: String(b.status || "limited"),
+          }))
+        : [],
+      infraSpec: rawPool.infraSpec ? String(rawPool.infraSpec) : undefined,
+      manualProvisioning: Boolean(rawPool.manualProvisioning),
+    }));
+
     const snapshot: PoolsSnapshot = {
       success: true,
-      data: poolsData,
+      data: normalizedPools,
     };
 
     return {

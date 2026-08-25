@@ -51,4 +51,4 @@ ENV NODE_ENV=production \
 VOLUME ["/app/data"]
 EXPOSE 7860
 
-ENTRYPOINT ["/sbin/tini", "--", "/entrypoint.sh"]
+ENTRYPOINT ["/sbin/tini", "-g", "--", "/entrypoint.sh"]

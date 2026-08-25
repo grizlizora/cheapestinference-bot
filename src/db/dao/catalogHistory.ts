@@ -9,38 +9,6 @@ export class CatalogHistoryDAO {
   private stmtInsertSlotPriceHistory: Database.Statement;
 
   constructor(private db: Database.Database) {
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS catalog_history (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        pool_slug TEXT NOT NULL,
-        pool_name TEXT NOT NULL,
-        event_type TEXT NOT NULL,
-        added_models_json TEXT NOT NULL DEFAULT '[]',
-        upgraded_models_json TEXT NOT NULL DEFAULT '[]',
-        removed_models_json TEXT NOT NULL DEFAULT '[]',
-        all_models_json TEXT NOT NULL,
-        previous_min_price TEXT,
-        new_min_price TEXT,
-        metadata_json TEXT DEFAULT '{}',
-        detected_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_catalog_hist_slug ON catalog_history(pool_slug, detected_at);
-
-      CREATE TABLE IF NOT EXISTS slot_price_history (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        pool_slug TEXT NOT NULL,
-        block_id TEXT NOT NULL,
-        old_price TEXT NOT NULL,
-        new_price TEXT NOT NULL,
-        price_delta REAL NOT NULL,
-        percent_delta REAL NOT NULL,
-        changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_slot_price_hist ON slot_price_history(pool_slug, block_id, changed_at);
-    `);
-
     this.stmtInsertModelUpgrade = db.prepare(`
       INSERT INTO catalog_history (
         pool_slug, pool_name, event_type, added_models_json, 

@@ -29,22 +29,6 @@ export class SlotHistoryDAO {
   private txRecordOpened: (poolSlug: string, blockId: string, status: string, price: string) => void;
 
   constructor(private db: Database.Database) {
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS slot_lifecycle_history (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        pool_slug TEXT NOT NULL,
-        block_id TEXT NOT NULL,
-        opened_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        closed_at DATETIME,
-        duration_seconds INTEGER,
-        initial_status TEXT NOT NULL,
-        price_month TEXT NOT NULL
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_slot_history_lookup 
-      ON slot_lifecycle_history(pool_slug, block_id, opened_at);
-    `);
-
     this.stmtOpenSlot = db.prepare(`
       INSERT INTO slot_lifecycle_history (pool_slug, block_id, initial_status, price_month, opened_at)
       VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)

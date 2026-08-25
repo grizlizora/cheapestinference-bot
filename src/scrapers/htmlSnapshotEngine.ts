@@ -151,7 +151,16 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
         }
       } catch {
         const raw = match[2].slice(1, -1);
-        combinedFlight += raw.replace(/\\"/g, '"').replace(/\\\\/g, "\\").replace(/\\n/g, "\n");
+        combinedFlight += raw.replace(/\\([\\"/nrtbf])/g, (_, char) => {
+          switch (char) {
+            case "n": return "\n";
+            case "r": return "\r";
+            case "t": return "\t";
+            case '"': return '"';
+            case "\\": return "\\";
+            default: return char;
+          }
+        });
       }
     }
 
@@ -162,36 +171,45 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
     let slugMatch: RegExpExecArray | null;
 
     while ((slugMatch = slugRegex.exec(combinedFlight)) !== null) {
-      const startIndex = combinedFlight.lastIndexOf("{", slugMatch.index);
-      if (startIndex === -1) continue;
+      let candidateIndex = slugMatch.index;
+      let foundValidPool = false;
 
-      const candidateJson = this.extractBalancedJsonObject(combinedFlight, startIndex);
-      if (!candidateJson) continue;
+      while (candidateIndex > 0 && !foundValidPool) {
+        const braceIndex = combinedFlight.lastIndexOf("{", candidateIndex - 1);
+        if (braceIndex === -1) break;
+        candidateIndex = braceIndex;
 
-      try {
-        const parsed = JSON.parse(candidateJson);
-        if (parsed.slug && Array.isArray(parsed.blocks) && parsed.blocks.length > 0) {
-          if (!pools.some((p) => p.slug === parsed.slug)) {
-            pools.push({
-              id: parsed.id || parsed.slug,
-              slug: parsed.slug,
-              modelId: parsed.modelId || parsed.slug,
-              modelName: parsed.modelName || parsed.name || parsed.slug,
-              models: Array.isArray(parsed.models) ? parsed.models : [],
-              description: parsed.description || "",
-              status: parsed.status || "active",
-              minPricePerDay: String(parsed.minPricePerDay || "0"),
-              annualDiscount: parsed.annualDiscount || 0.15,
-              blocks: parsed.blocks.map((b: any) => ({
-                block: b.block,
-                hoursUtc: b.hoursUtc || "",
-                pricePerMonth: String(b.pricePerMonth || "0"),
-                status: b.status || "limited",
-              })),
-            });
+        const candidateJson = this.extractBalancedJsonObject(combinedFlight, braceIndex);
+        if (!candidateJson) continue;
+
+        try {
+          const parsed = JSON.parse(candidateJson);
+          if (parsed.slug && Array.isArray(parsed.blocks) && parsed.blocks.length > 0) {
+            if (!pools.some((p) => p.slug === parsed.slug)) {
+              pools.push({
+                id: String(parsed.id || parsed.slug),
+                slug: String(parsed.slug),
+                modelId: String(parsed.modelId || parsed.slug),
+                modelName: String(parsed.modelName || parsed.name || parsed.slug),
+                models: Array.isArray(parsed.models) ? parsed.models.map(String) : [],
+                description: String(parsed.description || ""),
+                status: String(parsed.status || "active"),
+                minPricePerDay: String(parsed.minPricePerDay || "0"),
+                annualDiscount: typeof parsed.annualDiscount === "number" ? parsed.annualDiscount : 0.15,
+                blocks: parsed.blocks.map((b: any) => ({
+                  block: String(b.block),
+                  hoursUtc: String(b.hoursUtc || ""),
+                  pricePerMonth: String(b.pricePerMonth || "0"),
+                  status: String(b.status || "limited"),
+                })),
+                infraSpec: parsed.infraSpec ? String(parsed.infraSpec) : undefined,
+                manualProvisioning: Boolean(parsed.manualProvisioning),
+              });
+              foundValidPool = true;
+            }
           }
-        }
-      } catch {}
+        } catch {}
+      }
     }
 
     return pools.length > 0 ? pools : null;

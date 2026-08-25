@@ -17,6 +17,8 @@ export interface PackedUserProfile {
 export class SubscriberInvertedIndex {
   // Composite Key: "pool_slug:block_id:event_type" -> Set of User Primary Keys (id)
   private index = new Map<string, Set<number>>();
+  // poolSlug -> Set of known blockIds
+  private poolBlocks = new Map<string, Set<string>>();
   // User Primary Key (id) -> Packed Profile
   private profiles = new Map<number, PackedUserProfile>();
   // Telegram ID -> User Primary Key (id)
@@ -125,6 +127,16 @@ export class SubscriberInvertedIndex {
       this.index.set(key, set);
     }
     set.add(userId);
+
+    const parts = key.split(":");
+    if (parts.length >= 2 && parts[0] !== "ALL" && parts[1] !== "ALL") {
+      let blocks = this.poolBlocks.get(parts[0]);
+      if (!blocks) {
+        blocks = new Set<string>();
+        this.poolBlocks.set(parts[0], blocks);
+      }
+      blocks.add(parts[1]);
+    }
   }
 
   /**
@@ -146,17 +158,15 @@ export class SubscriberInvertedIndex {
     if (poolSet) for (const id of poolSet) matchedUserIds.add(id);
 
     // 3. Exact Block: 'poolSlug:blockId'
-    const blockSet = this.index.get(`${poolSlug}:${blockId}:${eventType}`);
-    if (blockSet) for (const id of blockSet) matchedUserIds.add(id);
-
-    // 4. If event is pool-wide (e.g. MODEL_UPGRADE_EVENT), notify all regional subscribers of that pool
-    if (blockId === "ALL") {
-      const prefix = `${poolSlug}:`;
-      const suffix = `:${eventType}`;
-      for (const [key, set] of this.index.entries()) {
-        if (key.startsWith(prefix) && key.endsWith(suffix) && !key.includes(":ALL:")) {
-          for (const id of set) matchedUserIds.add(id);
-        }
+    if (blockId !== "ALL") {
+      const blockSet = this.index.get(`${poolSlug}:${blockId}:${eventType}`);
+      if (blockSet) for (const id of blockSet) matchedUserIds.add(id);
+    } else {
+      // 4. Pool-wide event: query all known regional blocks in O(1)
+      const blocks = this.poolBlocks.get(poolSlug) || new Set(["asia", "europe", "americas"]);
+      for (const b of blocks) {
+        const regionalSet = this.index.get(`${poolSlug}:${b}:${eventType}`);
+        if (regionalSet) for (const id of regionalSet) matchedUserIds.add(id);
       }
     }
 

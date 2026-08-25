@@ -46,7 +46,7 @@ export class AvailabilityIntelligenceEngine {
     // rawSiteStatus === "available"
     if (analytics.demandCategory === "hot" && analytics.avgDurationFormatted) {
       return {
-        badge: `${translate(lang, "common.status_limited")} (🔥 ${analytics.avgDurationFormatted})`,
+        badge: `${translate(lang, "common.status_available")} (🔥 ${analytics.avgDurationFormatted})`,
         demandTag: translate(lang, "intelligence.tag_hot_slot"),
         isHot: true,
         predictionTip: translate(lang, "intelligence.tip_hot_historical", { duration: analytics.avgDurationFormatted }),
