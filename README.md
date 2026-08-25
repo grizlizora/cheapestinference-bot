@@ -59,7 +59,7 @@ cp .env.example .env
 ```
 Edit `.env`:
 ```env
-BOT_TOKEN=8965655089:AAEmKEgUPnqSMe5ijwajjHMkwPClXF3wbB8
+BOT_TOKEN=1234567890:ABCdefGHIJklmNoPQRsTUVwxyZ_example
 ADMIN_USER_IDS=123456789
 DB_PATH=./data/bot.db
 PORT=7860
@@ -96,7 +96,7 @@ docker compose logs -f
 2. Click **New Space** -> Choose **Docker** SDK (Blank) -> Set visibility to **Public** (required for free 24/7 tier).
 3. Push this repository to your Space repository.
 4. In your Space **Settings** -> **Variables and secrets**, add:
-   - `BOT_TOKEN`: `8965655089:AAEmKEgUPnqSMe5ijwajjHMkwPClXF3wbB8`
+   - `BOT_TOKEN`: `<your_bot_token_from_botfather>`
    - `TOR_ENABLED`: `true`
 5. Set up a free monitor on [UptimeRobot](https://uptimerobot.com) or [Cron-job.org](https://cron-job.org) to ping your Space URL:
    `https://<your-username>-<your-space-name>.hf.space/health` every 10 minutes.
@@ -109,7 +109,7 @@ docker compose logs -f
 2. Click **New +** -> **Web Service** -> Connect your Git repository.
 3. Select **Docker** runtime.
 4. Set Environment Variables:
-   - `BOT_TOKEN`: `8965655089:AAEmKEgUPnqSMe5ijwajjHMkwPClXF3wbB8`
+   - `BOT_TOKEN`: `<your_bot_token_from_botfather>`
    - `TOR_ENABLED`: `true`
    - `PORT`: `10000`
 5. Add a free HTTP monitor on [UptimeRobot](https://uptimerobot.com) to ping `https://<your-app>.onrender.com/health` every 10 minutes to prevent the free container from sleeping.
