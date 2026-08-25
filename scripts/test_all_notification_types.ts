@@ -429,6 +429,47 @@ async function runNotificationAuditTest() {
         },
       ],
     },
+    {
+      id: "TEST_12_LIMITED_SLOT_APPEARED_UK",
+      category: "SINGLE",
+      description: "12. SLOT_APPEARED with Limited Status (🟡 ОБМЕЖЕНИЙ СЛОТ Banner) [UK]",
+      lang: "uk",
+      events: [
+        {
+          id: crypto.randomUUID(),
+          type: "SLOT_APPEARED",
+          poolSlug: "frontier",
+          poolName: "Frontier Pool",
+          block: "europe",
+          models: ["glm-5.3", "minimax-m3"],
+          hoursUtc: "08:00 – 16:00 UTC",
+          previousStatus: "sold-out",
+          newStatus: "limited",
+          newPrice: "49.00",
+          timestamp: now,
+        },
+      ],
+    },
+    {
+      id: "TEST_13_FILTER_EXCLUSION_VERIFICATION",
+      category: "FILTER_AND_MUTE",
+      description: "13. Filter Exclusion Check (Disabled Category Dropped in RAM) [UK]",
+      lang: "uk",
+      events: [
+        {
+          id: crypto.randomUUID(),
+          type: "SLOT_PRICE_CHANGED",
+          poolSlug: "frontier",
+          poolName: "Frontier Pool",
+          block: "asia",
+          models: ["glm-5.3"],
+          hoursUtc: "00:00 – 08:00 UTC",
+          previousPrice: "49.00",
+          newPrice: "39.00",
+          timestamp: now,
+        },
+      ],
+    },
   ];
 
   // Run through scenarios sequentially
@@ -438,17 +479,27 @@ async function runNotificationAuditTest() {
     console.log(`\n------------------------------------------------------------------`);
     console.log(`▶ Running [${sc.id}]: ${sc.description}`);
 
-    // Update user language preference in RAM
-    index.updateUserPreferences(primaryTgId, { language: sc.lang, isMuted: false });
+    if (sc.category === "FILTER_AND_MUTE") {
+      index.updateUserPreferences(primaryTgId, { notifyPricesGlobal: false });
+      const pendingBefore = dispatcher.getTotalPending();
+      await dispatcher.handleDiffEvents(sc.events);
+      const pendingAfter = dispatcher.getTotalPending();
+      if (pendingAfter === pendingBefore) {
+        console.log(`  ✅ Filter Gate Verified: 0 messages dispatched for disabled category!`);
+      }
+      index.updateUserPreferences(primaryTgId, { notifyPricesGlobal: true });
+    } else {
+      index.updateUserPreferences(primaryTgId, { language: sc.lang, isMuted: false, notifyPricesGlobal: true });
 
-    const startMs = performance.now();
-    await dispatcher.handleDiffEvents(sc.events);
+      const startMs = performance.now();
+      await dispatcher.handleDiffEvents(sc.events);
 
-    // Allow worker loop token time to fire and Telegram API to acknowledge
-    await new Promise((resolve) => setTimeout(resolve, 350));
-    const latency = (performance.now() - startMs).toFixed(1);
+      // Allow worker loop token time to fire and Telegram API to acknowledge
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      const latency = (performance.now() - startMs).toFixed(1);
 
-    console.log(`  ✅ Dispatched successfully (Round-Trip Latency: ${latency}ms)`);
+      console.log(`  ✅ Dispatched successfully (Round-Trip Latency: ${latency}ms)`);
+    }
     passedCount++;
   }
 

@@ -8,7 +8,7 @@ import { SubscriberInvertedIndex } from "../src/bot/notifier/subscriberIndex.js"
 import { NotificationDispatcher, OutgoingAlertMessage } from "../src/bot/notifier/dispatcher.js";
 import { DiffEvent } from "../src/types/domain.js";
 
-describe("NotificationDispatcher Event Bundling", () => {
+describe("NotificationDispatcher Modern Alert & Bundling Test Suite", () => {
   let db: Database.Database;
   let userDao: UserDAO;
   let subDao: SubscriptionDAO;
@@ -81,7 +81,7 @@ describe("NotificationDispatcher Event Bundling", () => {
     index = new SubscriberInvertedIndex(db);
   });
 
-  it("should bundle multiple simultaneous events into 1 single notification per user", async () => {
+  it("should bundle multiple simultaneous events into 1 single notification per user with action buttons", async () => {
     const mockBot: any = {
       api: {
         sendMessage: async () => ({ message_id: 1 }),
@@ -89,8 +89,6 @@ describe("NotificationDispatcher Event Bundling", () => {
     };
 
     const dispatcher = new NotificationDispatcher(mockBot, userDao, logDao, historyDao, index);
-
-    // Override enqueue to capture output
     dispatcher.enqueue = (msg) => {
       enqueuedMessages.push(msg);
     };
@@ -104,7 +102,7 @@ describe("NotificationDispatcher Event Bundling", () => {
         block: "europe",
         models: ["Kimi K3", "Qwen3.8 Max"],
         hoursUtc: "08:00 – 16:00 UTC",
-        newPrice: "149.00",
+        newPrice: "149",
         timestamp: Date.now(),
       },
       {
@@ -115,21 +113,106 @@ describe("NotificationDispatcher Event Bundling", () => {
         block: "asia",
         models: ["GLM 5.3", "MiniMax M3"],
         hoursUtc: "00:00 – 08:00 UTC",
-        newPrice: "49.00",
+        newPrice: "49",
         timestamp: Date.now(),
       },
     ];
 
     await dispatcher.handleDiffEvents(simultaneousEvents);
 
-    // Should generate EXACTLY 1 bundled message instead of 2 separate messages!
     expect(enqueuedMessages).toHaveLength(1);
     const bundle = enqueuedMessages[0];
     expect(bundle.telegramId).toBe(1001);
     expect(bundle.eventType).toBe("BUNDLE_EVENT");
     expect(bundle.text).toContain("Оновлення слотів (2)");
-    expect(bundle.text).toContain("Flagship Pool");
-    expect(bundle.text).toContain("Frontier Pool");
+    expect(bundle.text).toContain("Flagship Pool • Європа");
+    expect(bundle.text).toContain("Frontier Pool • Азія");
+    expect(bundle.text).toContain("<code>$149/міс</code>");
+    expect(bundle.text).toContain("<code>$49/міс</code>");
     expect(bundle.priority).toBe("P1");
+    expect(bundle.keyboard).toBeDefined();
+  });
+
+  it("should format single SLOT_APPEARED with high-contrast banner and localized button", async () => {
+    const mockBot: any = {
+      api: {
+        sendMessage: async () => ({ message_id: 1 }),
+      },
+    };
+
+    const dispatcher = new NotificationDispatcher(mockBot, userDao, logDao, historyDao, index);
+    dispatcher.enqueue = (msg) => {
+      enqueuedMessages.push(msg);
+    };
+
+    const singleEvent: DiffEvent[] = [
+      {
+        id: "e1",
+        type: "SLOT_APPEARED",
+        poolSlug: "frontier",
+        poolName: "Frontier Pool",
+        block: "europe",
+        models: ["deepseek-r1", "glm-5.3"],
+        hoursUtc: "08:00 – 16:00 UTC",
+        newPrice: "149",
+        newStatus: "available",
+        timestamp: Date.now(),
+      },
+    ];
+
+    await dispatcher.handleDiffEvents(singleEvent);
+
+    expect(enqueuedMessages).toHaveLength(1);
+    const alert = enqueuedMessages[0];
+    expect(alert.text).toContain("🟢 <b>ВІЛЬНИЙ СЛОТ • Frontier Pool</b>");
+    expect(alert.text).toContain("━━━━━━━━━━━━━━━━━━━━━━━━");
+    expect(alert.text).toContain("<code>(08:00 – 16:00 UTC)</code>");
+    expect(alert.text).toContain("<code>deepseek-r1</code>");
+    expect(alert.text).toContain("<code>$149/міс</code>");
+  });
+
+  it("should format price discounts with green badge and localized sign", async () => {
+    const mockBot: any = {
+      api: {
+        sendMessage: async () => ({ message_id: 1 }),
+      },
+    };
+
+    const dispatcher = new NotificationDispatcher(mockBot, userDao, logDao, historyDao, index);
+    dispatcher.enqueue = (msg) => {
+      enqueuedMessages.push(msg);
+    };
+
+    const priceDiscountEvent: DiffEvent[] = [
+      {
+        id: "p1",
+        type: "SLOT_PRICE_CHANGED",
+        poolSlug: "core",
+        poolName: "Core Pool",
+        block: "asia",
+        models: ["deepseek-v4"],
+        hoursUtc: "00:00 – 08:00 UTC",
+        previousPrice: "39",
+        newPrice: "29",
+        timestamp: Date.now(),
+        slotPrice: {
+          block: "asia",
+          hoursUtc: "00:00 – 08:00 UTC",
+          previousPrice: "39",
+          newPrice: "29",
+          priceDelta: -10,
+          percentageDelta: -25.6,
+          isDiscount: true,
+        },
+      },
+    ];
+
+    await dispatcher.handleDiffEvents(priceDiscountEvent);
+
+    expect(enqueuedMessages).toHaveLength(1);
+    const alert = enqueuedMessages[0];
+    expect(alert.text).toContain("ЗМІНА ЦІНИ СЛОТА • Core Pool");
+    expect(alert.text).toContain("<s>$39</s> ➔ <b>$29/міс</b>");
+    expect(alert.text).toContain("🟢 <b>Знижка: -$10/міс (-25.6%) 🔥</b>");
   });
 });
