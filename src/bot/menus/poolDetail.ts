@@ -67,6 +67,7 @@ export function createPoolDetailMenu(
     .back(
       (ctx) => ctx.t("common.back"),
       async (ctx) => {
+        await ctx.answerCallbackQuery();
         await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao));
       }
     );

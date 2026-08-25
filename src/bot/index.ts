@@ -1,6 +1,5 @@
 import { Bot, session, InlineKeyboard } from "grammy";
 import { autoRetry } from "@grammyjs/auto-retry";
-import Database from "better-sqlite3";
 import { BotContext, SessionData } from "../types/context.js";
 import { UserDAO } from "../db/dao/users.js";
 import { SubscriptionDAO } from "../db/dao/subscriptions.js";
@@ -9,111 +8,127 @@ import { NotificationLogDAO } from "../db/dao/notificationLogs.js";
 import { SlotHistoryDAO } from "../db/dao/slotHistory.js";
 import { ScraperOrchestrator } from "../engine/scraperOrchestrator.js";
 import { ProxyPool } from "../proxy/proxyPool.js";
-import { NotificationDispatcher } from "./notifier/dispatcher.js";
-import { createMainMenu, renderDashboardText } from "./menus/mainDashboard.js";
-import { renderSubscriptionsText } from "./menus/subscriptions.js";
+import { createMainMenuHierarchy, renderDashboardText } from "./menus/mainDashboard.js";
 import { createStartHandler } from "./handlers/start.js";
-import { createLanguageHandler } from "./handlers/language.js";
 import { createAdminHandler } from "./handlers/admin.js";
-import { translate, SupportedLanguage } from "../i18n/index.js";
+import { NotificationDispatcher } from "./notifier/dispatcher.js";
 import { config } from "../config/env.js";
+import { translate, SupportedLanguage } from "../i18n/index.js";
 
 export function createTelegramBot(
   token: string,
-  db: Database.Database,
+  userDao: UserDAO,
+  subDao: SubscriptionDAO,
+  poolStateDao: PoolStateDAO,
+  logDao: NotificationLogDAO,
   scraper: ScraperOrchestrator,
   proxyPool: ProxyPool,
   historyDao?: SlotHistoryDAO
-) {
-  const userDao = new UserDAO(db);
-  const subDao = new SubscriptionDAO(db);
-  const poolStateDao = new PoolStateDAO(db);
-  const logDao = new NotificationLogDAO(db);
-  const resolvedHistoryDao = historyDao || new SlotHistoryDAO(db);
-
+): { bot: Bot<BotContext>; dispatcher: NotificationDispatcher } {
   const bot = new Bot<BotContext>(token);
+  const resolvedHistoryDao = historyDao;
 
-  // 1. Auto-retry for 429 and transient errors
-  bot.api.config.use(autoRetry());
+  // 1. Error Boundary
+  bot.catch((err) => {
+    const ctx = err.ctx;
+    console.error(
+      `❌ [Telegram Bot Error] Error while handling update ${ctx.update.update_id}:`,
+      err.error
+    );
+  });
 
-  // 2. Session middleware
+  // 2. Auto-retry plugin for flood control
+  bot.api.config.use(autoRetry({ maxRetryAttempts: 3, maxDelaySeconds: 10 }));
+
+  // 3. In-memory session middleware
   bot.use(
     session({
       initial: (): SessionData => ({}),
     })
   );
 
-  // 3. User Authentication & i18n Injection Middleware
+  // 4. User context loader & i18n helper
   bot.use(async (ctx, next) => {
-    if (!ctx.from) return next();
+    if (ctx.from) {
+      let user = userDao.getByTelegramId(ctx.from.id);
+      if (!user) {
+        const lang: SupportedLanguage = ["uk", "ru", "en"].includes(ctx.from.language_code || "")
+          ? (ctx.from.language_code as SupportedLanguage)
+          : "uk";
+        user = userDao.upsertUser({
+          telegram_id: ctx.from.id,
+          username: ctx.from.username ?? null,
+          first_name: ctx.from.first_name,
+          language: lang,
+        });
+      } else if (user.is_active === 0) {
+        userDao.reactivateUser(ctx.from.id);
+        user.is_active = 1;
+      }
 
-    let user = userDao.getByTelegramId(ctx.from.id);
-    const isNew = !user;
-
-    if (!user) {
-      const detectedLang: SupportedLanguage = ctx.from.language_code?.startsWith("uk")
-        ? "uk"
-        : ctx.from.language_code?.startsWith("ru")
-        ? "ru"
-        : "uk";
-
-      user = userDao.upsertUser({
-        telegram_id: ctx.from.id,
-        username: ctx.from.username || null,
-        first_name: ctx.from.first_name || "User",
-        language: detectedLang,
-      });
+      ctx.user = user;
+      ctx.lang = (user.language as SupportedLanguage) || "uk";
+    } else {
+      ctx.lang = "uk";
     }
 
-    ctx.user = user;
-    ctx.lang = user.language || "uk";
-    ctx.isNewUser = isNew;
     ctx.t = (key: string, params?: Record<string, string | number>) =>
       translate(ctx.lang, key, params);
 
     await next();
   });
 
-  // 4. Register Menus
-  const { mainDashboardMenu, languageMenu, subscriptionsMenu } = createMainMenu(
-    poolStateDao,
+  // 5. Shared Notification Dispatcher
+  const dispatcher = new NotificationDispatcher(
+    bot,
     subDao,
     userDao,
+    logDao,
+    resolvedHistoryDao
+  );
+
+  // 6. Navigation Menus
+  const { mainDashboardMenu } = createMainMenuHierarchy(
+    poolStateDao,
+    userDao,
+    subDao,
     resolvedHistoryDao
   );
   bot.use(mainDashboardMenu);
 
-  // 5. Register Commands
-  bot.command(
-    "start",
-    createStartHandler(userDao, poolStateDao, languageMenu, mainDashboardMenu, resolvedHistoryDao)
-  );
+  // 7. Command Handlers
+  bot.command("start", createStartHandler(userDao, poolStateDao, mainDashboardMenu, resolvedHistoryDao));
 
-  bot.command("menu", async (ctx) => {
-    await ctx.reply(renderDashboardText(ctx, poolStateDao, resolvedHistoryDao), {
+  bot.command(["menu", "dashboard"], async (ctx) => {
+    const text = renderDashboardText(ctx, poolStateDao, resolvedHistoryDao);
+    await ctx.reply(text, {
+      parse_mode: "HTML",
       reply_markup: mainDashboardMenu,
-      parse_mode: "HTML",
       link_preview_options: { is_disabled: true },
     });
   });
 
-  bot.command("dashboard", async (ctx) => {
-    await ctx.reply(renderDashboardText(ctx, poolStateDao, resolvedHistoryDao), {
+  bot.command(["alerts", "subscriptions"], async (ctx) => {
+    await ctx.reply(ctx.t("subscriptions.title", {
+      global_status: subDao.hasSubscription(ctx.user.id, "ALL", "ALL")
+        ? ctx.t("subscriptions.global_enabled")
+        : ctx.t("subscriptions.global_disabled"),
+      sound_status:
+        ctx.user.is_muted === 1
+          ? ctx.t("subscriptions.sound_muted")
+          : ctx.t("subscriptions.sound_enabled"),
+    }), {
+      parse_mode: "HTML",
       reply_markup: mainDashboardMenu,
-      parse_mode: "HTML",
-      link_preview_options: { is_disabled: true },
     });
   });
 
-  bot.command("alerts", async (ctx) => {
-    await ctx.reply(renderSubscriptionsText(ctx, subDao), {
-      reply_markup: subscriptionsMenu,
+  bot.command("language", async (ctx) => {
+    await ctx.reply(ctx.t("onboarding.welcome_title"), {
       parse_mode: "HTML",
-      link_preview_options: { is_disabled: true },
+      reply_markup: mainDashboardMenu,
     });
   });
-
-  bot.command("language", createLanguageHandler(languageMenu));
 
   bot.command(
     "admin",
@@ -137,7 +152,7 @@ export function createTelegramBot(
     });
   });
 
-  // 6. Test notification command (Admin Only, direct to caller)
+  // Test notification command (Admin Only, direct to caller)
   bot.command("testalert", async (ctx) => {
     if (!ctx.from) return;
     const isAdmin =
@@ -153,13 +168,6 @@ export function createTelegramBot(
       parse_mode: "HTML",
     });
 
-    const dispatcher = new NotificationDispatcher(
-      bot,
-      subDao,
-      userDao,
-      logDao,
-      resolvedHistoryDao
-    );
     await dispatcher.sendSingleAlert(
       ctx.user.id,
       ctx.from.id,
@@ -180,7 +188,29 @@ export function createTelegramBot(
     );
   });
 
-  // Register command list in Telegram UI
+  // Localized commands menu in Telegram UI
+  bot.api
+    .setMyCommands([
+      { command: "start", description: "Головне меню та моніторинг слотів" },
+      { command: "menu", description: "Відкрити дашборд доступності" },
+      { command: "alerts", description: "Керування підписками та звуком" },
+      { command: "language", description: "Змінити мову інтерфейсу" },
+      { command: "help", description: "Інструкція та контакт автора" },
+      { command: "stats", description: "Телеметрія системи (Admin)" },
+    ], { language_code: "uk" })
+    .catch(() => {});
+
+  bot.api
+    .setMyCommands([
+      { command: "start", description: "Главное меню и мониторинг слотов" },
+      { command: "menu", description: "Открыть дашборд доступности" },
+      { command: "alerts", description: "Управление подписками и звуком" },
+      { command: "language", description: "Сменить язык интерфейса" },
+      { command: "help", description: "Инструкция и контакт автора" },
+      { command: "stats", description: "Телеметрия системы (Admin)" },
+    ], { language_code: "ru" })
+    .catch(() => {});
+
   bot.api
     .setMyCommands([
       { command: "start", description: "Launch or refresh the main dashboard" },
@@ -190,19 +220,12 @@ export function createTelegramBot(
       { command: "help", description: "How the bot works & author contact" },
       { command: "stats", description: "Platform telemetry & status (Admin)" },
     ])
-    .catch((err) => console.warn("Failed to set Telegram commands:", err));
+    .catch(() => {});
 
-  // 7. Notification Dispatcher wired to Scraper diff_events
-  const dispatcher = new NotificationDispatcher(
-    bot,
-    subDao,
-    userDao,
-    logDao,
-    resolvedHistoryDao
-  );
-  scraper.on("diff_events", (events) => {
-    dispatcher.handleDiffEvents(events);
+  // Wire Scraper diff_events to dispatcher
+  scraper.on("diff_events", async (events) => {
+    await dispatcher.dispatchEvents(events);
   });
 
-  return { bot, userDao, subDao, poolStateDao, logDao, historyDao: resolvedHistoryDao, dispatcher };
+  return { bot, dispatcher };
 }

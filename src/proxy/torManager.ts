@@ -1,41 +1,48 @@
 import net from "node:net";
 
 export interface TorManagerOptions {
-  socksHost: string;
-  socksPort: number;
-  controlHost: string;
-  controlPort: number;
+  socksHost?: string;
+  socksPort?: number;
+  controlHost?: string;
+  controlPort?: number;
   controlPassword?: string;
   minNewnymIntervalMs?: number;
 }
 
 export class TorManager {
+  private readonly socksHost: string;
+  private readonly socksPort: number;
+  private readonly controlHost: string;
+  private readonly controlPort: number;
+  private readonly controlPassword?: string;
+  private readonly minInterval: number;
   private lastNewnymTime = 0;
-  private minInterval: number;
+  private renewalPromise: Promise<boolean> | null = null;
 
-  constructor(private readonly opts: TorManagerOptions) {
+  constructor(opts: TorManagerOptions = {}) {
+    this.socksHost = opts.socksHost ?? "127.0.0.1";
+    this.socksPort = opts.socksPort ?? 9050;
+    this.controlHost = opts.controlHost ?? "127.0.0.1";
+    this.controlPort = opts.controlPort ?? 9051;
+    this.controlPassword = opts.controlPassword;
     this.minInterval = opts.minNewnymIntervalMs ?? 10_000;
   }
 
   public getSocksUrl(): string {
-    // socks5h forces remote DNS resolution through Tor exit nodes
-    return `socks5h://${this.opts.socksHost}:${this.opts.socksPort}`;
+    return `socks5h://${this.socksHost}:${this.socksPort}`;
   }
 
   public async isSocksReady(): Promise<boolean> {
     return new Promise((resolve) => {
-      const socket = net.createConnection(
-        { host: this.opts.socksHost, port: this.opts.socksPort },
-        () => {
-          socket.destroy();
-          resolve(true);
-        }
-      );
-      socket.on("error", () => {
+      const socket = net.createConnection(this.socksPort, this.socksHost, () => {
+        socket.destroy();
+        resolve(true);
+      });
+      socket.setTimeout(2000, () => {
         socket.destroy();
         resolve(false);
       });
-      socket.setTimeout(2000, () => {
+      socket.on("error", () => {
         socket.destroy();
         resolve(false);
       });
@@ -43,9 +50,19 @@ export class TorManager {
   }
 
   /**
-   * Request a new Tor identity/circuit via the ControlPort (SIGNAL NEWNYM)
+   * Request a new Tor identity circuit with mutex deduplication
    */
-  public async renewCircuit(): Promise<boolean> {
+  public renewCircuit(): Promise<boolean> {
+    if (this.renewalPromise) {
+      return this.renewalPromise;
+    }
+    this.renewalPromise = this.executeRenewal().finally(() => {
+      this.renewalPromise = null;
+    });
+    return this.renewalPromise;
+  }
+
+  private async executeRenewal(): Promise<boolean> {
     const now = Date.now();
     if (now - this.lastNewnymTime < this.minInterval) {
       const waitMs = this.minInterval - (now - this.lastNewnymTime);
@@ -53,49 +70,47 @@ export class TorManager {
     }
 
     return new Promise((resolve) => {
-      const socket = net.createConnection(
-        { host: this.opts.controlHost, port: this.opts.controlPort },
-        () => {
-          const authCmd = this.opts.controlPassword
-            ? `AUTHENTICATE "${this.opts.controlPassword}"\r\n`
-            : `AUTHENTICATE ""\r\n`;
-          socket.write(authCmd);
-        }
-      );
+      const socket = net.createConnection(this.controlPort, this.controlHost, () => {
+        const authCmd = this.controlPassword
+          ? `AUTHENTICATE "${this.controlPassword}"\r\n`
+          : `AUTHENTICATE ""\r\n`;
 
-      let step: "auth" | "signal" = "auth";
+        socket.write(authCmd);
+      });
+
+      socket.setTimeout(5000, () => {
+        socket.destroy();
+        resolve(false);
+      });
+
+      let isAuthenticated = false;
 
       socket.on("data", (data) => {
-        const response = data.toString();
-        if (step === "auth") {
-          if (response.startsWith("250")) {
-            step = "signal";
+        const res = data.toString();
+
+        if (!isAuthenticated) {
+          if (res.startsWith("250")) {
+            isAuthenticated = true;
             socket.write("SIGNAL NEWNYM\r\n");
           } else {
-            console.warn(`[TorManager] ControlPort auth failed: ${response.trim()}`);
             socket.destroy();
             resolve(false);
           }
-        } else if (step === "signal") {
-          socket.destroy();
-          if (response.startsWith("250")) {
+        } else {
+          if (res.startsWith("250")) {
             this.lastNewnymTime = Date.now();
-            console.log("🧅 [TorManager] Tor circuit rotated successfully (NEWNYM).");
+            socket.destroy();
+            console.log("🧅 [Tor] Successfully acquired new Tor circuit identity (SIGNAL NEWNYM)");
             resolve(true);
           } else {
-            console.warn(`[TorManager] SIGNAL NEWNYM failed: ${response.trim()}`);
+            socket.destroy();
             resolve(false);
           }
         }
       });
 
       socket.on("error", (err) => {
-        console.warn(`[TorManager] ControlPort connection error: ${err.message}`);
-        socket.destroy();
-        resolve(false);
-      });
-
-      socket.setTimeout(4000, () => {
+        console.warn(`⚠️ [Tor] ControlPort error: ${err.message}`);
         socket.destroy();
         resolve(false);
       });

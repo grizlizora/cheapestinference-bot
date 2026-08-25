@@ -34,11 +34,26 @@ describe("RobustHttpClient", () => {
     expect(JSON.parse(decompressed).test).toBe("deflate_payload");
   });
 
-  it("should generate proper Chrome 128 browser headers", () => {
+  it("should fallback to raw deflate decompression on raw deflate streams", () => {
+    const rawText = JSON.stringify({ success: true, test: "raw_deflate_payload" });
+    const rawDeflated = zlib.deflateRawSync(Buffer.from(rawText));
+
+    const decompressed = (client as any).decompressBody(rawDeflated, "deflate");
+    expect(decompressed).toBe(rawText);
+    expect(JSON.parse(decompressed).test).toBe("raw_deflate_payload");
+  });
+
+  it("should generate proper Chrome 128 browser headers with same-site and Priority", () => {
     const headers = (client as any).getBrowserHeaders(false, '"etag-123"', 'Wed, 21 Oct 2026 07:28:00 GMT');
     expect(headers["User-Agent"]).toContain("Chrome/128.0.0.0");
     expect(headers["sec-ch-ua"]).toContain('"Chromium";v="128"');
+    expect(headers["Sec-Fetch-Site"]).toBe("same-site");
+    expect(headers["Priority"]).toBe("u=1, i");
     expect(headers["If-None-Match"]).toBe('"etag-123"');
     expect(headers["If-Modified-Since"]).toBe('Wed, 21 Oct 2026 07:28:00 GMT');
+
+    const htmlHeaders = (client as any).getBrowserHeaders(true);
+    expect(htmlHeaders["Priority"]).toBe("u=0, i");
+    expect(htmlHeaders["Sec-Fetch-Mode"]).toBe("navigate");
   });
 });

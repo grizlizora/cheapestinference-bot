@@ -11,6 +11,9 @@ import { SlotDiffEngine } from "./engine/diffEngine.js";
 import { ScraperOrchestrator } from "./engine/scraperOrchestrator.js";
 import { PoolStateDAO } from "./db/dao/poolState.js";
 import { SlotHistoryDAO } from "./db/dao/slotHistory.js";
+import { UserDAO } from "./db/dao/users.js";
+import { SubscriptionDAO } from "./db/dao/subscriptions.js";
+import { NotificationLogDAO } from "./db/dao/notificationLogs.js";
 import { createTelegramBot } from "./bot/index.js";
 import { createHealthServer } from "./server/health.js";
 
@@ -19,9 +22,12 @@ async function bootstrap() {
   console.log("🚀 Starting CheapestInference Telegram Monitor Bot");
   console.log("==================================================");
 
-  // 1. Initialize SQLite Database
+  // 1. Initialize SQLite Database & DAOs
   const db = getDatabase();
+  const userDao = new UserDAO(db);
+  const subDao = new SubscriptionDAO(db);
   const poolStateDao = new PoolStateDAO(db);
+  const notificationLogDao = new NotificationLogDAO(db);
   const slotHistoryDao = new SlotHistoryDAO(db);
   console.log(`📦 [Database] SQLite connected at: ${config.DB_PATH}`);
 
@@ -96,7 +102,16 @@ async function bootstrap() {
   scraper.start();
 
   // 7. Initialize and Start Telegram Bot via grammY runner
-  const { bot } = createTelegramBot(config.BOT_TOKEN, db, scraper, proxyPool, slotHistoryDao);
+  const { bot, dispatcher } = createTelegramBot(
+    config.BOT_TOKEN,
+    userDao,
+    subDao,
+    poolStateDao,
+    notificationLogDao,
+    scraper,
+    proxyPool,
+    slotHistoryDao
+  );
   const runner = run(bot);
   console.log("🤖 [Bot] Telegram bot is active and listening for updates.");
 
@@ -118,6 +133,7 @@ async function bootstrap() {
     if (runner.isRunning()) {
       await runner.stop();
     }
+    await dispatcher.flushPending().catch(() => {});
     healthServer.close();
     closeDatabase();
     console.log("👋 [Shutdown] All services stopped. Goodbye!");

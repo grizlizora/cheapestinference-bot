@@ -3,20 +3,22 @@ import { BotContext } from "../../types/context.js";
 import { SubscriptionDAO } from "../../db/dao/subscriptions.js";
 import { UserDAO } from "../../db/dao/users.js";
 import { PoolStateDAO } from "../../db/dao/poolState.js";
+import { SlotHistoryDAO } from "../../db/dao/slotHistory.js";
 import { renderDashboardText, safeEditMessageText } from "./mainDashboard.js";
 
 export function createSubscriptionsMenu(
   subDao: SubscriptionDAO,
   userDao: UserDAO,
-  poolStateDao: PoolStateDAO
+  poolStateDao: PoolStateDAO,
+  historyDao?: SlotHistoryDAO
 ) {
   return new Menu<BotContext>("subscriptions-menu")
     .text(
       (ctx) => {
         const isGlobal = subDao.hasSubscription(ctx.user.id, "ALL", "ALL");
         return isGlobal
-          ? ctx.t("subscriptions.btn_toggle_global_off")
-          : ctx.t("subscriptions.btn_toggle_global_on");
+          ? ctx.t("subscriptions.btn_toggle_global_on")
+          : ctx.t("subscriptions.btn_toggle_global_off");
       },
       async (ctx) => {
         const active = subDao.toggleSubscription(ctx.user.id, "ALL", "ALL");
@@ -34,8 +36,8 @@ export function createSubscriptionsMenu(
     .text(
       (ctx) =>
         ctx.user.is_muted === 1
-          ? ctx.t("subscriptions.btn_toggle_sound_on")
-          : ctx.t("subscriptions.btn_toggle_sound_off"),
+          ? ctx.t("subscriptions.btn_toggle_sound_off")
+          : ctx.t("subscriptions.btn_toggle_sound_on"),
       async (ctx) => {
         const newMuted = userDao.toggleMute(ctx.from!.id);
         ctx.user.is_muted = newMuted;
@@ -123,7 +125,8 @@ export function createSubscriptionsMenu(
     .back(
       (ctx) => ctx.t("common.back"),
       async (ctx) => {
-        await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao));
+        await ctx.answerCallbackQuery();
+        await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao));
       }
     );
 }

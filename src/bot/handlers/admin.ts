@@ -20,7 +20,7 @@ export function createAdminHandler(
       config.ADMIN_USER_IDS.includes(ctx.from.id);
 
     if (!isAdmin) {
-      await ctx.reply("⛔ Unauthorized. This command is restricted to administrators.");
+      await ctx.reply(ctx.t("admin.unauthorized"));
       return;
     }
 
@@ -35,16 +35,18 @@ export function createAdminHandler(
     const seconds = uptimeSec % 60;
     const uptimeStr = `${hours}h ${minutes}m ${seconds}s`;
 
-    const lastScrapeAgo = scraperTelemetry.lastScrapeTimestamp > 0
-      ? Math.round((Date.now() - scraperTelemetry.lastScrapeTimestamp) / 1000)
-      : -1;
+    const lastScrapeAgo =
+      scraperTelemetry.lastScrapeTimestamp > 0
+        ? Math.round((Date.now() - scraperTelemetry.lastScrapeTimestamp) / 1000)
+        : -1;
 
     const memUsageMb = +(process.memoryUsage().rss / 1024 / 1024).toFixed(1);
 
-    const proxyModeStr = proxyStatus.torActive
-      ? `🧅 Tor Active (${proxyStatus.alive}/${proxyStatus.total} alive)`
+    const hasTor = proxyStatus.proxies.some((p) => p.type === "tor");
+    const proxyModeStr = hasTor
+      ? `🧅 Tor Active (${proxyStatus.available}/${proxyStatus.total} alive)`
       : proxyStatus.total > 0
-      ? `🌐 Proxies (${proxyStatus.alive}/${proxyStatus.total} alive)`
+      ? `🌐 Proxies (${proxyStatus.available}/${proxyStatus.total} alive)`
       : "⚡ Direct Connection";
 
     const text = ctx.t("admin.stats_title", {

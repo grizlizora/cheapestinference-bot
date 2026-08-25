@@ -1,55 +1,60 @@
 import { Menu } from "@grammyjs/menu";
 import { BotContext } from "../../types/context.js";
 import { PoolStateDAO } from "../../db/dao/poolState.js";
-import { SubscriptionDAO } from "../../db/dao/subscriptions.js";
 import { UserDAO } from "../../db/dao/users.js";
+import { SubscriptionDAO } from "../../db/dao/subscriptions.js";
 import { SlotHistoryDAO } from "../../db/dao/slotHistory.js";
 import { AvailabilityIntelligenceEngine } from "../../engine/intelligenceEngine.js";
 import { createLanguageMenu } from "./language.js";
 import { createPoolDetailMenu, renderPoolDetailText } from "./poolDetail.js";
 import { createSubscriptionsMenu, renderSubscriptionsText } from "./subscriptions.js";
 
+/**
+ * Safely edit message text ignoring Telegram 400 "message is not modified"
+ */
 export async function safeEditMessageText(
   ctx: BotContext,
   text: string,
-  extra?: any
-): Promise<boolean> {
+  extra: any = { parse_mode: "HTML", link_preview_options: { is_disabled: true } }
+) {
   try {
-    await ctx.editMessageText(text, {
-      parse_mode: "HTML",
-      link_preview_options: { is_disabled: true },
-      ...extra,
-    });
-    return true;
+    await ctx.editMessageText(text, extra);
   } catch (err: any) {
-    if (err?.description?.includes("message is not modified")) {
-      return false;
+    if (
+      err?.description?.includes("message is not modified") ||
+      err?.message?.includes("message is not modified")
+    ) {
+      return;
     }
-    throw err;
+    console.warn("⚠️ [Menu] Safe editMessageText warning:", err?.message || err);
   }
 }
 
-export function createMainMenu(
+export function createMainMenuHierarchy(
   poolStateDao: PoolStateDAO,
-  subDao: SubscriptionDAO,
   userDao: UserDAO,
+  subDao: SubscriptionDAO,
   historyDao?: SlotHistoryDAO
 ) {
-  const languageMenu = createLanguageMenu(userDao, poolStateDao);
+  const languageMenu = createLanguageMenu(userDao, poolStateDao, historyDao);
   const poolDetailMenu = createPoolDetailMenu(poolStateDao, subDao, historyDao);
-  const subscriptionsMenu = createSubscriptionsMenu(subDao, userDao, poolStateDao);
+  const subscriptionsMenu = createSubscriptionsMenu(subDao, userDao, poolStateDao, historyDao);
 
   const helpMenu = new Menu<BotContext>("help-menu")
-    .url((ctx) => ctx.t("common.btn_contact_author"), "https://t.me/grizlizora")
+    .url(
+      (ctx) => ctx.t("common.btn_contact_author"),
+      "https://t.me/grizlizora"
+    )
     .row()
     .back(
       (ctx) => ctx.t("common.back"),
       async (ctx) => {
+        await ctx.answerCallbackQuery();
         await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao));
       }
     );
 
-  const mainDashboardMenu = new Menu<BotContext>("main-dashboard")
+  const mainDashboardMenu = new Menu<BotContext>("main-dashboard-menu")
     .dynamic((ctx, range) => {
       const summaries = poolStateDao.getPoolSummaries();
       const pools =
@@ -70,6 +75,7 @@ export function createMainMenu(
         const icon = pool.available ? (pool.isLimited ? "🟡" : "🟢") : "🔴";
         range
           .text(`${icon} ${pool.name}`, async (c) => {
+            await c.answerCallbackQuery();
             c.session.tempPoolSlug = pool.slug;
             await safeEditMessageText(
               c,
@@ -83,6 +89,7 @@ export function createMainMenu(
     .text(
       (ctx) => ctx.t("menu.btn_subscriptions"),
       async (ctx) => {
+        await ctx.answerCallbackQuery();
         await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
         return ctx.menu.nav("subscriptions-menu");
       }
@@ -104,6 +111,7 @@ export function createMainMenu(
     .text(
       (ctx) => ctx.t("common.help"),
       async (ctx) => {
+        await ctx.answerCallbackQuery();
         await safeEditMessageText(ctx, ctx.t("help_text"));
         return ctx.menu.nav("help-menu");
       }
@@ -112,6 +120,7 @@ export function createMainMenu(
     .text(
       (ctx) => ctx.t("menu.btn_language"),
       async (ctx) => {
+        await ctx.answerCallbackQuery();
         await safeEditMessageText(ctx, ctx.t("onboarding.welcome_title"));
         return ctx.menu.nav("language-menu");
       }
@@ -140,20 +149,34 @@ export function renderDashboardText(
     });
   }
 
+  const intelligenceEngine = historyDao
+    ? new AvailabilityIntelligenceEngine(historyDao)
+    : null;
+
   const poolSummariesText = summaries
     .map((p) => {
-      let statusBadge = ctx.t("common.status_sold_out");
-      if (p.available_count > 0) {
-        const hasLimited = p.blocks.some((b) => b.status === "limited");
-        statusBadge = hasLimited
-          ? ctx.t("common.status_limited")
-          : ctx.t("common.status_available");
+      // Check if any block has special smart badges
+      let statusBadge =
+        p.available_count > 0
+          ? ctx.t("common.status_available")
+          : ctx.t("common.status_sold_out");
+
+      if (intelligenceEngine && p.available_count > 0) {
+        for (const b of p.blocks) {
+          if (b.status === "limited" || b.status === "available") {
+            const smart = intelligenceEngine.getSmartStatus(p.slug, b.block, b.status, ctx.lang);
+            if (smart.isHot) {
+              statusBadge = smart.badge;
+              break;
+            }
+          }
+        }
       }
 
       return ctx.t("menu.pool_summary_card", {
-        pool_name: p.fullName || p.name,
+        pool_name: p.name,
         status_badge: statusBadge,
-        models: p.models.join(", ") || "Active LLMs",
+        models: p.models.join(", ") || "Custom models",
         min_price: p.min_price,
         available_count: p.available_count,
         total_blocks: p.total_blocks || 3,

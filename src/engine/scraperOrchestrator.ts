@@ -53,7 +53,8 @@ export class ScraperOrchestrator extends EventEmitter {
     if (this.running) return;
     this.running = true;
     console.log("🕷 [ScraperOrchestrator] Starting polling loop...");
-    this.scheduleNext(0);
+    // Schedule first periodic poll after calculated delay to prevent immediate duplicate
+    this.scheduleNext(this.calculateDelayMs());
   }
 
   public stop(): void {
@@ -79,87 +80,107 @@ export class ScraperOrchestrator extends EventEmitter {
     if (this.consecutiveFailures > 0) {
       const exp = Math.min(
         this.opts.maxBackoffSec,
-        this.opts.minIntervalSec * Math.pow(1.8, this.consecutiveFailures)
+        this.opts.minIntervalSec * Math.pow(1.5, this.consecutiveFailures)
       );
-      const jitter = Math.random() * 5;
-      return (exp + jitter) * 1000;
+      const jitter = Math.random() * 5_000;
+      return Math.floor(exp * 1000 + jitter);
     }
 
-    const span = this.opts.maxIntervalSec - this.opts.minIntervalSec;
-    const intervalSec = this.opts.minIntervalSec + Math.random() * span;
-    return intervalSec * 1000;
+    const range = this.opts.maxIntervalSec - this.opts.minIntervalSec;
+    const intervalSec = this.opts.minIntervalSec + Math.random() * range;
+    return Math.floor(intervalSec * 1000);
   }
 
   private scheduleNext(delayMs: number): void {
     if (!this.running) return;
-    this.timerHandle = setTimeout(() => this.poll(), delayMs);
+    if (this.timerHandle) clearTimeout(this.timerHandle);
+
+    this.timerHandle = setTimeout(async () => {
+      await this.poll();
+      if (this.running) {
+        this.scheduleNext(this.calculateDelayMs());
+      }
+    }, delayMs);
   }
 
-  public async poll(): Promise<ScrapeResult | null> {
-    if (this.isPolling) return null;
-    if (!this.running && this.totalScrapes > 0) return null;
+  public async poll(): Promise<DiffEvent[]> {
+    if (this.isPolling) {
+      return [];
+    }
 
     this.isPolling = true;
     this.totalScrapes++;
-    let result: ScrapeResult;
+    const startTime = Date.now();
 
     try {
-      // 1. Try Primary JSON API Engine
-      try {
-        result = await this.apiEngine.fetch(
-          this.apiEtag,
-          this.apiLastModified
-        );
-        if (result.etag) this.apiEtag = result.etag;
-        if (result.lastModified) this.apiLastModified = result.lastModified;
-      } catch (apiErr: any) {
-        this.emit("warn", `API Engine failed (${apiErr.message}). Switching to HTML fallback.`);
-        // 2. Seamless HTML Fallback with isolated ETag
-        result = await this.htmlEngine.fetch(
-          this.htmlEtag,
-          this.htmlLastModified
-        );
-        if (result.etag) this.htmlEtag = result.etag;
-        if (result.lastModified) this.htmlLastModified = result.lastModified;
-      }
-
-      this.lastScrapeLatencyMs = result.latencyMs;
+      const result = await this.fetchFromEngines();
       this.lastScrapeTimestamp = Date.now();
+      this.lastScrapeLatencyMs = result.latencyMs;
       this.lastSource = result.source;
       this.consecutiveFailures = 0;
 
-      if (result.modified && result.snapshot) {
-        // Validate payload sanity
-        const validSnapshot = this.sanityGuard.validateSnapshot(result.snapshot);
-
-        // Update database with latest dynamic pool data
-        this.poolStateDao.saveSnapshot(validSnapshot);
-
-        // Compute state diffs
-        const events: DiffEvent[] = this.diffEngine.processSnapshot(validSnapshot);
-
-        if (events.length > 0) {
-          this.emit("diff_events", events);
-        }
+      // Handle HTTP 304 Cache Not Modified
+      if (!result.modified || !result.snapshot) {
+        this.emit("heartbeat", {
+          source: result.source,
+          latencyMs: result.latencyMs,
+          modified: false,
+        });
+        return [];
       }
+
+      // Validate snapshot integrity
+      this.sanityGuard.validateSnapshot(result.snapshot);
+
+      // Persist latest state to database
+      this.poolStateDao.saveSnapshot(result.snapshot);
+
+      // Compute diffs against previous baseline
+      const events = this.diffEngine.processSnapshot(result.snapshot);
 
       this.emit("heartbeat", {
         source: result.source,
         latencyMs: result.latencyMs,
-        modified: result.modified,
-        timestamp: this.lastScrapeTimestamp,
+        modified: true,
+        eventsCount: events.length,
       });
 
-      return result;
+      if (events.length > 0) {
+        this.emit("diff_events", events);
+      }
+
+      return events;
     } catch (err: any) {
       this.consecutiveFailures++;
+      this.lastScrapeTimestamp = Date.now();
+      this.lastScrapeLatencyMs = Date.now() - startTime;
       this.emit("error", err);
-      return null;
+      return [];
     } finally {
       this.isPolling = false;
-      if (this.running) {
-        this.scheduleNext(this.calculateDelayMs());
-      }
+    }
+  }
+
+  private async fetchFromEngines(): Promise<ScrapeResult> {
+    try {
+      const apiResult = await this.apiEngine.fetch(
+        this.apiEtag,
+        this.apiLastModified,
+        8_000
+      );
+      if (apiResult.etag) this.apiEtag = apiResult.etag;
+      if (apiResult.lastModified) this.apiLastModified = apiResult.lastModified;
+      return apiResult;
+    } catch (apiErr: any) {
+      this.emit("warn", `API Engine failed (${apiErr.message}). Switching to HTML fallback.`);
+
+      const htmlResult = await this.htmlEngine.fetch(
+        this.htmlEtag,
+        this.htmlLastModified
+      );
+      if (htmlResult.etag) this.htmlEtag = htmlResult.etag;
+      if (htmlResult.lastModified) this.htmlLastModified = htmlResult.lastModified;
+      return htmlResult;
     }
   }
 }

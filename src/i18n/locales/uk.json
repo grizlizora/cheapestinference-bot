@@ -14,6 +14,7 @@
     "currency_day": "день",
     "help": "ℹ️ Довідка",
     "btn_contact_author": "👨‍💻 Написати автору (@grizlizora)",
+    "open_site": "🌐 Відкрити CheapestInference",
     "unknown": "Невідомо"
   },
   "onboarding": {
@@ -22,7 +23,7 @@
   },
   "menu": {
     "dashboard_title": "📊 <b>CheapestInference — Моніторинг слотів</b>\n\nАктуальний стан тарифів та регіональних блоків:\n\n{pool_summaries}\n\n🕒 <i>Останнє оновлення: {updated_at}</i>",
-    "pool_summary_card": "📦 <b>{pool_name}</b>\n• Статус: {status_badge} <i>({available_count}/3 блоків вільно)</i>\n• Моделі: <code>{models}</code>\n• Вартість: від <b>${min_price}/міс</b>\n🔗 <a href=\"{url}\">Сторінка тарифу на сайті</a>",
+    "pool_summary_card": "📦 <b>{pool_name}</b>\n• Статус: {status_badge} <i>({available_count}/{total_blocks} блоків вільно)</i>\n• Моделі: <code>{models}</code>\n• Вартість: від <b>${min_price}/міс</b>\n🔗 <a href=\"{url}\">Сторінка тарифу на сайті</a>",
     "loading_data": "⏳ <i>Завантаження даних із сайту...</i>",
     "btn_flagship": "🚀 Flagship Пул",
     "btn_frontier": "⚡ Frontier Пул",
@@ -47,10 +48,10 @@
     "global_disabled": "ВИМКНЕНО ❌",
     "sound_enabled": "Звук увімкнено 🔊",
     "sound_muted": "Без звуку 🔇",
-    "btn_toggle_global_on": "🌐 Глобальні (на всі слоти): [УВІМК]",
-    "btn_toggle_global_off": "🌐 Глобальні (на всі слоти): [ВИМК]",
-    "btn_toggle_sound_on": "🔊 Звуковий режим: Увімкнено",
-    "btn_toggle_sound_off": "🔇 Звуковий режим: Без звуку",
+    "btn_toggle_global_on": "🌐 Глобальні (всі слоти): ✅ УВІМКНЕНО",
+    "btn_toggle_global_off": "🌐 Глобальні (всі слоти): ❌ ВИМКНЕНО",
+    "btn_toggle_sound_on": "🔊 Звуковий режим: 🔔 Увімкнено",
+    "btn_toggle_sound_off": "🔇 Звуковий режим: 🔕 Без звуку",
     "toast_global_on": "🌐 Глобальні сповіщення увімкнено",
     "toast_global_off": "🌐 Глобальні сповіщення вимкнено",
     "toast_sound_enabled": "🔊 Звукові сповіщення увімкнено",
@@ -74,10 +75,20 @@
     "price_changed_body": "У тарифі <b>{pool_name}</b> ({block_name}) змінилася ціна:\n\n💵 Стара ціна: <s>${old_price}/міс</s>\n💰 Нова ціна: <b>${new_price}/міс</b>\n⏱ <b>Час:</b> {timestamp} UTC",
     "catalog_updated_header": "🆕 <b>ОНОВЛЕННЯ МОДЕЛЕЙ НА САЙТІ</b>",
     "catalog_updated_body": "У тарифі <b>{pool_name}</b> оновлено список підтримуваних моделей!\n\n🤖 <b>Актуальні моделі:</b>\n<code>{models}</code>",
+    "analytics_duration_tip": "\n\n📊 <i>Статистика бота: зазвичай цей слот залишається вільним {duration}!</i>",
     "batch_title": "🚨 <b>Оновлення CheapestInference ({count})</b>",
     "batch_price_update": "🏷️ Зміна ціни",
     "btn_claim_slot": "🚀 Оформити слот на сайті",
     "btn_open_pool": "🔎 Переглянути пул у боті"
+  },
+  "intelligence": {
+    "tag_high_demand": "🔥 Високий попит",
+    "tag_hot_slot": "🔥 Гарячий слот",
+    "tag_stable": "🟢 Стабільний",
+    "tip_limited_historical": "⚡ <i>За історією розбирають за {duration}!</i>",
+    "tip_limited_site": "⚠️ <i>Сайт сигналізує про обмежену кількість місць!</i>",
+    "tip_hot_historical": "🔥 <i>Гарячий слот! Зазвичай доступний лише {duration}.</i>",
+    "tip_stable_historical": "⏱ <i>Середній час у наявності: {duration}.</i>"
   },
   "admin": {
     "stats_title": "📊 <b>Панель адміністратора & Телеметрія</b>\n\n🟢 <b>Статус системи:</b> {status}\n⏱ <b>Аптайм:</b> {uptime}\n\n👥 <b>Користувачі:</b>\n• Всього зареєстровано: <b>{total_users}</b>\n• Активних спостерігачів: <b>{active_users}</b>\n• Заблокували бота: <b>{blocked_users}</b>\n• Активних правил підписок: <b>{active_subscriptions}</b>\n\n🕷 <b>Скрейпер & Anti-Ban:</b>\n• Останнє опитування: <b>{last_scrape_ago}с тому</b> (Затримка: {latency}мс)\n• Джерело даних: <code>{source}</code>\n• Помилок поспіль: <b>{consecutive_failures}</b>\n• Режим Tor / Проксі: <b>{proxy_status}</b>\n\n💾 <b>Пам'ять процесу:</b> <b>{memory_mb} MB</b>",

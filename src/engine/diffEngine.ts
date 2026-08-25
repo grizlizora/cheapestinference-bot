@@ -46,8 +46,10 @@ export class SlotDiffEngine {
     }
 
     const incomingSlotKeys = new Set<string>();
+    const incomingPoolSlugs = new Set<string>();
 
     for (const pool of snapshot.data) {
+      incomingPoolSlugs.add(pool.slug);
       const prevPool = this.inMemoryPools.get(pool.slug);
 
       // Check if models array or pool metadata updated dynamically
@@ -183,7 +185,8 @@ export class SlotDiffEngine {
               this.pendingDisappearances.delete(key);
             }
           } else {
-            // Transitions like limited -> available or available -> limited
+            // Transitions within in-stock (limited <-> available)
+            this.pendingDisappearances.delete(key);
             prevSlot.status = block.status;
           }
         } else {
@@ -224,6 +227,7 @@ export class SlotDiffEngine {
     // Reconcile deleted / decommissioned slots that vanished from response
     for (const [key, trackedSlot] of this.inMemorySlots.entries()) {
       if (!incomingSlotKeys.has(key)) {
+        this.pendingDisappearances.delete(key);
         if (trackedSlot.status === "available" || trackedSlot.status === "limited") {
           this.historyDao?.recordSlotClosed(trackedSlot.poolSlug, trackedSlot.block);
           events.push({
@@ -241,6 +245,13 @@ export class SlotDiffEngine {
           });
         }
         this.inMemorySlots.delete(key);
+      }
+    }
+
+    // Reconcile deleted pools from memory
+    for (const slug of this.inMemoryPools.keys()) {
+      if (!incomingPoolSlugs.has(slug)) {
+        this.inMemoryPools.delete(slug);
       }
     }
 

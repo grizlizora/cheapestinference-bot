@@ -30,14 +30,15 @@ export class AvailabilityIntelligenceEngine {
     }
 
     if (rawSiteStatus === "limited") {
+      const tip = analytics.avgDurationFormatted
+        ? translate(lang, "intelligence.tip_limited_historical", { duration: analytics.avgDurationFormatted })
+        : translate(lang, "intelligence.tip_limited_site");
+
       return {
         badge: translate(lang, "common.status_limited"),
-        demandTag: "🔥 High Demand",
+        demandTag: translate(lang, "intelligence.tag_high_demand"),
         isHot: true,
-        predictionTip:
-          analytics.avgDurationFormatted
-            ? `⚡ <i>За історією розбирають за ${analytics.avgDurationFormatted}!</i>`
-            : "⚡ <i>Сайт сигналізує про обмежену кількість місць!</i>",
+        predictionTip: tip,
         analytics,
       };
     }
@@ -46,19 +47,19 @@ export class AvailabilityIntelligenceEngine {
     if (analytics.demandCategory === "hot" && analytics.avgDurationFormatted) {
       return {
         badge: `🟡 ${translate(lang, "common.status_limited")} (🔥 ${analytics.avgDurationFormatted})`,
-        demandTag: "🔥 Hot Slot",
+        demandTag: translate(lang, "intelligence.tag_hot_slot"),
         isHot: true,
-        predictionTip: `🔥 <i>Гарячий слот! За історією живе в середньому ${analytics.avgDurationFormatted}.</i>`,
+        predictionTip: translate(lang, "intelligence.tip_hot_historical", { duration: analytics.avgDurationFormatted }),
         analytics,
       };
     }
 
     return {
       badge: translate(lang, "common.status_available"),
-      demandTag: "🟢 Stable",
+      demandTag: translate(lang, "intelligence.tag_stable"),
       isHot: false,
       predictionTip: analytics.avgDurationFormatted
-        ? `⏱ <i>Середній час у наявності: ${analytics.avgDurationFormatted}</i>`
+        ? translate(lang, "intelligence.tip_stable_historical", { duration: analytics.avgDurationFormatted })
         : undefined,
       analytics,
     };

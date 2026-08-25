@@ -1,132 +1,156 @@
 import { TorManager } from "./torManager.js";
+import type { RobustHttpClient } from "../http/client.js";
 
-export interface ProxyItem {
+export interface ProxyEntry {
   url: string;
-  type: "tor" | "socks5" | "http" | "https";
-  alive: boolean;
-  latencyMs: number;
-  consecutiveErrors: number;
-  bannedUntil?: number;
+  type: "tor" | "external" | "direct";
   lastUsedAt: number;
+  consecutiveErrors: number;
+  bannedUntil: number | null;
+  latencyMs: number;
 }
 
 export class ProxyPool {
-  private proxies: ProxyItem[] = [];
+  private proxies: ProxyEntry[] = [];
+  private allowDirectFallback: boolean;
+  private httpClient?: RobustHttpClient;
 
   constructor(
-    private readonly torManager?: TorManager,
-    private readonly allowDirectFallback = true,
-    initialProxyUrls: string[] = []
+    private torManager?: TorManager,
+    allowDirectFallback: boolean = true,
+    externalProxyList: string[] = []
   ) {
+    this.allowDirectFallback = allowDirectFallback;
+
     if (this.torManager) {
       this.proxies.push({
         url: this.torManager.getSocksUrl(),
         type: "tor",
-        alive: true,
-        latencyMs: 0,
-        consecutiveErrors: 0,
         lastUsedAt: 0,
+        consecutiveErrors: 0,
+        bannedUntil: null,
+        latencyMs: 300,
       });
     }
 
-    for (const url of initialProxyUrls) {
-      this.addProxy(url);
+    for (const url of externalProxyList) {
+      if (url.trim()) {
+        this.proxies.push({
+          url: url.trim(),
+          type: "external",
+          lastUsedAt: 0,
+          consecutiveErrors: 0,
+          bannedUntil: null,
+          latencyMs: 200,
+        });
+      }
+    }
+
+    if (this.proxies.length === 0 && this.allowDirectFallback) {
+      this.proxies.push({
+        url: "",
+        type: "direct",
+        lastUsedAt: 0,
+        consecutiveErrors: 0,
+        bannedUntil: null,
+        latencyMs: 50,
+      });
     }
   }
 
-  public addProxy(url: string): void {
-    let type: ProxyItem["type"] = "http";
-    if (url.startsWith("socks5")) type = "socks5";
-    else if (url.startsWith("https")) type = "https";
-
-    this.proxies.push({
-      url,
-      type,
-      alive: true,
-      latencyMs: 0,
-      consecutiveErrors: 0,
-      lastUsedAt: 0,
-    });
+  public setHttpClient(client: RobustHttpClient): void {
+    this.httpClient = client;
   }
 
   public getNextProxyUrl(): string | null {
     const now = Date.now();
 
-    // Auto-recover proxies whose quarantine has expired
+    // Auto-recover proxies whose quarantine expired
     for (const p of this.proxies) {
-      if (!p.alive && p.bannedUntil && p.bannedUntil <= now) {
-        p.alive = true;
-        p.bannedUntil = undefined;
-        p.consecutiveErrors = 1; // probationary error count
+      if (p.bannedUntil && p.bannedUntil <= now) {
+        p.bannedUntil = null;
+        p.consecutiveErrors = 0;
       }
     }
 
-    const available = this.proxies.filter(
-      (p) => p.alive && (!p.bannedUntil || p.bannedUntil <= now)
-    );
+    const available = this.proxies.filter((p) => p.bannedUntil === null || p.bannedUntil <= now);
 
     if (available.length === 0) {
-      if (this.allowDirectFallback) return null; // Direct connection
-      throw new Error("No active proxies available and direct fallback is disabled");
+      if (this.allowDirectFallback) return null;
+      return this.proxies[0]?.url || null;
     }
 
-    // Sort by lowest consecutive errors, lowest latency, and LRU tiebreaker
+    // Least Recently Used (LRU) tiebreaker among lowest error proxies
     available.sort(
-      (a, b) =>
-        a.consecutiveErrors - b.consecutiveErrors ||
-        a.latencyMs - b.latencyMs ||
-        a.lastUsedAt - b.lastUsedAt
+      (a, b) => a.consecutiveErrors - b.consecutiveErrors || a.lastUsedAt - b.lastUsedAt
     );
 
     const selected = available[0];
     selected.lastUsedAt = now;
-    return selected.url;
+    return selected.url || null;
   }
 
   public reportSuccess(proxyUrl: string | null, latencyMs: number): void {
-    if (!proxyUrl) return;
-    const entry = this.proxies.find((p) => p.url === proxyUrl);
+    const entry = this.findEntry(proxyUrl);
     if (entry) {
-      entry.alive = true;
       entry.consecutiveErrors = 0;
+      entry.bannedUntil = null;
       entry.latencyMs = latencyMs;
-      entry.bannedUntil = undefined;
     }
   }
 
   public async reportFailure(proxyUrl: string | null, statusCode?: number): Promise<void> {
-    if (!proxyUrl) return;
-    const entry = this.proxies.find((p) => p.url === proxyUrl);
+    const entry = this.findEntry(proxyUrl);
     if (!entry) return;
 
     entry.consecutiveErrors += 1;
 
-    // Tor circuit rotation on rate-limiting / blocking
-    if (
-      entry.type === "tor" &&
-      (statusCode === 429 || statusCode === 403 || entry.consecutiveErrors >= 2)
-    ) {
-      if (this.torManager) {
+    // HTTP 429 (Rate Limit) or 403 (Cloudflare WAF Block)
+    if (statusCode === 429 || statusCode === 403) {
+      if (entry.type === "tor" && this.torManager) {
+        console.warn("🧅 [ProxyPool] Tor IP throttled/blocked. Renewing Tor circuit...");
         await this.torManager.renewCircuit().catch(() => {});
+        this.httpClient?.invalidateDispatcher(entry.url);
         entry.consecutiveErrors = 0;
+        return;
       }
+
+      // Quarantine non-Tor proxy for 5 minutes
+      entry.bannedUntil = Date.now() + 300_000;
+      this.httpClient?.invalidateDispatcher(entry.url);
+      console.warn(`⚠️ [ProxyPool] Proxy ${entry.url || "direct"} banned for 5 minutes due to HTTP ${statusCode}`);
       return;
     }
 
-    if (statusCode === 429 || statusCode === 403) {
-      // Quarantine for 1-5 minutes
-      entry.bannedUntil = Date.now() + Math.min(300_000, 30_000 * Math.pow(2, entry.consecutiveErrors));
-    } else if (entry.consecutiveErrors >= 3) {
-      entry.alive = false;
-      entry.bannedUntil = Date.now() + 60_000;
+    if (entry.consecutiveErrors >= 3) {
+      if (entry.type === "tor" && this.torManager) {
+        await this.torManager.renewCircuit().catch(() => {});
+        this.httpClient?.invalidateDispatcher(entry.url);
+        entry.consecutiveErrors = 0;
+      } else {
+        entry.bannedUntil = Date.now() + 180_000; // 3 min quarantine
+        this.httpClient?.invalidateDispatcher(entry.url);
+      }
     }
   }
 
-  public getStatus(): { total: number; alive: number; torActive: boolean } {
+  private findEntry(proxyUrl: string | null): ProxyEntry | undefined {
+    const targetUrl = proxyUrl ?? "";
+    return this.proxies.find((p) => p.url === targetUrl);
+  }
+
+  public getStatus() {
     return {
       total: this.proxies.length,
-      alive: this.proxies.filter((p) => p.alive).length,
-      torActive: this.proxies.some((p) => p.type === "tor" && p.alive),
+      available: this.proxies.filter((p) => p.bannedUntil === null || p.bannedUntil <= Date.now()).length,
+      quarantined: this.proxies.filter((p) => p.bannedUntil !== null && p.bannedUntil > Date.now()).length,
+      proxies: this.proxies.map((p) => ({
+        type: p.type,
+        url: p.url ? p.url.replace(/\/\/.*@/, "//***@") : "direct",
+        consecutiveErrors: p.consecutiveErrors,
+        isBanned: p.bannedUntil !== null && p.bannedUntil > Date.now(),
+        latencyMs: p.latencyMs,
+      })),
     };
   }
 }

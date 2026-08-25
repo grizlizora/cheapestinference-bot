@@ -26,6 +26,7 @@ export class SlotHistoryDAO {
   private stmtCloseActiveSlot: Database.Statement;
   private stmtGetAnalytics: Database.Statement;
   private stmtGetActiveSlot: Database.Statement;
+  private txRecordOpened: (poolSlug: string, blockId: string, status: string, price: string) => void;
 
   constructor(private db: Database.Database) {
     db.exec(`
@@ -72,6 +73,11 @@ export class SlotHistoryDAO {
       FROM slot_lifecycle_history
       WHERE pool_slug = ? AND block_id = ? AND duration_seconds IS NOT NULL
     `);
+
+    this.txRecordOpened = this.db.transaction((poolSlug, blockId, status, price) => {
+      this.stmtCloseActiveSlot.run(poolSlug, blockId);
+      this.stmtOpenSlot.run(poolSlug, blockId, status, price);
+    });
   }
 
   public recordSlotOpened(
@@ -80,9 +86,7 @@ export class SlotHistoryDAO {
     initialStatus: string,
     priceMonth: string
   ): void {
-    // Close any previous dangling unclosed record for safety
-    this.recordSlotClosed(poolSlug, blockId);
-    this.stmtOpenSlot.run(poolSlug, blockId, initialStatus, priceMonth);
+    this.txRecordOpened(poolSlug, blockId, initialStatus, priceMonth);
   }
 
   public recordSlotClosed(poolSlug: string, blockId: string): void {
@@ -96,7 +100,7 @@ export class SlotHistoryDAO {
   public getSlotAnalytics(poolSlug: string, blockId: string): SlotAnalytics {
     const row = this.stmtGetAnalytics.get(poolSlug, blockId) as any;
     const total = Number(row?.total_openings || 0);
-    const avgSec = row?.avg_duration ? Math.round(Number(row.avg_duration)) : null;
+    const avgSec = row?.avg_duration != null ? Math.round(Number(row.avg_duration)) : null;
 
     let demandCategory: SlotAnalytics["demandCategory"] = "unknown";
     if (avgSec !== null) {
@@ -115,18 +119,18 @@ export class SlotHistoryDAO {
     let avgDurationFormatted = "";
     if (avgSec !== null) {
       if (avgSec < 60) {
-        avgDurationFormatted = `~${avgSec}с`;
+        avgDurationFormatted = `~${avgSec}s`;
       } else if (avgSec < 3600) {
-        avgDurationFormatted = `~${Math.round(avgSec / 60)} хв`;
+        avgDurationFormatted = `~${Math.round(avgSec / 60)} min`;
       } else {
-        avgDurationFormatted = `~${(avgSec / 3600).toFixed(1)} год`;
+        avgDurationFormatted = `~${(avgSec / 3600).toFixed(1)} h`;
       }
     }
 
     return {
       avgDurationSeconds: avgSec,
-      minDurationSeconds: row?.min_duration ? Number(row.min_duration) : null,
-      maxDurationSeconds: row?.max_duration ? Number(row.max_duration) : null,
+      minDurationSeconds: row?.min_duration != null ? Number(row.min_duration) : null,
+      maxDurationSeconds: row?.max_duration != null ? Number(row.max_duration) : null,
       totalOpenings: total,
       lastOpenedAt: row?.last_opened_at || null,
       demandCategory,

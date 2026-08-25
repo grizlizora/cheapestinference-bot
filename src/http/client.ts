@@ -35,6 +35,16 @@ export class RobustHttpClient {
       keepAliveMaxTimeout: 120_000,
       pipelining: 1,
     });
+    this.proxyPool.setHttpClient(this);
+  }
+
+  public invalidateDispatcher(proxyUrl: string | null): void {
+    if (!proxyUrl) return;
+    const existing = this.dispatchers.get(proxyUrl);
+    if (existing) {
+      existing.close().catch(() => {});
+      this.dispatchers.delete(proxyUrl);
+    }
   }
 
   private getOrCreateDispatcher(proxyUrl: string | null, timeoutMs: number): Dispatcher {
@@ -62,7 +72,7 @@ export class RobustHttpClient {
               host: opts.hostname,
               port: parseInt(opts.port, 10) || (opts.protocol === "https:" ? 443 : 80),
             },
-            timeout: timeoutMs + 10_000,
+            timeout: timeoutMs + 5_000,
           })
             .then((info) => {
               if (opts.protocol === "https:") {
@@ -70,8 +80,17 @@ export class RobustHttpClient {
                   socket: info.socket,
                   servername: opts.servername || opts.hostname,
                   rejectUnauthorized: true,
+                  ALPNProtocols: ["http/1.1"],
                 });
-                tlsSocket.on("secureConnect", () => callback(null, tlsSocket));
+
+                tlsSocket.setTimeout(10_000, () => {
+                  tlsSocket.destroy(new Error("TLS Handshake Timeout over SOCKS5"));
+                });
+
+                tlsSocket.on("secureConnect", () => {
+                  tlsSocket.setTimeout(0);
+                  callback(null, tlsSocket);
+                });
                 tlsSocket.on("error", (err) => callback(err, null));
               } else {
                 callback(null, info.socket);
@@ -109,6 +128,7 @@ export class RobustHttpClient {
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
       "Accept-Language": "en-US,en;q=0.9,uk;q=0.8",
       "Accept-Encoding": "gzip, deflate, br",
+      "Priority": isHtml ? "u=0, i" : "u=1, i",
     };
 
     if (isHtml) {
@@ -123,7 +143,7 @@ export class RobustHttpClient {
       headers["Accept"] = "application/json, text/plain, */*";
       headers["Sec-Fetch-Dest"] = "empty";
       headers["Sec-Fetch-Mode"] = "cors";
-      headers["Sec-Fetch-Site"] = "same-origin";
+      headers["Sec-Fetch-Site"] = "same-site";
       headers["Referer"] = "https://cheapestinference.com/pools";
       headers["Origin"] = "https://cheapestinference.com";
     }
@@ -143,7 +163,11 @@ export class RobustHttpClient {
       } else if (enc === "br") {
         return zlib.brotliDecompressSync(buffer).toString("utf-8");
       } else if (enc === "deflate") {
-        return zlib.inflateSync(buffer).toString("utf-8");
+        try {
+          return zlib.inflateSync(buffer).toString("utf-8");
+        } catch {
+          return zlib.inflateRawSync(buffer).toString("utf-8");
+        }
       }
     } catch {
       // Fallback to raw string if decompression throws
@@ -153,7 +177,7 @@ export class RobustHttpClient {
 
   public async get(opts: HttpRequestOptions): Promise<HttpResponse> {
     const proxyUrl = this.proxyPool.getNextProxyUrl();
-    const timeoutMs = opts.timeoutMs ?? 20_000;
+    const timeoutMs = opts.timeoutMs ?? 15_000;
     const maxRedirects = opts.maxRedirects ?? 5;
     const startTime = Date.now();
     const dispatcher = this.getOrCreateDispatcher(proxyUrl, timeoutMs);
@@ -175,7 +199,7 @@ export class RobustHttpClient {
           dispatcher,
           headersTimeout: timeoutMs,
           bodyTimeout: timeoutMs,
-          maxRedirections: 0, // Handled explicitly below
+          maxRedirections: 0,
         });
 
         // Handle HTTP 301, 302, 307, 308 Redirects
@@ -189,7 +213,6 @@ export class RobustHttpClient {
           const redirectLocation = res.headers["location"];
           currentUrl = new URL(redirectLocation, currentUrl).toString();
           redirectsCount++;
-          // Consume response body to release socket
           await res.body.arrayBuffer();
           continue;
         }
