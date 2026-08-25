@@ -8,6 +8,10 @@ export interface UserRecord {
   language: SupportedLanguage;
   is_muted: number; // 0 = Sound ON, 1 = Muted
   is_active: number; // 1 = Active, 0 = Blocked bot
+  notify_available_global: number; // 1 = Enabled, 0 = Disabled
+  notify_sold_out_global: number; // 1 = Enabled, 0 = Disabled
+  notify_models_global: number; // 1 = Enabled, 0 = Disabled
+  notify_prices_global: number; // 1 = Enabled, 0 = Disabled
   created_at: string;
   updated_at: string;
 }
@@ -19,6 +23,8 @@ export interface SubscriptionRecord {
   block_id: string;  // 'ALL' | 'asia' | 'europe' | 'americas'
   notify_on_available: number;
   notify_on_sold_out: number;
+  notify_on_models: number;
+  notify_on_prices: number;
   created_at: string;
 }
 

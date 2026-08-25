@@ -11,9 +11,11 @@ import { SlotDiffEngine } from "./engine/diffEngine.js";
 import { ScraperOrchestrator } from "./engine/scraperOrchestrator.js";
 import { PoolStateDAO } from "./db/dao/poolState.js";
 import { SlotHistoryDAO } from "./db/dao/slotHistory.js";
+import { CatalogHistoryDAO } from "./db/dao/catalogHistory.js";
 import { UserDAO } from "./db/dao/users.js";
 import { SubscriptionDAO } from "./db/dao/subscriptions.js";
 import { NotificationLogDAO } from "./db/dao/notificationLogs.js";
+import { DatabaseMaintenanceManager } from "./db/maintenance.js";
 import { createTelegramBot } from "./bot/index.js";
 import { createHealthServer } from "./server/health.js";
 
@@ -22,14 +24,18 @@ async function bootstrap() {
   console.log("🚀 Starting CheapestInference Telegram Monitor Bot");
   console.log("==================================================");
 
-  // 1. Initialize SQLite Database & DAOs
+  // 1. Initialize SQLite Database, DAOs & Maintenance
   const db = getDatabase();
   const userDao = new UserDAO(db);
   const subDao = new SubscriptionDAO(db);
   const poolStateDao = new PoolStateDAO(db);
   const notificationLogDao = new NotificationLogDAO(db);
   const slotHistoryDao = new SlotHistoryDAO(db);
-  console.log(`📦 [Database] SQLite connected at: ${config.DB_PATH}`);
+  const catalogHistoryDao = new CatalogHistoryDAO(db);
+
+  const maintenanceManager = new DatabaseMaintenanceManager(db);
+  maintenanceManager.startDailyMaintenance();
+  console.log(`📦 [Database] SQLite connected & supercharged at: ${config.DB_PATH}`);
 
   // 2. Initialize Proxy / Tor Subsystem
   let torManager: TorManager | undefined;
@@ -62,7 +68,7 @@ async function bootstrap() {
   const jsonApiEngine = new JsonApiEngine(httpClient);
   const htmlSnapshotEngine = new HtmlSnapshotEngine(httpClient);
   const sanityGuard = new SanityGuard();
-  const diffEngine = new SlotDiffEngine(slotHistoryDao);
+  const diffEngine = new SlotDiffEngine(slotHistoryDao, catalogHistoryDao);
 
   // 4. Initialize Scraper Orchestrator
   const scraper = new ScraperOrchestrator(
@@ -122,7 +128,6 @@ async function bootstrap() {
   const shutdown = async (signal: string) => {
     console.log(`\n🛑 [Shutdown] Received ${signal}. Stopping services gracefully...`);
 
-    // Force exit watchdog after 5s if graceful shutdown hangs
     const forceTimeout = setTimeout(() => {
       console.error("⚠️ [Shutdown] Graceful drain timed out. Forcing process exit.");
       process.exit(1);

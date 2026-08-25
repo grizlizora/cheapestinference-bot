@@ -15,11 +15,18 @@ export function getDatabase(): Database.Database {
 
   dbInstance = new Database(config.DB_PATH);
 
-  // Performance and integrity pragmas
+  // Performance and zero-copy scaling PRAGMAs
   dbInstance.pragma("journal_mode = WAL");
   dbInstance.pragma("synchronous = NORMAL");
   dbInstance.pragma("foreign_keys = ON");
-  dbInstance.pragma("cache_size = -2000"); // 2MB memory cache
+  dbInstance.pragma("cache_size = -4000"); // 4MB RAM cache
+  dbInstance.pragma("mmap_size = 30000000000"); // 30GB Memory-Mapped I/O
+  dbInstance.pragma("busy_timeout = 5000"); // 5s timeout on lock
+  dbInstance.pragma("temp_store = MEMORY");
+  dbInstance.pragma("wal_autocheckpoint = 1000");
+  try {
+    dbInstance.pragma("auto_vacuum = INCREMENTAL");
+  } catch {}
 
   // Run schema initialization
   initSchema(dbInstance);
@@ -35,9 +42,13 @@ function initSchema(db: Database.Database): void {
       telegram_id INTEGER NOT NULL UNIQUE,
       username TEXT,
       first_name TEXT NOT NULL,
-      language TEXT NOT NULL DEFAULT 'uk',
+      language TEXT NOT NULL DEFAULT 'en',
       is_muted INTEGER NOT NULL DEFAULT 0,
       is_active INTEGER NOT NULL DEFAULT 1,
+      notify_available_global INTEGER NOT NULL DEFAULT 1,
+      notify_sold_out_global INTEGER NOT NULL DEFAULT 0,
+      notify_models_global INTEGER NOT NULL DEFAULT 1,
+      notify_prices_global INTEGER NOT NULL DEFAULT 1,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
@@ -52,12 +63,14 @@ function initSchema(db: Database.Database): void {
       block_id TEXT NOT NULL,
       notify_on_available INTEGER NOT NULL DEFAULT 1,
       notify_on_sold_out INTEGER NOT NULL DEFAULT 0,
+      notify_on_models INTEGER NOT NULL DEFAULT 1,
+      notify_on_prices INTEGER NOT NULL DEFAULT 1,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
       UNIQUE(user_id, pool_slug, block_id)
     );
 
-    CREATE INDEX IF NOT EXISTS idx_subs_lookup ON subscriptions(pool_slug, block_id, notify_on_available);
+    CREATE INDEX IF NOT EXISTS idx_subs_covering ON subscriptions(pool_slug, block_id, notify_on_available, notify_on_sold_out, user_id);
     CREATE INDEX IF NOT EXISTS idx_subs_user ON subscriptions(user_id);
 
     CREATE TABLE IF NOT EXISTS pool_state (
@@ -77,7 +90,21 @@ function initSchema(db: Database.Database): void {
       UNIQUE(pool_slug, block_id)
     );
 
-    CREATE INDEX IF NOT EXISTS idx_pool_state_slug ON pool_state(pool_slug);
+    CREATE INDEX IF NOT EXISTS idx_pool_state_slug ON pool_state(pool_slug, block_id);
+
+    CREATE TABLE IF NOT EXISTS slot_lifecycle_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pool_slug TEXT NOT NULL,
+      block_id TEXT NOT NULL,
+      opened_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      closed_at DATETIME,
+      duration_seconds INTEGER,
+      initial_status TEXT NOT NULL,
+      price_month TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_slot_history_active ON slot_lifecycle_history(pool_slug, block_id, closed_at);
+    CREATE INDEX IF NOT EXISTS idx_slot_history_analytics ON slot_lifecycle_history(pool_slug, block_id, duration_seconds) WHERE duration_seconds IS NOT NULL;
 
     CREATE TABLE IF NOT EXISTS notification_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -89,7 +116,8 @@ function initSchema(db: Database.Database): void {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
-    CREATE INDEX IF NOT EXISTS idx_notif_logs_sent ON notification_logs(sent_at);
+    CREATE INDEX IF NOT EXISTS idx_notif_logs_retention ON notification_logs(sent_at);
+    CREATE INDEX IF NOT EXISTS idx_notif_logs_user_history ON notification_logs(user_id, sent_at);
   `);
 }
 

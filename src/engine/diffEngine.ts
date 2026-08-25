@@ -1,5 +1,7 @@
 import { DiffEvent, PoolData, PoolsSnapshot } from "../types/domain.js";
 import { SlotHistoryDAO } from "../db/dao/slotHistory.js";
+import { CatalogHistoryDAO } from "../db/dao/catalogHistory.js";
+import { ModelSemanticMatcher } from "./modelSemanticMatcher.js";
 
 interface TrackedSlot {
   poolSlug: string;
@@ -18,7 +20,10 @@ export class SlotDiffEngine {
   private pendingDisappearances = new Map<string, number>();
   private isInitialized = false;
 
-  constructor(private readonly historyDao?: SlotHistoryDAO) {}
+  constructor(
+    private readonly historyDao?: SlotHistoryDAO,
+    private readonly catalogHistoryDao?: CatalogHistoryDAO
+  ) {}
 
   public isReady(): boolean {
     return this.isInitialized;
@@ -32,14 +37,10 @@ export class SlotDiffEngine {
     };
   }
 
-  /**
-   * Process a fresh scrape snapshot and compute real state diff events
-   */
   public processSnapshot(snapshot: PoolsSnapshot): DiffEvent[] {
     const now = Date.now();
     const events: DiffEvent[] = [];
 
-    // Cold boot: silently establish baseline
     if (!this.isInitialized) {
       this.bootstrap(snapshot);
       return [];
@@ -52,14 +53,20 @@ export class SlotDiffEngine {
       incomingPoolSlugs.add(pool.slug);
       const prevPool = this.inMemoryPools.get(pool.slug);
 
-      // Check if models array or pool metadata updated dynamically
       if (prevPool) {
-        const prevModels = (prevPool.models || []).slice().sort().join(",");
-        const newModels = (pool.models || []).slice().sort().join(",");
-        if (prevModels !== newModels || prevPool.modelName !== pool.modelName) {
+        // 1. Model Catalog Granular Diffing (ModelSemanticMatcher)
+        const modelDiff = ModelSemanticMatcher.diffModelLists(
+          pool.slug,
+          pool.modelName,
+          prevPool.models || [],
+          pool.models || []
+        );
+
+        if (modelDiff.hasChanges) {
+          this.catalogHistoryDao?.recordModelUpgrade(modelDiff);
           events.push({
             id: crypto.randomUUID(),
-            type: "CATALOG_UPDATED",
+            type: "MODEL_UPGRADE_EVENT",
             poolSlug: pool.slug,
             poolName: pool.modelName,
             block: "ALL",
@@ -68,9 +75,84 @@ export class SlotDiffEngine {
             newStatus: pool.status,
             newPrice: pool.minPricePerDay,
             timestamp: now,
+            modelUpgrade: {
+              added: modelDiff.added,
+              upgraded: modelDiff.upgraded,
+              removed: modelDiff.removed,
+              allActiveModels: pool.models || [],
+            },
+          });
+        }
+
+        // 2. Pool Base Price Diffing
+        const prevMin = parseFloat(prevPool.minPricePerDay || "0");
+        const newMin = parseFloat(pool.minPricePerDay || "0");
+        if (!isNaN(prevMin) && !isNaN(newMin) && Math.abs(prevMin - newMin) > 0.01) {
+          const delta = newMin - prevMin;
+          const pct = prevMin > 0 ? (delta / prevMin) * 100 : 0;
+          const basePricePayload = {
+            previousMinPrice: prevPool.minPricePerDay,
+            newMinPrice: pool.minPricePerDay,
+            priceDelta: parseFloat(delta.toFixed(2)),
+            percentageDelta: parseFloat(pct.toFixed(2)),
+          };
+          this.catalogHistoryDao?.recordBasePriceUpdate(
+            pool.slug,
+            pool.modelName,
+            pool.models || [],
+            basePricePayload
+          );
+          events.push({
+            id: crypto.randomUUID(),
+            type: "POOL_BASE_PRICE_CHANGED",
+            poolSlug: pool.slug,
+            poolName: pool.modelName,
+            block: "ALL",
+            models: pool.models || [],
+            hoursUtc: "",
+            previousPrice: prevPool.minPricePerDay,
+            newPrice: pool.minPricePerDay,
+            timestamp: now,
+            basePrice: basePricePayload,
+          });
+        }
+
+        // 3. Tier Terms & Metadata Diffing
+        const descChanged = (prevPool.description || "") !== (pool.description || "");
+        const discountChanged = (prevPool.annualDiscount || 0) !== (pool.annualDiscount || 0);
+        const infraChanged = (prevPool.infraSpec || "") !== (pool.infraSpec || "");
+        const manualProvChanged = (prevPool.manualProvisioning || false) !== (pool.manualProvisioning || false);
+
+        if (descChanged || discountChanged || infraChanged || manualProvChanged) {
+          const tierPayload = {
+            previousDescription: prevPool.description,
+            newDescription: pool.description,
+            previousAnnualDiscount: prevPool.annualDiscount,
+            newAnnualDiscount: pool.annualDiscount || 0.15,
+            previousInfraSpec: prevPool.infraSpec,
+            newInfraSpec: pool.infraSpec,
+            manualProvisioningChanged: manualProvChanged,
+          };
+          this.catalogHistoryDao?.recordTierUpdate(
+            pool.slug,
+            pool.modelName,
+            pool.models || [],
+            tierPayload
+          );
+          events.push({
+            id: crypto.randomUUID(),
+            type: "TIER_UPDATED_EVENT",
+            poolSlug: pool.slug,
+            poolName: pool.modelName,
+            block: "ALL",
+            models: pool.models || [],
+            hoursUtc: "",
+            timestamp: now,
+            tierUpdate: tierPayload,
           });
         }
       } else {
+        // Brand new pool listed
         events.push({
           id: crypto.randomUUID(),
           type: "NEW_POOL_EVENT",
@@ -87,14 +169,13 @@ export class SlotDiffEngine {
 
       this.inMemoryPools.set(pool.slug, pool);
 
+      // 4. Regional Slot Block Diffing
       for (const block of pool.blocks) {
         const key = `${pool.slug}:${block.block}`;
         incomingSlotKeys.add(key);
-
         const prevSlot = this.inMemorySlots.get(key);
 
         if (!prevSlot) {
-          // New slot block discovered
           this.inMemorySlots.set(key, {
             poolSlug: pool.slug,
             poolName: pool.modelName,
@@ -129,15 +210,14 @@ export class SlotDiffEngine {
           continue;
         }
 
-        // Slot already tracked; check transitions
         const wasInStock = prevSlot.status === "available" || prevSlot.status === "limited";
         const isNowInStock = block.status === "available" || block.status === "limited";
         const isNowSoldOut = block.status === "sold-out";
 
-        // Status changed
+        // Status transitions
         if (prevSlot.status !== block.status) {
           if (!wasInStock && isNowInStock) {
-            // SLOT_APPEARED: Fast path K=1 (immediate notification)
+            // Fast-path K=1
             this.pendingDisappearances.delete(key);
             this.historyDao?.recordSlotOpened(
               pool.slug,
@@ -161,7 +241,7 @@ export class SlotDiffEngine {
             });
             prevSlot.status = block.status;
           } else if (wasInStock && isNowSoldOut) {
-            // SLOT_DISAPPEARED: K=2 confirmation gate to prevent false alarms
+            // K=2 Confirmation Gate
             const pendingCount = (this.pendingDisappearances.get(key) || 0) + 1;
             this.pendingDisappearances.set(key, pendingCount);
 
@@ -185,26 +265,50 @@ export class SlotDiffEngine {
               this.pendingDisappearances.delete(key);
             }
           } else {
-            // Transitions within in-stock (limited <-> available)
+            // Status transition between active states (available <-> limited)
             this.pendingDisappearances.delete(key);
             prevSlot.status = block.status;
           }
         } else {
-          // If status confirmed same, clear pending disappearances
           if (this.pendingDisappearances.has(key)) {
             this.pendingDisappearances.delete(key);
           }
         }
 
-        // Price changed check
+        // 5. Regional Slot Price Changed (SLOT_PRICE_CHANGED)
+        const oldPriceNum = parseFloat(prevSlot.pricePerMonth || "0");
+        const newPriceNum = parseFloat(block.pricePerMonth || "0");
         if (
           prevSlot.pricePerMonth !== block.pricePerMonth &&
           block.pricePerMonth !== "" &&
-          block.pricePerMonth !== "0"
+          block.pricePerMonth !== "0" &&
+          !isNaN(oldPriceNum) &&
+          !isNaN(newPriceNum)
         ) {
+          const delta = newPriceNum - oldPriceNum;
+          const pct = oldPriceNum > 0 ? (delta / oldPriceNum) * 100 : 0;
+          const slotPricePayload = {
+            block: block.block,
+            hoursUtc: block.hoursUtc,
+            previousPrice: prevSlot.pricePerMonth,
+            newPrice: block.pricePerMonth,
+            priceDelta: parseFloat(delta.toFixed(2)),
+            percentageDelta: parseFloat(pct.toFixed(2)),
+            isDiscount: delta < 0,
+          };
+
+          this.catalogHistoryDao?.recordSlotPriceChange(
+            pool.slug,
+            block.block,
+            prevSlot.pricePerMonth,
+            block.pricePerMonth,
+            slotPricePayload.priceDelta,
+            slotPricePayload.percentageDelta
+          );
+
           events.push({
             id: crypto.randomUUID(),
-            type: "PRICE_CHANGED",
+            type: "SLOT_PRICE_CHANGED",
             poolSlug: pool.slug,
             poolName: pool.modelName,
             block: block.block,
@@ -214,6 +318,7 @@ export class SlotDiffEngine {
             newPrice: block.pricePerMonth,
             newStatus: block.status,
             timestamp: now,
+            slotPrice: slotPricePayload,
           });
           prevSlot.pricePerMonth = block.pricePerMonth;
         }
@@ -224,31 +329,28 @@ export class SlotDiffEngine {
       }
     }
 
-    // Reconcile deleted / decommissioned slots that vanished from response
-    for (const [key, trackedSlot] of this.inMemorySlots.entries()) {
+    // Reconcile and prune vanished pools / slots
+    for (const [key, slot] of this.inMemorySlots.entries()) {
       if (!incomingSlotKeys.has(key)) {
-        this.pendingDisappearances.delete(key);
-        if (trackedSlot.status === "available" || trackedSlot.status === "limited") {
-          this.historyDao?.recordSlotClosed(trackedSlot.poolSlug, trackedSlot.block);
+        if (slot.status === "available" || slot.status === "limited") {
           events.push({
             id: crypto.randomUUID(),
             type: "SLOT_DISAPPEARED",
-            poolSlug: trackedSlot.poolSlug,
-            poolName: trackedSlot.poolName,
-            block: trackedSlot.block,
-            models: trackedSlot.models,
-            hoursUtc: trackedSlot.hoursUtc,
-            previousStatus: trackedSlot.status,
+            poolSlug: slot.poolSlug,
+            poolName: slot.poolName,
+            block: slot.block,
+            models: slot.models,
+            hoursUtc: slot.hoursUtc,
+            previousStatus: slot.status,
             newStatus: "sold-out",
-            newPrice: trackedSlot.pricePerMonth,
             timestamp: now,
           });
         }
         this.inMemorySlots.delete(key);
+        this.pendingDisappearances.delete(key);
       }
     }
 
-    // Reconcile deleted pools from memory
     for (const slug of this.inMemoryPools.keys()) {
       if (!incomingPoolSlugs.has(slug)) {
         this.inMemoryPools.delete(slug);

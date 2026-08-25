@@ -1,9 +1,27 @@
 import { describe, it, expect } from "vitest";
-import { translate, SUPPORTED_LANGUAGES, getLanguageFlag } from "../src/i18n/index.js";
+import {
+  translate,
+  SUPPORTED_LANGUAGES,
+  getLanguageFlag,
+  resolveDefaultLanguage,
+} from "../src/i18n/index.js";
 
 describe("i18n subsystem", () => {
   it("should support uk, en, and ru", () => {
     expect(SUPPORTED_LANGUAGES).toEqual(["uk", "en", "ru"]);
+  });
+
+  it("should resolve default language to en for international users, and uk/ru for native users", () => {
+    expect(resolveDefaultLanguage("uk")).toBe("uk");
+    expect(resolveDefaultLanguage("uk-UA")).toBe("uk");
+    expect(resolveDefaultLanguage("ru")).toBe("ru");
+    expect(resolveDefaultLanguage("be")).toBe("ru");
+    expect(resolveDefaultLanguage("en")).toBe("en");
+    expect(resolveDefaultLanguage("en-US")).toBe("en");
+    expect(resolveDefaultLanguage("de")).toBe("en");
+    expect(resolveDefaultLanguage("fr")).toBe("en");
+    expect(resolveDefaultLanguage(null)).toBe("en");
+    expect(resolveDefaultLanguage(undefined)).toBe("en");
   });
 
   it("should correctly translate common keys in Ukrainian", () => {
@@ -17,7 +35,7 @@ describe("i18n subsystem", () => {
     expect(translate("en", "common.status_available")).toBe("🟢 Available");
     expect(translate("en", "common.status_sold_out")).toBe("🔴 Sold Out");
     expect(translate("en", "subscriptions.toast_global_on")).toBe("🌐 Global alerts enabled");
-    expect(translate("en", "menu.loading_data")).toContain("Loading");
+    expect(translate("en", "menu.loading_data")).toContain("Fetching");
   });
 
   it("should correctly translate common keys in Russian", () => {

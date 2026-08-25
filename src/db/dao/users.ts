@@ -7,11 +7,37 @@ export class UserDAO {
   private stmtUpsert: Database.Statement;
   private stmtUpdateLang: Database.Statement;
   private stmtToggleMute: Database.Statement;
+  private stmtToggleAvail: Database.Statement;
+  private stmtToggleSoldOut: Database.Statement;
+  private stmtToggleModels: Database.Statement;
+  private stmtTogglePrices: Database.Statement;
   private stmtDeactivate: Database.Statement;
   private stmtReactivate: Database.Statement;
   private stmtGetStats: Database.Statement;
 
-  constructor(private db: Database.Database) {
+  constructor(public readonly db: Database.Database) {
+    // Run schema migration for new user preference columns
+    try {
+      db.exec(`
+        ALTER TABLE users ADD COLUMN notify_available_global INTEGER NOT NULL DEFAULT 1;
+      `);
+    } catch {}
+    try {
+      db.exec(`
+        ALTER TABLE users ADD COLUMN notify_sold_out_global INTEGER NOT NULL DEFAULT 0;
+      `);
+    } catch {}
+    try {
+      db.exec(`
+        ALTER TABLE users ADD COLUMN notify_models_global INTEGER NOT NULL DEFAULT 1;
+      `);
+    } catch {}
+    try {
+      db.exec(`
+        ALTER TABLE users ADD COLUMN notify_prices_global INTEGER NOT NULL DEFAULT 1;
+      `);
+    } catch {}
+
     this.stmtGetByTgId = db.prepare("SELECT * FROM users WHERE telegram_id = ?");
     this.stmtGetById = db.prepare("SELECT * FROM users WHERE id = ?");
     this.stmtUpsert = db.prepare(`
@@ -29,6 +55,18 @@ export class UserDAO {
     `);
     this.stmtToggleMute = db.prepare(`
       UPDATE users SET is_muted = CASE WHEN is_muted = 1 THEN 0 ELSE 1 END, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?
+    `);
+    this.stmtToggleAvail = db.prepare(`
+      UPDATE users SET notify_available_global = CASE WHEN notify_available_global = 1 THEN 0 ELSE 1 END, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?
+    `);
+    this.stmtToggleSoldOut = db.prepare(`
+      UPDATE users SET notify_sold_out_global = CASE WHEN notify_sold_out_global = 1 THEN 0 ELSE 1 END, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?
+    `);
+    this.stmtToggleModels = db.prepare(`
+      UPDATE users SET notify_models_global = CASE WHEN notify_models_global = 1 THEN 0 ELSE 1 END, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?
+    `);
+    this.stmtTogglePrices = db.prepare(`
+      UPDATE users SET notify_prices_global = CASE WHEN notify_prices_global = 1 THEN 0 ELSE 1 END, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?
     `);
     this.stmtDeactivate = db.prepare(`
       UPDATE users SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?
@@ -63,7 +101,7 @@ export class UserDAO {
       telegram_id: params.telegram_id,
       username: params.username,
       first_name: params.first_name,
-      language: params.language || "uk",
+      language: params.language || "en",
     }) as UserRecord;
   }
 
@@ -75,6 +113,30 @@ export class UserDAO {
     this.stmtToggleMute.run(tgId);
     const user = this.getByTelegramId(tgId);
     return user ? user.is_muted : 0;
+  }
+
+  toggleAvailable(tgId: number): number {
+    this.stmtToggleAvail.run(tgId);
+    const user = this.getByTelegramId(tgId);
+    return user ? user.notify_available_global : 1;
+  }
+
+  toggleSoldOut(tgId: number): number {
+    this.stmtToggleSoldOut.run(tgId);
+    const user = this.getByTelegramId(tgId);
+    return user ? user.notify_sold_out_global : 0;
+  }
+
+  toggleModels(tgId: number): number {
+    this.stmtToggleModels.run(tgId);
+    const user = this.getByTelegramId(tgId);
+    return user ? user.notify_models_global : 1;
+  }
+
+  togglePrices(tgId: number): number {
+    this.stmtTogglePrices.run(tgId);
+    const user = this.getByTelegramId(tgId);
+    return user ? user.notify_prices_global : 1;
   }
 
   deactivateUser(tgId: number): void {

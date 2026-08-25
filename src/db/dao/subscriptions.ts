@@ -9,11 +9,18 @@ export class SubscriptionDAO {
   private stmtCountActiveSubs: Database.Statement;
   private stmtHasSub: Database.Statement;
 
-  constructor(private db: Database.Database) {
-    // Matches 3 hierarchical subscription levels:
-    // 1. Global: ('ALL', 'ALL')
-    // 2. Pool-wide: (poolSlug, 'ALL')
-    // 3. Slot-specific: (poolSlug, blockId)
+  constructor(public readonly db: Database.Database) {
+    try {
+      db.exec(`
+        ALTER TABLE subscriptions ADD COLUMN notify_on_models INTEGER NOT NULL DEFAULT 1;
+      `);
+    } catch {}
+    try {
+      db.exec(`
+        ALTER TABLE subscriptions ADD COLUMN notify_on_prices INTEGER NOT NULL DEFAULT 1;
+      `);
+    } catch {}
+
     this.stmtFindSubscribers = db.prepare(`
       SELECT DISTINCT u.telegram_id, u.language, u.is_muted
       FROM subscriptions s
@@ -27,6 +34,8 @@ export class SubscriptionDAO {
         AND (
           (? = 'available' AND s.notify_on_available = 1)
           OR (? = 'sold_out' AND s.notify_on_sold_out = 1)
+          OR (? = 'models' AND s.notify_on_models = 1)
+          OR (? = 'prices' AND s.notify_on_prices = 1)
         )
     `);
 
@@ -35,11 +44,14 @@ export class SubscriptionDAO {
     `);
 
     this.stmtAddSub = db.prepare(`
-      INSERT INTO subscriptions (user_id, pool_slug, block_id, notify_on_available, notify_on_sold_out)
-      VALUES (?, ?, ?, 1, 1)
+      INSERT INTO subscriptions (
+        user_id, pool_slug, block_id, notify_on_available, notify_on_sold_out, notify_on_models, notify_on_prices
+      ) VALUES (?, ?, ?, 1, 1, 1, 1)
       ON CONFLICT(user_id, pool_slug, block_id) DO UPDATE SET
         notify_on_available = 1,
-        notify_on_sold_out = 1
+        notify_on_sold_out = 1,
+        notify_on_models = 1,
+        notify_on_prices = 1
     `);
 
     this.stmtRemoveSub = db.prepare(`
@@ -58,12 +70,14 @@ export class SubscriptionDAO {
   findSubscribersForSlot(
     poolSlug: string,
     blockId: string,
-    eventType: "available" | "sold_out"
+    eventType: "available" | "sold_out" | "models" | "prices"
   ): SubscriberMatch[] {
     return this.stmtFindSubscribers.all(
       poolSlug,
       poolSlug,
       blockId,
+      eventType,
+      eventType,
       eventType,
       eventType
     ) as SubscriberMatch[];
@@ -82,10 +96,10 @@ export class SubscriptionDAO {
     const exists = this.hasSubscription(userId, poolSlug, blockId);
     if (exists) {
       this.stmtRemoveSub.run(userId, poolSlug, blockId);
-      return false; // Now unsubscribed
+      return false;
     } else {
       this.stmtAddSub.run(userId, poolSlug, blockId);
-      return true; // Now subscribed
+      return true;
     }
   }
 

@@ -8,12 +8,17 @@ import { NotificationLogDAO } from "../db/dao/notificationLogs.js";
 import { SlotHistoryDAO } from "../db/dao/slotHistory.js";
 import { ScraperOrchestrator } from "../engine/scraperOrchestrator.js";
 import { ProxyPool } from "../proxy/proxyPool.js";
-import { createMainMenuHierarchy, renderDashboardText } from "./menus/mainDashboard.js";
+import {
+  createMainMenuHierarchy,
+  renderDashboardText,
+} from "./menus/mainDashboard.js";
+import { renderSubscriptionsText } from "./menus/subscriptions.js";
 import { createStartHandler } from "./handlers/start.js";
 import { createAdminHandler } from "./handlers/admin.js";
+import { createBackupHandler } from "./handlers/backup.js";
 import { NotificationDispatcher } from "./notifier/dispatcher.js";
 import { config } from "../config/env.js";
-import { translate, SupportedLanguage } from "../i18n/index.js";
+import { translate, resolveDefaultLanguage, SupportedLanguage } from "../i18n/index.js";
 
 export function createTelegramBot(
   token: string,
@@ -28,7 +33,7 @@ export function createTelegramBot(
   const bot = new Bot<BotContext>(token);
   const resolvedHistoryDao = historyDao;
 
-  // 1. Error Boundary
+  // 1. Global Error Boundary
   bot.catch((err) => {
     const ctx = err.ctx;
     console.error(
@@ -47,29 +52,28 @@ export function createTelegramBot(
     })
   );
 
-  // 4. User context loader & i18n helper
+  // 4. User context loader & universal language resolution
   bot.use(async (ctx, next) => {
     if (ctx.from) {
       let user = userDao.getByTelegramId(ctx.from.id);
       if (!user) {
-        const lang: SupportedLanguage = ["uk", "ru", "en"].includes(ctx.from.language_code || "")
-          ? (ctx.from.language_code as SupportedLanguage)
-          : "uk";
+        const lang = resolveDefaultLanguage(ctx.from.language_code);
         user = userDao.upsertUser({
           telegram_id: ctx.from.id,
           username: ctx.from.username ?? null,
           first_name: ctx.from.first_name,
           language: lang,
         });
+        (ctx as any).isNewUser = true;
       } else if (user.is_active === 0) {
         userDao.reactivateUser(ctx.from.id);
         user.is_active = 1;
       }
 
       ctx.user = user;
-      ctx.lang = (user.language as SupportedLanguage) || "uk";
+      ctx.lang = (user.language as SupportedLanguage) || "en";
     } else {
-      ctx.lang = "uk";
+      ctx.lang = "en";
     }
 
     ctx.t = (key: string, params?: Record<string, string | number>) =>
@@ -78,17 +82,16 @@ export function createTelegramBot(
     await next();
   });
 
-  // 5. Shared Notification Dispatcher
+  // 5. Shared Notification Dispatcher with In-Memory Inverted Index
   const dispatcher = new NotificationDispatcher(
     bot,
-    subDao,
     userDao,
     logDao,
     resolvedHistoryDao
   );
 
-  // 6. Navigation Menus
-  const { mainDashboardMenu } = createMainMenuHierarchy(
+  // 6. Navigation Menus Hierarchy
+  const { mainDashboardMenu, languageMenu, subscriptionsMenu } = createMainMenuHierarchy(
     poolStateDao,
     userDao,
     subDao,
@@ -97,7 +100,10 @@ export function createTelegramBot(
   bot.use(mainDashboardMenu);
 
   // 7. Command Handlers
-  bot.command("start", createStartHandler(userDao, poolStateDao, mainDashboardMenu, resolvedHistoryDao));
+  bot.command(
+    "start",
+    createStartHandler(userDao, poolStateDao, languageMenu, mainDashboardMenu, resolvedHistoryDao)
+  );
 
   bot.command(["menu", "dashboard"], async (ctx) => {
     const text = renderDashboardText(ctx, poolStateDao, resolvedHistoryDao);
@@ -109,36 +115,25 @@ export function createTelegramBot(
   });
 
   bot.command(["alerts", "subscriptions"], async (ctx) => {
-    await ctx.reply(ctx.t("subscriptions.title", {
-      global_status: subDao.hasSubscription(ctx.user.id, "ALL", "ALL")
-        ? ctx.t("subscriptions.global_enabled")
-        : ctx.t("subscriptions.global_disabled"),
-      sound_status:
-        ctx.user.is_muted === 1
-          ? ctx.t("subscriptions.sound_muted")
-          : ctx.t("subscriptions.sound_enabled"),
-    }), {
+    const text = renderSubscriptionsText(ctx, subDao);
+    await ctx.reply(text, {
       parse_mode: "HTML",
-      reply_markup: mainDashboardMenu,
+      reply_markup: subscriptionsMenu,
+      link_preview_options: { is_disabled: true },
     });
   });
 
   bot.command("language", async (ctx) => {
     await ctx.reply(ctx.t("onboarding.welcome_title"), {
       parse_mode: "HTML",
-      reply_markup: mainDashboardMenu,
+      reply_markup: languageMenu,
+      link_preview_options: { is_disabled: true },
     });
   });
 
-  bot.command(
-    "admin",
-    createAdminHandler(userDao, subDao, scraper, proxyPool)
-  );
-
-  bot.command(
-    "stats",
-    createAdminHandler(userDao, subDao, scraper, proxyPool)
-  );
+  bot.command("admin", createAdminHandler(userDao, subDao, scraper, proxyPool));
+  bot.command("stats", createAdminHandler(userDao, subDao, scraper, proxyPool));
+  bot.command("backup", createBackupHandler(userDao.db, userDao, subDao));
 
   bot.command("help", async (ctx) => {
     const keyboard = new InlineKeyboard().url(
@@ -152,7 +147,7 @@ export function createTelegramBot(
     });
   });
 
-  // Test notification command (Admin Only, direct to caller)
+  // Test notification command (Admin Only)
   bot.command("testalert", async (ctx) => {
     if (!ctx.from) return;
     const isAdmin =
@@ -164,67 +159,86 @@ export function createTelegramBot(
       return;
     }
 
-    await ctx.reply("🧪 <i>Sending synthetic slot alert to your chat...</i>", {
+    await ctx.reply("🧪 <i>Dispatching test alert through high-concurrency queue...</i>", {
       parse_mode: "HTML",
     });
 
-    await dispatcher.sendSingleAlert(
-      ctx.user.id,
-      ctx.from.id,
-      ctx.lang,
-      ctx.user.is_muted === 1,
+    await dispatcher.handleDiffEvents([
       {
         id: crypto.randomUUID(),
-        type: "SLOT_APPEARED",
-        poolSlug: "flagship",
-        poolName: "Flagship Pool — Kimi K3, Qwen3.8 Max",
-        block: "europe",
-        models: ["kimi-k3", "qwen3.8-max"],
-        hoursUtc: "08:00-16:00 UTC",
-        newStatus: "limited",
-        newPrice: "165.00",
+        type: "MODEL_UPGRADE_EVENT",
+        poolSlug: "frontier",
+        poolName: "Frontier Pool",
+        block: "ALL",
+        models: ["glm-5.3", "minimax-m3", "qwen-3.5-turbo"],
+        hoursUtc: "",
         timestamp: Date.now(),
-      }
-    );
+        modelUpgrade: {
+          added: [{ type: "added", modelName: "qwen-3.5-turbo", family: "qwen", newVersion: "3.5" }],
+          upgraded: [
+            {
+              type: "upgraded",
+              modelName: "glm-5.3",
+              previousModelName: "glm-5.2",
+              family: "glm",
+              oldVersion: "5.2",
+              newVersion: "5.3",
+              changeNote: "GLM 5.2 ➡️ GLM 5.3",
+            },
+          ],
+          removed: [],
+          allActiveModels: ["glm-5.3", "minimax-m3", "qwen-3.5-turbo"],
+        },
+      },
+    ]);
   });
 
-  // Localized commands menu in Telegram UI
+  // Localized command scopes in Telegram
   bot.api
-    .setMyCommands([
-      { command: "start", description: "Головне меню та моніторинг слотів" },
-      { command: "menu", description: "Відкрити дашборд доступності" },
-      { command: "alerts", description: "Керування підписками та звуком" },
-      { command: "language", description: "Змінити мову інтерфейсу" },
-      { command: "help", description: "Інструкція та контакт автора" },
-      { command: "stats", description: "Телеметрія системи (Admin)" },
-    ], { language_code: "uk" })
+    .setMyCommands(
+      [
+        { command: "start", description: "Головне меню та моніторинг слотів" },
+        { command: "menu", description: "Відкрити дашборд доступності" },
+        { command: "alerts", description: "Керування підписками та фільтрами" },
+        { command: "language", description: "Змінити мову інтерфейсу" },
+        { command: "help", description: "Інструкція та контакт автора" },
+        { command: "stats", description: "Телеметрія системи (Admin)" },
+        { command: "backup", description: "Завантажити бекап бази (Admin)" },
+      ],
+      { language_code: "uk" }
+    )
+    .catch(() => {});
+
+  bot.api
+    .setMyCommands(
+      [
+        { command: "start", description: "Главное меню и мониторинг слотов" },
+        { command: "menu", description: "Открыть дашборд доступности" },
+        { command: "alerts", description: "Управление подписками и фильтрами" },
+        { command: "language", description: "Сменить язык интерфейса" },
+        { command: "help", description: "Инструкция и контакт автора" },
+        { command: "stats", description: "Телеметрия системы (Admin)" },
+        { command: "backup", description: "Скачать бэкап базы (Admin)" },
+      ],
+      { language_code: "ru" }
+    )
     .catch(() => {});
 
   bot.api
     .setMyCommands([
-      { command: "start", description: "Главное меню и мониторинг слотов" },
-      { command: "menu", description: "Открыть дашборд доступности" },
-      { command: "alerts", description: "Управление подписками и звуком" },
-      { command: "language", description: "Сменить язык интерфейса" },
-      { command: "help", description: "Инструкция и контакт автора" },
-      { command: "stats", description: "Телеметрия системы (Admin)" },
-    ], { language_code: "ru" })
-    .catch(() => {});
-
-  bot.api
-    .setMyCommands([
-      { command: "start", description: "Launch or refresh the main dashboard" },
+      { command: "start", description: "Main dashboard & live slot monitor" },
       { command: "menu", description: "Open slot availability dashboard" },
-      { command: "alerts", description: "Manage slot subscriptions & sound" },
+      { command: "alerts", description: "Manage subscriptions & alert filters" },
       { command: "language", description: "Change language / Змінити мову" },
       { command: "help", description: "How the bot works & author contact" },
-      { command: "stats", description: "Platform telemetry & status (Admin)" },
+      { command: "stats", description: "System telemetry (Admin)" },
+      { command: "backup", description: "Download SQLite database backup (Admin)" },
     ])
     .catch(() => {});
 
   // Wire Scraper diff_events to dispatcher
   scraper.on("diff_events", async (events) => {
-    await dispatcher.dispatchEvents(events);
+    await dispatcher.handleDiffEvents(events);
   });
 
   return { bot, dispatcher };

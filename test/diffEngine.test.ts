@@ -17,6 +17,7 @@ describe("SlotDiffEngine", () => {
         description: "Flagship tier",
         status: "active",
         minPricePerDay: "149.00",
+        annualDiscount: 0.15,
         blocks: [
           { block: "asia", hoursUtc: "00:00-08:00 UTC", pricePerMonth: "155.00", status: "sold-out" },
           { block: "europe", hoursUtc: "08:00-16:00 UTC", pricePerMonth: "165.00", status: "sold-out" },
@@ -39,7 +40,6 @@ describe("SlotDiffEngine", () => {
   it("should immediately emit SLOT_APPEARED on K=1 when a slot becomes available/limited", () => {
     engine.processSnapshot(sampleSnapshot);
 
-    // Slot in europe becomes limited
     const updatedSnapshot: PoolsSnapshot = JSON.parse(JSON.stringify(sampleSnapshot));
     updatedSnapshot.data[0].blocks[1].status = "limited";
 
@@ -52,25 +52,22 @@ describe("SlotDiffEngine", () => {
   });
 
   it("should require K=2 consecutive confirmations before emitting SLOT_DISAPPEARED", () => {
-    // 1. Initial baseline: europe is limited
     const inStockSnapshot: PoolsSnapshot = JSON.parse(JSON.stringify(sampleSnapshot));
     inStockSnapshot.data[0].blocks[1].status = "limited";
     engine.processSnapshot(inStockSnapshot);
 
-    // 2. Scrape 1: europe becomes sold-out (K=1, should not emit yet to prevent flapping)
     const soldOutSnapshot: PoolsSnapshot = JSON.parse(JSON.stringify(sampleSnapshot));
     soldOutSnapshot.data[0].blocks[1].status = "sold-out";
     const eventsRun1 = engine.processSnapshot(soldOutSnapshot);
     expect(eventsRun1).toHaveLength(0);
 
-    // 3. Scrape 2: europe still sold-out (K=2, confirmed disappearance)
     const eventsRun2 = engine.processSnapshot(soldOutSnapshot);
     expect(eventsRun2).toHaveLength(1);
     expect(eventsRun2[0].type).toBe("SLOT_DISAPPEARED");
     expect(eventsRun2[0].block).toBe("europe");
   });
 
-  it("should emit PRICE_CHANGED when price updates", () => {
+  it("should emit SLOT_PRICE_CHANGED with delta & percentage when price updates", () => {
     engine.processSnapshot(sampleSnapshot);
 
     const priceChangeSnapshot: PoolsSnapshot = JSON.parse(JSON.stringify(sampleSnapshot));
@@ -78,35 +75,36 @@ describe("SlotDiffEngine", () => {
 
     const events = engine.processSnapshot(priceChangeSnapshot);
     expect(events).toHaveLength(1);
-    expect(events[0].type).toBe("PRICE_CHANGED");
-    expect(events[0].newPrice).toBe("140.00");
+    expect(events[0].type).toBe("SLOT_PRICE_CHANGED");
+    expect(events[0].slotPrice?.priceDelta).toBe(-15.00);
+    expect(events[0].slotPrice?.isDiscount).toBe(true);
   });
 
-  it("should emit CATALOG_UPDATED when new models are dynamically added", () => {
+  it("should emit MODEL_UPGRADE_EVENT with exact diffs when models update", () => {
     engine.processSnapshot(sampleSnapshot);
 
     const modelUpdateSnapshot: PoolsSnapshot = JSON.parse(JSON.stringify(sampleSnapshot));
-    modelUpdateSnapshot.data[0].models = ["kimi-k3", "qwen3.8-max", "deepseek-r1"];
+    modelUpdateSnapshot.data[0].models = ["kimi-k3", "qwen-3.8-max", "deepseek-r1"];
 
     const events = engine.processSnapshot(modelUpdateSnapshot);
-    expect(events.some((e) => e.type === "CATALOG_UPDATED")).toBe(true);
+    expect(events.some((e) => e.type === "MODEL_UPGRADE_EVENT")).toBe(true);
+    const upgradeEvent = events.find((e) => e.type === "MODEL_UPGRADE_EVENT");
+    expect(upgradeEvent?.modelUpgrade?.added.some((m) => m.modelName === "deepseek-r1")).toBe(true);
   });
 
   it("should reconcile and emit SLOT_DISAPPEARED when a previously active slot is deleted from site", () => {
-    // 1. Initial baseline: europe is available
     const inStockSnapshot: PoolsSnapshot = JSON.parse(JSON.stringify(sampleSnapshot));
     inStockSnapshot.data[0].blocks[1].status = "available";
     engine.processSnapshot(inStockSnapshot);
 
-    // 2. Snapshot where europe block is deleted/removed completely from the site
     const deletedSlotSnapshot: PoolsSnapshot = {
       success: true,
       data: [
         {
           ...sampleSnapshot.data[0],
           blocks: [
-            sampleSnapshot.data[0].blocks[0], // only asia
-            sampleSnapshot.data[0].blocks[2], // only americas
+            sampleSnapshot.data[0].blocks[0],
+            sampleSnapshot.data[0].blocks[2],
           ],
         },
       ],

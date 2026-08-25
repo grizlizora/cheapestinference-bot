@@ -31,7 +31,68 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
       throw new Error(`HTML endpoint responded with HTTP ${res.statusCode}`);
     }
 
-    // 1. Primary SSR Snapshot extraction: window.__POOLS_SNAPSHOT__
+    // 1. Next.js App Router RSC Flight Stream Chunk Parser (self.__next_f.push)
+    const rscRegex = /self\.__next_f\.push\(\[\d+,\s*"([\s\S]*?)"\]\)/g;
+    let match: RegExpExecArray | null;
+    const chunks: string[] = [];
+
+    while ((match = rscRegex.exec(res.body)) !== null) {
+      if (match[1]) {
+        chunks.push(match[1]);
+      }
+    }
+
+    if (chunks.length > 0) {
+      const combinedFlight = chunks
+        .map((c) => c.replace(/\\"/g, '"').replace(/\\\\/g, "\\").replace(/\\n/g, "\n"))
+        .join("");
+
+      const poolArrayMatch = combinedFlight.match(
+        /\{"slug":"(flagship|frontier|core|[\w-]+)",[\s\S]*?"blocks":\[[\s\S]*?\]\}/g
+      );
+
+      if (poolArrayMatch && poolArrayMatch.length > 0) {
+        try {
+          const pools: PoolData[] = [];
+          for (const rawPoolJson of poolArrayMatch) {
+            const parsed = JSON.parse(rawPoolJson);
+            if (parsed.slug && Array.isArray(parsed.blocks)) {
+              pools.push({
+                id: parsed.id || parsed.slug,
+                slug: parsed.slug,
+                modelId: parsed.modelId || parsed.slug,
+                modelName: parsed.modelName || parsed.name || parsed.slug,
+                models: Array.isArray(parsed.models) ? parsed.models : [],
+                description: parsed.description || "",
+                status: parsed.status || "active",
+                minPricePerDay: String(parsed.minPricePerDay || "0"),
+                annualDiscount: parsed.annualDiscount || 0.15,
+                blocks: parsed.blocks.map((b: any) => ({
+                  block: b.block,
+                  hoursUtc: b.hoursUtc || "",
+                  pricePerMonth: String(b.pricePerMonth || "0"),
+                  status: b.status || "limited",
+                })),
+              });
+            }
+          }
+
+          if (pools.length > 0) {
+            return {
+              success: true,
+              modified: true,
+              snapshot: { success: true, data: pools },
+              etag: res.etag,
+              lastModified: res.lastModified,
+              source: "html_rsc_stream",
+              latencyMs: res.latencyMs,
+            };
+          }
+        } catch {}
+      }
+    }
+
+    // 2. Primary SSR Snapshot extraction: window.__POOLS_SNAPSHOT__
     const snapshotMatch = res.body.match(
       /window\.__POOLS_SNAPSHOT__\s*=\s*({[\s\S]*?});?\s*<\/script>/
     );
@@ -50,12 +111,10 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
             latencyMs: res.latencyMs,
           };
         }
-      } catch {
-        // Continue to fallback
-      }
+      } catch {}
     }
 
-    // 2. Next.js SSR payload: <script id="__NEXT_DATA__">
+    // 3. Next.js SSR payload: <script id="__NEXT_DATA__">
     const nextDataMatch = res.body.match(
       /<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/
     );
@@ -77,14 +136,11 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
             latencyMs: res.latencyMs,
           };
         }
-      } catch {
-        // Continue to fallback
-      }
+      } catch {}
     }
 
-    // 3. Fallback: Cheerio DOM & Schema.org Extraction
+    // 4. Fallback: Cheerio DOM & Schema.org Extraction
     const $ = cheerio.load(res.body);
-
     const pools: PoolData[] = [];
 
     const defaultPools: Array<{ slug: string; name: string; models: string[]; minPrice: string }> = [

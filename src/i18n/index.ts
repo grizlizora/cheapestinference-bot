@@ -5,13 +5,30 @@ import en from "./locales/en.json" with { type: "json" };
 import ru from "./locales/ru.json" with { type: "json" };
 
 export const SUPPORTED_LANGUAGES: SupportedLanguage[] = ["uk", "en", "ru"];
-export const DEFAULT_LANGUAGE: SupportedLanguage = "uk";
+export const DEFAULT_LANGUAGE: SupportedLanguage = "en";
 
 const dictionaries: Record<SupportedLanguage, typeof uk> = {
   uk,
   en: en as typeof uk,
   ru: ru as typeof uk,
 };
+
+export function resolveDefaultLanguage(rawLangCode?: string | null): SupportedLanguage {
+  if (!rawLangCode) return "en";
+
+  const primary = rawLangCode.toLowerCase().split(/[-_]/)[0];
+
+  if (primary === "uk") {
+    return "uk";
+  }
+
+  if (primary === "ru" || primary === "be" || primary === "kk") {
+    return "ru";
+  }
+
+  // Universal Fallback for all other locales (en, de, fr, es, zh, etc.)
+  return "en";
+}
 
 export function translate(
   lang: SupportedLanguage,

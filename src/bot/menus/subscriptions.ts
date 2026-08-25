@@ -13,6 +13,91 @@ export function createSubscriptionsMenu(
   historyDao?: SlotHistoryDAO
 ) {
   return new Menu<BotContext>("subscriptions-menu")
+    // Category 1: Available Slots
+    .text(
+      (ctx) =>
+        (ctx.user.notify_available_global ?? 1) === 1
+          ? ctx.t("subscriptions.btn_toggle_avail_on")
+          : ctx.t("subscriptions.btn_toggle_avail_off"),
+      async (ctx) => {
+        const val = userDao.toggleAvailable(ctx.from!.id);
+        ctx.user.notify_available_global = val;
+        const toast =
+          val === 1
+            ? ctx.t("subscriptions.toast_avail_on")
+            : ctx.t("subscriptions.toast_avail_off");
+        await ctx.answerCallbackQuery(toast);
+        await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
+        try {
+          ctx.menu.update();
+        } catch {}
+      }
+    )
+    .row()
+    // Category 2: Sold Out
+    .text(
+      (ctx) =>
+        (ctx.user.notify_sold_out_global ?? 0) === 1
+          ? ctx.t("subscriptions.btn_toggle_sold_on")
+          : ctx.t("subscriptions.btn_toggle_sold_off"),
+      async (ctx) => {
+        const val = userDao.toggleSoldOut(ctx.from!.id);
+        ctx.user.notify_sold_out_global = val;
+        const toast =
+          val === 1
+            ? ctx.t("subscriptions.toast_sold_on")
+            : ctx.t("subscriptions.toast_sold_off");
+        await ctx.answerCallbackQuery(toast);
+        await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
+        try {
+          ctx.menu.update();
+        } catch {}
+      }
+    )
+    .row()
+    // Category 3: Model Updates
+    .text(
+      (ctx) =>
+        (ctx.user.notify_models_global ?? 1) === 1
+          ? ctx.t("subscriptions.btn_toggle_models_on")
+          : ctx.t("subscriptions.btn_toggle_models_off"),
+      async (ctx) => {
+        const val = userDao.toggleModels(ctx.from!.id);
+        ctx.user.notify_models_global = val;
+        const toast =
+          val === 1
+            ? ctx.t("subscriptions.toast_models_on")
+            : ctx.t("subscriptions.toast_models_off");
+        await ctx.answerCallbackQuery(toast);
+        await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
+        try {
+          ctx.menu.update();
+        } catch {}
+      }
+    )
+    .row()
+    // Category 4: Price Changes
+    .text(
+      (ctx) =>
+        (ctx.user.notify_prices_global ?? 1) === 1
+          ? ctx.t("subscriptions.btn_toggle_prices_on")
+          : ctx.t("subscriptions.btn_toggle_prices_off"),
+      async (ctx) => {
+        const val = userDao.togglePrices(ctx.from!.id);
+        ctx.user.notify_prices_global = val;
+        const toast =
+          val === 1
+            ? ctx.t("subscriptions.toast_prices_on")
+            : ctx.t("subscriptions.toast_prices_off");
+        await ctx.answerCallbackQuery(toast);
+        await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
+        try {
+          ctx.menu.update();
+        } catch {}
+      }
+    )
+    .row()
+    // Global All Slots
     .text(
       (ctx) => {
         const isGlobal = subDao.hasSubscription(ctx.user.id, "ALL", "ALL");
@@ -33,6 +118,7 @@ export function createSubscriptionsMenu(
       }
     )
     .row()
+    // Sound Toggle
     .text(
       (ctx) =>
         ctx.user.is_muted === 1
@@ -53,6 +139,7 @@ export function createSubscriptionsMenu(
       }
     )
     .row()
+    // Dynamic Pool & Regional Block Sections
     .dynamic((ctx, range) => {
       const summaries = poolStateDao.getPoolSummaries();
       const pools =
@@ -141,8 +228,32 @@ export function renderSubscriptionsText(ctx: BotContext, subDao: SubscriptionDAO
       ? ctx.t("subscriptions.sound_muted")
       : ctx.t("subscriptions.sound_enabled");
 
+  const availStatus =
+    (ctx.user.notify_available_global ?? 1) === 1
+      ? ctx.t("subscriptions.filter_on")
+      : ctx.t("subscriptions.filter_off");
+
+  const soldStatus =
+    (ctx.user.notify_sold_out_global ?? 0) === 1
+      ? ctx.t("subscriptions.filter_on")
+      : ctx.t("subscriptions.filter_off");
+
+  const modelStatus =
+    (ctx.user.notify_models_global ?? 1) === 1
+      ? ctx.t("subscriptions.filter_on")
+      : ctx.t("subscriptions.filter_off");
+
+  const priceStatus =
+    (ctx.user.notify_prices_global ?? 1) === 1
+      ? ctx.t("subscriptions.filter_on")
+      : ctx.t("subscriptions.filter_off");
+
   return ctx.t("subscriptions.title", {
     global_status: globalStatus,
     sound_status: soundStatus,
+    avail_status: availStatus,
+    sold_status: soldStatus,
+    model_status: modelStatus,
+    price_status: priceStatus,
   });
 }
