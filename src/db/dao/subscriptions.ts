@@ -30,6 +30,7 @@ export class SubscriptionDAO {
           (s.pool_slug = 'ALL' AND s.block_id = 'ALL')
           OR (s.pool_slug = ? AND s.block_id = 'ALL')
           OR (s.pool_slug = ? AND s.block_id = ?)
+          OR (? = 'ALL' AND s.pool_slug = ?)
         )
         AND (
           (? = 'available' AND s.notify_on_available = 1 AND COALESCE(u.notify_available_global, 1) = 1)
@@ -76,6 +77,8 @@ export class SubscriptionDAO {
       poolSlug,
       poolSlug,
       blockId,
+      blockId,
+      poolSlug,
       eventType,
       eventType,
       eventType,
