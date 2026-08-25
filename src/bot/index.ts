@@ -202,7 +202,16 @@ export function createTelegramBot(
   // 9. Command Handlers
   bot.command(
     "start",
-    createStartHandler(userDao, poolStateDao, languageMenu, mainDashboardMenu, resolvedHistoryDao)
+    createStartHandler(
+      userDao,
+      poolStateDao,
+      languageMenu,
+      mainDashboardMenu,
+      resolvedHistoryDao,
+      subDao,
+      subscriptionsMenu,
+      poolDetailMenu
+    )
   );
 
   bot.command("menu", async (ctx) => {

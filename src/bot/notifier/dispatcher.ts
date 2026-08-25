@@ -393,7 +393,23 @@ export class NotificationDispatcher {
 
   private truncateToTelegramLimit(text: string, maxLen = 3900): string {
     if (text.length <= maxLen) return text;
-    return text.substring(0, maxLen - 20) + "\n\n<i>...[truncated]</i>";
+    let truncated = text.substring(0, maxLen - 30);
+    const lastNewline = truncated.lastIndexOf("\n");
+    if (lastNewline > maxLen / 2) {
+      truncated = truncated.substring(0, lastNewline);
+    }
+    const openTags = (truncated.match(/<(?!(?:\/|br|hr))[a-z]+[^>]*>/gi) || [])
+      .map(tag => tag.match(/<([a-z]+)/i)?.[1].toLowerCase())
+      .filter(Boolean) as string[];
+    const closeTags = (truncated.match(/<\/[a-z]+>/gi) || [])
+      .map(tag => tag.match(/<\/([a-z]+)>/i)?.[1].toLowerCase())
+      .filter(Boolean) as string[];
+
+    while (openTags.length > closeTags.length) {
+      const tagToClose = openTags.pop();
+      truncated += `</${tagToClose}>`;
+    }
+    return truncated + "\n\n<i>...[truncated]</i>";
   }
 
   private formatAlertMessage(
@@ -871,6 +887,14 @@ export class NotificationDispatcher {
   }
 
   private flushBlockedUsersToDb(): void {
+    // Evict user rate-limit timestamps older than 5 minutes to prevent RAM growth
+    const cutoff = Date.now() - 5 * 60 * 1000;
+    for (const [tgId, lastSent] of this.lastUserDispatchTime.entries()) {
+      if (lastSent < cutoff) {
+        this.lastUserDispatchTime.delete(tgId);
+      }
+    }
+
     if (this.blockedUsersBatch.length === 0) return;
     const uniqueIds = Array.from(new Set(this.blockedUsersBatch));
     this.blockedUsersBatch = [];

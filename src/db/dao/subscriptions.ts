@@ -119,7 +119,6 @@ export class SubscriptionDAO {
       poolSlug,
       blockId,
       blockId,
-      blockId,
       poolSlug,
       eventType,
       eventType,

@@ -2,6 +2,7 @@ import { Dispatcher, Agent, ProxyAgent, request } from "undici";
 import { SocksClient } from "socks";
 import zlib from "node:zlib";
 import tls from "node:tls";
+import dns from "node:dns/promises";
 import util from "node:util";
 import { ProxyPool } from "../proxy/proxyPool.js";
 
@@ -9,6 +10,34 @@ const gunzipAsync = util.promisify(zlib.gunzip);
 const brotliDecompressAsync = util.promisify(zlib.brotliDecompress);
 const inflateAsync = util.promisify(zlib.inflate);
 const inflateRawAsync = util.promisify(zlib.inflateRaw);
+
+// In-memory DNS cache with 5-minute TTL to bypass synchronous libuv getaddrinfo overhead
+interface DnsCacheEntry {
+  addresses: string[];
+  expiresAt: number;
+}
+const dnsCache = new Map<string, DnsCacheEntry>();
+
+export async function cachedDnsLookup(hostname: string): Promise<string> {
+  const now = Date.now();
+  const cached = dnsCache.get(hostname);
+  if (cached && cached.expiresAt > now && cached.addresses.length > 0) {
+    return cached.addresses[Math.floor(Math.random() * cached.addresses.length)];
+  }
+
+  try {
+    const addresses = await dns.resolve4(hostname);
+    if (addresses.length > 0) {
+      dnsCache.set(hostname, {
+        addresses,
+        expiresAt: now + 300_000, // 5 min TTL
+      });
+      return addresses[0];
+    }
+  } catch {}
+
+  return hostname;
+}
 
 export interface HttpRequestOptions {
   url: string;
@@ -40,6 +69,7 @@ export class RobustHttpClient {
       connect: {
         timeout: 10_000,
         autoSelectFamily: true,
+        autoSelectFamilyAttemptTimeout: 50, // 50ms instead of 250ms default on dual-stack
         keepAlive: true,
         keepAliveInitialDelay: 1000,
         noDelay: true,
@@ -75,6 +105,7 @@ export class RobustHttpClient {
     }
     this.dispatchers.clear();
     this.tlsSessionCache.clear();
+    dnsCache.clear();
   }
 
   private getOrCreateDispatcher(proxyUrl: string | null, timeoutMs: number): Dispatcher {
@@ -246,12 +277,13 @@ export class RobustHttpClient {
     const timeoutMs = opts.timeoutMs ?? 15_000;
     const maxRedirects = opts.maxRedirects ?? 5;
     const startTime = Date.now();
-    const dispatcher = this.getOrCreateDispatcher(proxyUrl, timeoutMs);
 
     let currentUrl = opts.url;
     let redirectsCount = 0;
+    let socketRetried = false;
 
     while (redirectsCount <= maxRedirects) {
+      const dispatcher = this.getOrCreateDispatcher(proxyUrl, timeoutMs);
       try {
         const headers = this.getBrowserHeaders(
           opts.isHtmlFallback ?? false,
@@ -329,6 +361,19 @@ export class RobustHttpClient {
           finalUrl: currentUrl,
         };
       } catch (err: any) {
+        // Transparent single-shot retry on dead keep-alive socket
+        const isSocketReset =
+          err.code === "UND_ERR_SOCKET" ||
+          err.code === "ECONNRESET" ||
+          err.code === "EPIPE" ||
+          err.message?.includes("other side closed");
+
+        if (isSocketReset && !socketRetried) {
+          socketRetried = true;
+          if (proxyUrl) this.invalidateDispatcher(proxyUrl);
+          continue;
+        }
+
         if (redirectsCount > 0 && err.message.includes("Redirect")) {
           throw err;
         }

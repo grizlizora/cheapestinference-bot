@@ -139,6 +139,9 @@ export class ProxyPool {
   }
 
   private findEntry(proxyUrl: string | null): ProxyEntry | undefined {
+    if (proxyUrl && proxyUrl.startsWith("socks5h://tor_")) {
+      return this.proxies.find((p) => p.type === "tor");
+    }
     const targetUrl = proxyUrl ?? "";
     return this.proxies.find((p) => p.url === targetUrl);
   }

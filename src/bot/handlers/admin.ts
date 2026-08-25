@@ -5,6 +5,7 @@ import { SubscriptionDAO } from "../../db/dao/subscriptions.js";
 import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
 import { ProxyPool } from "../../proxy/proxyPool.js";
 import { config } from "../../config/env.js";
+import { escapeHtml } from "../../i18n/index.js";
 
 export function renderAdminText(
   ctx: BotContext,
@@ -50,7 +51,7 @@ export function renderAdminText(
     active_subscriptions: activeSubs,
     last_scrape_ago: lastScrapeAgo >= 0 ? lastScrapeAgo : "N/A",
     latency: scraperTelemetry.lastScrapeLatencyMs,
-    source: scraperTelemetry.lastSource,
+    source: escapeHtml(scraperTelemetry.lastSource || "N/A"),
     consecutive_failures: scraperTelemetry.consecutiveFailures,
     proxy_status: proxyModeStr,
     memory_mb: memUsageMb,

@@ -22,16 +22,22 @@ export function createPoolDetailMenu(
       const blocks = poolStateDao.getPoolBlocks(slug);
       const isSubscribedToPool = subDao.hasSubscription(ctx.user.id, slug, "ALL");
 
-      // Direct buy links with block anchors
       const availableBlocks = blocks.filter(
         (b) => b.status === "available" || b.status === "limited"
       );
 
-      for (const b of availableBlocks) {
-        const blockName = translate(ctx.lang, `common.block_${b.block_id}`) || b.block_id;
+      if (availableBlocks.length > 0) {
+        for (const b of availableBlocks) {
+          const blockName = translate(ctx.lang, `common.block_${b.block_id}`) || b.block_id;
+          range.url(
+            `${ctx.t("alerts.btn_claim_slot")} (${blockName})`,
+            `https://cheapestinference.com/pools/${slug}#${b.block_id}`
+          ).row();
+        }
+      } else {
         range.url(
-          `${ctx.t("alerts.btn_claim_slot")} (${blockName})`,
-          `https://cheapestinference.com/pools/${slug}#${b.block_id}`
+          ctx.t("common.open_site"),
+          `https://cheapestinference.com/pools/${slug}`
         ).row();
       }
 
@@ -58,6 +64,15 @@ export function createPoolDetailMenu(
               soldOut: active,
               models: active,
               prices: active,
+            });
+          }
+
+          if (!active) {
+            invertedIndex.updateSubscription(c.user.id, "ALL", "ALL", {
+              available: false,
+              soldOut: false,
+              models: false,
+              prices: false,
             });
           }
 

@@ -4,7 +4,8 @@ DataDirectory /var/lib/tor
 Log notice file /var/log/tor/notices.log
 ClientOnly 1
 AvoidDiskWrites 1
-MaxMemInQueues 64 MB
+MaxMemInQueues 16 MB
+NumCPUs 1
 DisableDebuggerAttachment 1
 MaxCircuitDirtiness 30
 CircuitBuildTimeout 10

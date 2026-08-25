@@ -50,11 +50,12 @@ export function createMainMenuHierarchy(
       "https://t.me/grizlizora"
     )
     .row()
-    .back(
+    .text(
       (ctx) => ctx.t("common.back"),
       async (ctx) => {
         await ctx.answerCallbackQuery();
         await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao));
+        return ctx.menu.nav("main-dashboard-menu");
       }
     );
 

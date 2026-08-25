@@ -7,6 +7,7 @@ export class PoolStateDAO {
   private stmtGetAll: Database.Statement;
   private stmtGetBySlug: Database.Statement;
   private stmtUpsert: Database.Statement;
+  private stmtDeleteMissing: Database.Statement;
 
   constructor(private db: Database.Database) {
     this.stmtGetBySlugAndBlock = db.prepare(`
@@ -17,6 +18,9 @@ export class PoolStateDAO {
     `);
     this.stmtGetBySlug = db.prepare(`
       SELECT * FROM pool_state WHERE pool_slug = ? ORDER BY id ASC
+    `);
+    this.stmtDeleteMissing = db.prepare(`
+      DELETE FROM pool_state WHERE pool_slug NOT IN (SELECT value FROM json_each(?))
     `);
     this.stmtUpsert = db.prepare(`
       INSERT INTO pool_state (
@@ -56,6 +60,8 @@ export class PoolStateDAO {
 
   saveSnapshot(snapshot: PoolsSnapshot): void {
     const insertMany = this.db.transaction((pools: PoolData[]) => {
+      const validSlugs = pools.map((p) => p.slug);
+      this.stmtDeleteMissing.run(JSON.stringify(validSlugs));
       for (const pool of pools) {
         for (const block of pool.blocks) {
           this.stmtUpsert.run({

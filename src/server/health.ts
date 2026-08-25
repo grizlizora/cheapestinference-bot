@@ -28,47 +28,54 @@ export function createHealthServer(
       pathname === "/ping" ||
       pathname === "/live"
     ) {
-      const telemetry = scraper.getTelemetry();
-      const proxyStatus = proxyPool.getStatus();
+      try {
+        const telemetry = scraper.getTelemetry();
+        const proxyStatus = proxyPool.getStatus();
 
-      // Return HTTP 200 for process liveness to prevent destructive restart loops on Render / HF Spaces
-      const isDegraded = telemetry.consecutiveFailures > 0;
-      const statusCode = 200;
+        // Return HTTP 200 for process liveness to prevent destructive restart loops on Render / HF Spaces
+        const isDegraded = telemetry.consecutiveFailures > 0;
+        const statusCode = 200;
 
-      res.writeHead(statusCode, {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-        "Surrogate-Control": "no-store",
-        "Pragma": "no-cache",
-        "Expires": "0",
-        "Connection": "close",
-        "Access-Control-Allow-Origin": "*",
-      });
+        res.writeHead(statusCode, {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          "Surrogate-Control": "no-store",
+          "CDN-Cache-Control": "no-store",
+          "Cloudflare-CDN-Cache-Control": "no-store",
+          "Pragma": "no-cache",
+          "Expires": "0",
+          "Connection": "close",
+          "Access-Control-Allow-Origin": "*",
+        });
 
-      if (req.method === "HEAD") {
-        res.end();
-        return;
+        if (req.method === "HEAD") {
+          res.end();
+          return;
+        }
+
+        const payload = {
+          status: isDegraded ? "degraded" : "healthy",
+          uptimeSeconds: Math.floor(process.uptime()),
+          timestamp: new Date().toISOString(),
+          memoryUsageMb: {
+            rss: +(process.memoryUsage().rss / 1024 / 1024).toFixed(1),
+            heapUsed: +(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(1),
+          },
+          scraper: {
+            lastScrapeTimestamp: telemetry.lastScrapeTimestamp,
+            lastLatencyMs: telemetry.lastScrapeLatencyMs,
+            lastSource: telemetry.lastSource,
+            consecutiveFailures: telemetry.consecutiveFailures,
+            totalScrapes: telemetry.totalScrapes,
+          },
+          proxy: proxyStatus,
+        };
+
+        res.end(JSON.stringify(payload, null, 2));
+      } catch (err: any) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ status: "error", error: err.message }));
       }
-
-      const payload = {
-        status: isDegraded ? "degraded" : "healthy",
-        uptimeSeconds: Math.floor(process.uptime()),
-        timestamp: new Date().toISOString(),
-        memoryUsageMb: {
-          rss: +(process.memoryUsage().rss / 1024 / 1024).toFixed(1),
-          heapUsed: +(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(1),
-        },
-        scraper: {
-          lastScrapeTimestamp: telemetry.lastScrapeTimestamp,
-          lastLatencyMs: telemetry.lastScrapeLatencyMs,
-          lastSource: telemetry.lastSource,
-          consecutiveFailures: telemetry.consecutiveFailures,
-          totalScrapes: telemetry.totalScrapes,
-        },
-        proxy: proxyStatus,
-      };
-
-      res.end(JSON.stringify(payload, null, 2));
       return;
     }
 
