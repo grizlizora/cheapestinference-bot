@@ -215,4 +215,61 @@ describe("NotificationDispatcher Modern Alert & Bundling Test Suite", () => {
     expect(alert.text).toContain("<s>$39</s> ➔ <b>$29/міс</b>");
     expect(alert.text).toContain("🟢 <b>Знижка: -$10/міс (-25.6%) 🔥</b>");
   });
+
+  it("should never leak unparsed template placeholders like {pool_name} in bundled digests", async () => {
+    const mockBot: any = {
+      api: {
+        sendMessage: async () => ({ message_id: 1 }),
+      },
+    };
+
+    const dispatcher = new NotificationDispatcher(mockBot, userDao, logDao, historyDao, index);
+    dispatcher.enqueue = (msg) => {
+      enqueuedMessages.push(msg);
+    };
+
+    const mixedEvents: DiffEvent[] = [
+      {
+        id: "m1",
+        type: "SLOT_APPEARED",
+        poolSlug: "frontier",
+        poolName: "Frontier Pool",
+        block: "europe",
+        models: ["glm-5.3", "minimax-m3"],
+        hoursUtc: "08:00 – 16:00 UTC",
+        newPrice: "49.00",
+        timestamp: Date.now(),
+      },
+      {
+        id: "m2",
+        type: "MODEL_UPGRADE_EVENT",
+        poolSlug: "core",
+        poolName: "Core Pool",
+        block: "ALL",
+        models: ["deepseek-v4-r1"],
+        hoursUtc: "",
+        timestamp: Date.now(),
+      },
+      {
+        id: "m3",
+        type: "TIER_UPDATED_EVENT",
+        poolSlug: "flagship",
+        poolName: "Flagship Pool",
+        block: "ALL",
+        models: ["kimi-k3"],
+        hoursUtc: "",
+        timestamp: Date.now(),
+      },
+    ];
+
+    await dispatcher.handleDiffEvents(mixedEvents);
+
+    expect(enqueuedMessages).toHaveLength(1);
+    const bundle = enqueuedMessages[0];
+    expect(bundle.text).not.toContain("{pool_name}");
+    expect(bundle.text).not.toContain("{block_name}");
+    expect(bundle.text).not.toContain("{models}");
+    expect(bundle.text).toContain("Core Pool • Оновлення моделей");
+    expect(bundle.text).toContain("Flagship Pool • Оновлення тарифу");
+  });
 });

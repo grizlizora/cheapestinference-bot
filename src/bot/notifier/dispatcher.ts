@@ -624,8 +624,14 @@ export class NotificationDispatcher {
           `🔒 <b>${escapeHtml(event.poolName)} • ${escapeHtml(blockName)}</b> — <i>${translate(lang, "common.status_sold_out")}</i>`
         );
       } else if (event.type === "MODEL_UPGRADE_EVENT") {
+        const upgradeTitle =
+          lang === "uk"
+            ? "Оновлення моделей"
+            : lang === "ru"
+            ? "Обновление моделей"
+            : "Model Upgrade";
         sectionLines.push(
-          `🚀 <b>${escapeHtml(event.poolName)} • ${translate(lang, "alerts.model_upgrade_header")}</b>\n` +
+          `🚀 <b>${escapeHtml(event.poolName)} • ${upgradeTitle}</b>\n` +
           `🤖 ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
         );
       } else if (event.type === "SLOT_PRICE_CHANGED") {
@@ -645,12 +651,24 @@ export class NotificationDispatcher {
           `💵 <s>$${escapeHtml(event.previousPrice || "0")}</s> ➔ <b>$${escapeHtml(event.newPrice || "0")}/${currencyMonth}</b>${deltaStr}`
         );
       } else if (event.type === "TIER_UPDATED_EVENT") {
+        const tierTitle =
+          lang === "uk"
+            ? "Оновлення тарифу"
+            : lang === "ru"
+            ? "Обновление тарифа"
+            : "Tier Specification Updated";
         sectionLines.push(
-          `📝 <b>${escapeHtml(event.poolName)}</b> — ${translate(lang, "alerts.tier_updated_header")}`
+          `📝 <b>${escapeHtml(event.poolName)} • ${tierTitle}</b>`
         );
       } else if (event.type === "NEW_POOL_EVENT") {
+        const newPoolTitle =
+          lang === "uk"
+            ? "Новий пул запущено"
+            : lang === "ru"
+            ? "Новый пул запущен"
+            : "New Pool Launched";
         sectionLines.push(
-          `✨ <b>${escapeHtml(event.poolName)}</b> — ${translate(lang, "alerts.new_pool_header")}\n` +
+          `✨ <b>${escapeHtml(event.poolName)} • ${newPoolTitle}</b>\n` +
           `🤖 ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
         );
       } else {
