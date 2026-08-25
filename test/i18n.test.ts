@@ -31,6 +31,9 @@ describe("i18n subsystem", () => {
     const textUk = translate("uk", "pool_detail.btn_subscribe_pool", { pool_name: "FLAGSHIP" });
     expect(textUk).toBe("🔔 Підписатися на весь пул FLAGSHIP");
 
+    const slotUk = translate("uk", "subscriptions.slot_active", { name: "🌏 Азія", hours: "00-08" });
+    expect(slotUk).toBe("✅ 🌏 Азія (00-08)");
+
     const batchEn = translate("en", "alerts.batch_title", { count: 3 });
     expect(batchEn).toBe("🚨 <b>CheapestInference Updates (3)</b>");
   });

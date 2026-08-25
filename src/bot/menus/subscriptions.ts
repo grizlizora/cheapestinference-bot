@@ -62,9 +62,9 @@ export function createSubscriptionsMenu(
             ];
 
       const blocks = [
-        { id: "asia", nameKey: "common.block_asia" },
-        { id: "europe", nameKey: "common.block_europe" },
-        { id: "americas", nameKey: "common.block_americas" },
+        { id: "asia", nameKey: "common.block_asia", hours: "00-08" },
+        { id: "europe", nameKey: "common.block_europe", hours: "08-16" },
+        { id: "americas", nameKey: "common.block_americas", hours: "16-24" },
       ];
 
       for (const pool of pools) {
@@ -94,13 +94,19 @@ export function createSubscriptionsMenu(
 
           range.text(
             isSlotSub
-              ? ctx.t("subscriptions.slot_active", { name: blockTitle })
-              : ctx.t("subscriptions.slot_inactive", { name: blockTitle }),
+              ? ctx.t("subscriptions.slot_active", { name: blockTitle, hours: block.hours })
+              : ctx.t("subscriptions.slot_inactive", { name: blockTitle, hours: block.hours }),
             async (c) => {
               const active = subDao.toggleSubscription(c.user.id, pool.slug, block.id);
               const toast = active
-                ? c.t("subscriptions.toast_slot_on", { pool: pool.name, block: blockTitle })
-                : c.t("subscriptions.toast_slot_off", { pool: pool.name, block: blockTitle });
+                ? c.t("subscriptions.toast_slot_on", {
+                    pool: pool.name,
+                    block: `${blockTitle} (${block.hours} UTC)`,
+                  })
+                : c.t("subscriptions.toast_slot_off", {
+                    pool: pool.name,
+                    block: `${blockTitle} (${block.hours} UTC)`,
+                  });
               await c.answerCallbackQuery(toast);
               await safeEditMessageText(c, renderSubscriptionsText(c, subDao));
               try {
