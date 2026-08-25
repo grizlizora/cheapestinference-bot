@@ -487,6 +487,16 @@ export class NotificationDispatcher {
       });
 
       text = `${header}\n\n${body}`;
+    } else if (event.type === "NEW_POOL_EVENT") {
+      const header = translate(lang, "alerts.new_pool_header");
+      const body = translate(lang, "alerts.new_pool_body", {
+        pool_name: escapeHtml(event.poolName),
+        models: (event.models || []).map(escapeHtml).join(", "),
+        min_price: escapeHtml(event.newPrice || "0"),
+        description: escapeHtml((event.metadata?.description as string) || "High-performance compute pool"),
+      });
+
+      text = `${header}\n\n${body}`;
       keyboard = new InlineKeyboard().url(
         translate(lang, "common.open_site"),
         poolUrl
@@ -573,9 +583,35 @@ export class NotificationDispatcher {
         sectionLines.push(
           `🏷 <b>${escapeHtml(event.poolName)}</b> (${escapeHtml(blockName)}) — $${escapeHtml(event.previousPrice || "0")} ➡️ <b>$${escapeHtml(event.newPrice || "0")}/mo</b>`
         );
+      } else if (event.type === "POOL_BASE_PRICE_CHANGED" || event.type === "PRICE_CHANGED") {
+        let delta = "";
+        if (event.basePrice) {
+          const sign = event.basePrice.priceDelta > 0 ? "+" : "";
+          delta = ` (${sign}$${event.basePrice.priceDelta}/mo, ${sign}${event.basePrice.percentageDelta}%)`;
+        }
+        sectionLines.push(
+          `💰 <b>${escapeHtml(event.poolName)}</b> — $${escapeHtml(event.previousPrice || "0")} ➡️ <b>$${escapeHtml(event.newPrice || "0")}/mo</b>${delta}`
+        );
+      } else if (event.type === "TIER_UPDATED_EVENT") {
+        sectionLines.push(
+          `📝 <b>${escapeHtml(event.poolName)}</b> — ${translate(lang, "alerts.tier_updated_header")}`
+        );
+      } else if (event.type === "NEW_POOL_EVENT") {
+        sectionLines.push(
+          `✨ <b>${escapeHtml(event.poolName)}</b> — ${translate(lang, "alerts.new_pool_header")}\n` +
+          `   🤖 ${(event.models || []).map(escapeHtml).join(", ")}`
+        );
       } else {
-        sectionLines.push(`• <b>${escapeHtml(event.poolName)}</b>: ${escapeHtml(event.newStatus || "updated")}`);
+        sectionLines.push(`• <b>${escapeHtml(event.poolName)}</b> (${escapeHtml(blockName)}): ${escapeHtml(event.newStatus || "updated")}`);
       }
+    }
+
+    if (buttonCount === 0) {
+      keyboard.url(
+        translate(lang, "common.open_site"),
+        "https://cheapestinference.com/pools"
+      );
+      buttonCount++;
     }
 
     const footer =

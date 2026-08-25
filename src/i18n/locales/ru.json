@@ -110,8 +110,10 @@
     "batch_title": "🚨 <b>Обновления CheapestInference ({count})</b>",
     "batch_price_update": "🏷️ Изменение цены",
     "btn_claim_slot": "🚀 Оформить слот на сайте",
-    "btn_open_pool": "🔎 Просмотреть пул в боте",
-    "price_drop_badge": "Снижение цены! 🔥"
+    "btn_open_pool": "🔎 Посмотреть тариф в боте",
+    "price_drop_badge": "Снижение цены! 🔥",
+    "new_pool_header": "✨ <b>НОВЫЙ ТАРИФНЫЙ ПУЛ НА САЙТЕ!</b>",
+    "new_pool_body": "На платформе CheapestInference добавлен новый пул: <b>{pool_name}</b>!\n\n🤖 <b>Модели:</b> <code>{models}</code>\n💰 <b>Цена:</b> от <b>${min_price}/мес</b>\n📄 <b>Описание:</b> <i>{description}</i>\n\n⚡ <i>Новый пул автоматически добавлен в мониторинг и меню уведомлений!</i>"
   },
   "intelligence": {
     "tag_high_demand": "🔥 Высокий спрос",

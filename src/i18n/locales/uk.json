@@ -111,7 +111,9 @@
     "batch_price_update": "🏷️ Зміна ціни",
     "btn_claim_slot": "🚀 Оформити слот на сайті",
     "btn_open_pool": "🔎 Переглянути пул у боті",
-    "price_drop_badge": "Знижка ціни! 🔥"
+    "price_drop_badge": "Знижка ціни! 🔥",
+    "new_pool_header": "✨ <b>НОВИЙ ТАРИФНИЙ ПУЛ НА САЙТІ!</b>",
+    "new_pool_body": "На платформі CheapestInference додано новий пул: <b>{pool_name}</b>!\n\n🤖 <b>Моделі:</b> <code>{models}</code>\n💰 <b>Ціна:</b> від <b>${min_price}/міс</b>\n📄 <b>Опис:</b> <i>{description}</i>\n\n⚡ <i>Новий пул автоматично додано до моніторингу та меню сповіщень!</i>"
   },
   "intelligence": {
     "tag_high_demand": "🔥 Високий попит",

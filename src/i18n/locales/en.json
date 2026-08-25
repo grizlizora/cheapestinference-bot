@@ -111,7 +111,9 @@
     "batch_price_update": "🏷️ Price Update",
     "btn_claim_slot": "🚀 Claim Slot on Site",
     "btn_open_pool": "🔎 View Pool in Bot",
-    "price_drop_badge": "Price Drop! 🔥"
+    "price_drop_badge": "Price Drop! 🔥",
+    "new_pool_header": "✨ <b>NEW COMPUTE POOL ADDED!</b>",
+    "new_pool_body": "A new compute pool has been launched on CheapestInference: <b>{pool_name}</b>!\n\n🤖 <b>Models:</b> <code>{models}</code>\n💰 <b>Price:</b> from <b>${min_price}/mo</b>\n📄 <b>Description:</b> <i>{description}</i>\n\n⚡ <i>This new pool is now actively monitored and available in alerts settings!</i>"
   },
   "intelligence": {
     "tag_high_demand": "🔥 High Demand",
