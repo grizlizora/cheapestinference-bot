@@ -50,6 +50,64 @@ export class TorManager {
   }
 
   /**
+   * Polls Tor ControlPort until bootstrap reaches 100% (circuits ready for traffic)
+   */
+  public async waitUntilBootstrapped(timeoutMs = 12_000): Promise<boolean> {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const isReady = await this.checkBootstrapStatus();
+      if (isReady) {
+        return true;
+      }
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    return false;
+  }
+
+  private async checkBootstrapStatus(): Promise<boolean> {
+    return new Promise((resolve) => {
+      const socket = net.createConnection(this.controlPort, this.controlHost, () => {
+        const authCmd = this.controlPassword
+          ? `AUTHENTICATE "${this.controlPassword}"\r\n`
+          : `AUTHENTICATE ""\r\n`;
+        socket.write(authCmd);
+      });
+
+      socket.setTimeout(2000, () => {
+        socket.destroy();
+        resolve(false);
+      });
+
+      let isAuthenticated = false;
+
+      socket.on("data", (data) => {
+        const res = data.toString();
+        if (!isAuthenticated) {
+          if (res.startsWith("250")) {
+            isAuthenticated = true;
+            socket.write("GETINFO status/bootstrap-phase\r\n");
+          } else {
+            socket.destroy();
+            resolve(false);
+          }
+        } else {
+          socket.destroy();
+          if (res.includes("PROGRESS=100") || res.includes("TAG=done")) {
+            resolve(true);
+          } else {
+            resolve(false);
+          }
+        }
+      });
+
+      socket.on("error", () => {
+        socket.destroy();
+        resolve(false);
+      });
+    });
+  }
+
+  /**
    * Request a new Tor identity circuit with mutex deduplication
    */
   public renewCircuit(): Promise<boolean> {

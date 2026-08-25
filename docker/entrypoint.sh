@@ -20,6 +20,7 @@ if [ "$TOR_ENABLED" = "true" ] || [ "$TOR_ENABLED" = "1" ]; then
   for i in $(seq 1 30); do
     if nc -w 1 127.0.0.1 9050 < /dev/null 2>/dev/null; then
       echo "✅ Tor SOCKS5 proxy is ready and listening on 127.0.0.1:9050 (Attempt $i)"
+      sleep 3
       TOR_READY=1
       break
     fi

@@ -97,6 +97,11 @@ async function bootstrap() {
   });
 
   // 5. Perform Initial Warmup Scrape
+  if (torManager) {
+    console.log("🧅 [Tor] Waiting for Tor consensus & circuit bootstrap...");
+    await torManager.waitUntilBootstrapped(15_000).catch(() => {});
+  }
+
   console.log("🔍 [Warmup] Performing initial scrape to establish baseline catalog...");
   try {
     await scraper.poll();
