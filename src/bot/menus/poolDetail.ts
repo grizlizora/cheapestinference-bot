@@ -36,12 +36,14 @@ export function createPoolDetailMenu(
       }
 
       // Toggle subscription for this pool (Cascading to all its regional blocks)
+      const blockIds = blocks.length > 0 ? blocks.map((b) => b.block_id) : DEFAULT_BLOCK_IDS;
+
       range.text(
         isSubscribedToPool
           ? ctx.t("pool_detail.btn_unsubscribe_pool", { pool_name: slug.toUpperCase() })
           : ctx.t("pool_detail.btn_subscribe_pool", { pool_name: slug.toUpperCase() }),
         async (c) => {
-          const active = subDao.togglePoolWithBlocks(c.user.id, slug, DEFAULT_BLOCK_IDS);
+          const active = subDao.togglePoolWithBlocks(c.user.id, slug, blockIds);
 
           invertedIndex.updateSubscription(c.user.id, slug, "ALL", {
             available: active,
@@ -50,7 +52,7 @@ export function createPoolDetailMenu(
             prices: active,
           });
 
-          for (const bId of DEFAULT_BLOCK_IDS) {
+          for (const bId of blockIds) {
             invertedIndex.updateSubscription(c.user.id, slug, bId, {
               available: active,
               soldOut: active,
@@ -59,18 +61,9 @@ export function createPoolDetailMenu(
             });
           }
 
-          if (!active) {
-            invertedIndex.updateSubscription(c.user.id, "ALL", "ALL", {
-              available: false,
-              soldOut: false,
-              models: false,
-              prices: false,
-            });
-          }
-
           const toast = active
-            ? c.t("subscriptions.toast_pool_on", { pool: slug.toUpperCase() })
-            : c.t("subscriptions.toast_pool_off", { pool: slug.toUpperCase() });
+            ? c.t("subscriptions.toast_pool_on", { name: slug.toUpperCase() })
+            : c.t("subscriptions.toast_pool_off", { name: slug.toUpperCase() });
           await c.answerCallbackQuery(toast);
           await safeEditMessageText(c, renderPoolDetailText(c, poolStateDao, historyDao));
           try {
@@ -94,11 +87,12 @@ export function createPoolDetailMenu(
         }
       );
     })
-    .back(
+    .text(
       (ctx) => ctx.t("common.back"),
       async (ctx) => {
         await ctx.answerCallbackQuery();
         await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao));
+        return ctx.menu.nav("main-dashboard-menu");
       }
     );
 }

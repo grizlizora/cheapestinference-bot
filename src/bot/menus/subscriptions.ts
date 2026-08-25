@@ -219,6 +219,7 @@ export function createSubscriptionsMenu(
 
       for (const pool of pools) {
         const poolBlocks = poolStateDao.getPoolBlocks(pool.slug);
+        const blockIds = poolBlocks.length > 0 ? poolBlocks.map((b) => b.block_id) : DEFAULT_BLOCK_IDS;
         const isPoolSub = subDao.hasSubscription(ctx.user.id, pool.slug, "ALL");
         range
           .text(
@@ -226,8 +227,8 @@ export function createSubscriptionsMenu(
               ? ctx.t("subscriptions.pool_active", { name: pool.name })
               : ctx.t("subscriptions.pool_inactive", { name: pool.name }),
             async (c) => {
-              // Cascading Master Toggle: Toggling the pool synchronizes all 3 regional blocks!
-              const active = subDao.togglePoolWithBlocks(c.user.id, pool.slug, DEFAULT_BLOCK_IDS);
+              // Cascading Master Toggle: Toggling the pool synchronizes all regional blocks!
+              const active = subDao.togglePoolWithBlocks(c.user.id, pool.slug, blockIds);
 
               invertedIndex.updateSubscription(c.user.id, pool.slug, "ALL", {
                 available: active,
@@ -236,7 +237,7 @@ export function createSubscriptionsMenu(
                 prices: active,
               });
 
-              for (const bId of DEFAULT_BLOCK_IDS) {
+              for (const bId of blockIds) {
                 invertedIndex.updateSubscription(c.user.id, pool.slug, bId, {
                   available: active,
                   soldOut: active,
@@ -278,7 +279,7 @@ export function createSubscriptionsMenu(
                 : ctx.t("subscriptions.slot_inactive", { name: blockTitle, hours: blockHours }),
               async (c) => {
                 // Child Block Toggle: Auto-updates parent "Весь пул" state
-                const active = subDao.toggleBlockAndUpdatePool(c.user.id, pool.slug, block.id, DEFAULT_BLOCK_IDS);
+                const active = subDao.toggleBlockAndUpdatePool(c.user.id, pool.slug, block.id, blockIds);
                 const parentPoolActive = subDao.hasSubscription(c.user.id, pool.slug, "ALL");
 
                 invertedIndex.updateSubscription(c.user.id, pool.slug, block.id, {
