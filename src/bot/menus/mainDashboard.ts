@@ -108,6 +108,7 @@ export function createMainMenu(
         return ctx.menu.nav("help-menu");
       }
     )
+    .row()
     .text(
       (ctx) => ctx.t("menu.btn_language"),
       async (ctx) => {
