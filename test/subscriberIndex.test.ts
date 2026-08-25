@@ -21,6 +21,7 @@ describe("SubscriberInvertedIndex", () => {
         notify_models_global INTEGER NOT NULL DEFAULT 1,
         notify_prices_global INTEGER NOT NULL DEFAULT 1,
         notify_admin_new_users INTEGER NOT NULL DEFAULT 1,
+        last_active_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
@@ -113,5 +114,23 @@ describe("SubscriberInvertedIndex", () => {
     // Instant 403 block eviction in memory
     index.markUserDeactivated(1001);
     expect(index.resolveSubscribers("flagship", "europe", "available")).toHaveLength(0);
+  });
+
+  it("should prioritize recently active users at the front of the queue", () => {
+    // User 1 active 5 hours ago
+    db.exec("INSERT INTO users (id, telegram_id, first_name, language, last_active_at) VALUES (1, 1001, 'IdleUser', 'en', datetime('now', '-5 hours'))");
+    db.exec("INSERT INTO subscriptions (user_id, pool_slug, block_id) VALUES (1, 'flagship', 'europe')");
+
+    // User 2 active 1 minute ago
+    db.exec("INSERT INTO users (id, telegram_id, first_name, language, last_active_at) VALUES (2, 1002, 'ActiveUser', 'en', datetime('now', '-1 minute'))");
+    db.exec("INSERT INTO subscriptions (user_id, pool_slug, block_id) VALUES (2, 'flagship', 'europe')");
+
+    const index = new SubscriberInvertedIndex(db);
+    const resolved = index.resolveSubscribers("flagship", "europe", "available");
+
+    expect(resolved).toHaveLength(2);
+    // ActiveUser must be first!
+    expect(resolved[0].telegramId).toBe(1002);
+    expect(resolved[1].telegramId).toBe(1001);
   });
 });

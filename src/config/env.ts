@@ -17,6 +17,7 @@ const envSchema = z.object({
         : []
     ),
   DB_PATH: z.string().default("./data/bot.db"),
+  TELEGRAM_API_ROOT: z.string().optional(),
   PORT: z
     .string()
     .default("7860")

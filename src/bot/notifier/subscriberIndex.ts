@@ -11,6 +11,7 @@ export interface PackedUserProfile {
   notifySoldOutGlobal: boolean;
   notifyModelsGlobal: boolean;
   notifyPricesGlobal: boolean;
+  lastActiveAt?: number;
 }
 
 export class SubscriberInvertedIndex {
@@ -43,7 +44,8 @@ export class SubscriberInvertedIndex {
         COALESCE(notify_available_global, 1) as notify_available_global,
         COALESCE(notify_sold_out_global, 0) as notify_sold_out_global,
         COALESCE(notify_models_global, 1) as notify_models_global,
-        COALESCE(notify_prices_global, 1) as notify_prices_global
+        COALESCE(notify_prices_global, 1) as notify_prices_global,
+        last_active_at
       FROM users
     `);
 
@@ -57,6 +59,7 @@ export class SubscriberInvertedIndex {
       notify_sold_out_global: number;
       notify_models_global: number;
       notify_prices_global: number;
+      last_active_at?: string;
     }>) {
       this.profiles.set(row.id, {
         userId: row.id,
@@ -68,6 +71,7 @@ export class SubscriberInvertedIndex {
         notifySoldOutGlobal: row.notify_sold_out_global === 1,
         notifyModelsGlobal: row.notify_models_global === 1,
         notifyPricesGlobal: row.notify_prices_global === 1,
+        lastActiveAt: row.last_active_at ? new Date(row.last_active_at).getTime() : 0,
       });
       this.tgIdToUserId.set(row.telegram_id, row.id);
     }
@@ -124,7 +128,7 @@ export class SubscriberInvertedIndex {
   }
 
   /**
-   * O(1) Hierarchical Subscriber Resolution for any event type
+   * O(1) Hierarchical Subscriber Resolution with Engagement-Based Active-First Sorting
    */
   public resolveSubscribers(
     poolSlug: string,
@@ -168,6 +172,9 @@ export class SubscriberInvertedIndex {
         results.push(profile);
       }
     }
+
+    // Engagement-Based Sorting: Most recently active users are placed at the front of the queue
+    results.sort((a, b) => (b.lastActiveAt || 0) - (a.lastActiveAt || 0));
 
     return results;
   }

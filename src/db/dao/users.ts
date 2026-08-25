@@ -12,6 +12,7 @@ export class UserDAO {
   private stmtToggleModels: Database.Statement;
   private stmtTogglePrices: Database.Statement;
   private stmtToggleAdminNewUsers: Database.Statement;
+  private stmtTouchLastActive: Database.Statement;
   private stmtDeactivate: Database.Statement;
   private stmtReactivate: Database.Statement;
   private stmtGetStats: Database.Statement;
@@ -43,6 +44,11 @@ export class UserDAO {
         ALTER TABLE users ADD COLUMN notify_admin_new_users INTEGER NOT NULL DEFAULT 1;
       `);
     } catch {}
+    try {
+      db.exec(`
+        ALTER TABLE users ADD COLUMN last_active_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP;
+      `);
+    } catch {}
 
     this.stmtGetByTgId = db.prepare("SELECT * FROM users WHERE telegram_id = ?");
     this.stmtGetById = db.prepare("SELECT * FROM users WHERE id = ?");
@@ -53,6 +59,7 @@ export class UserDAO {
         username = excluded.username,
         first_name = excluded.first_name,
         is_active = 1,
+        last_active_at = CURRENT_TIMESTAMP,
         updated_at = CURRENT_TIMESTAMP
       RETURNING *
     `);
@@ -77,11 +84,14 @@ export class UserDAO {
     this.stmtToggleAdminNewUsers = db.prepare(`
       UPDATE users SET notify_admin_new_users = CASE WHEN notify_admin_new_users = 1 THEN 0 ELSE 1 END, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?
     `);
+    this.stmtTouchLastActive = db.prepare(`
+      UPDATE users SET last_active_at = CURRENT_TIMESTAMP WHERE telegram_id = ?
+    `);
     this.stmtDeactivate = db.prepare(`
       UPDATE users SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?
     `);
     this.stmtReactivate = db.prepare(`
-      UPDATE users SET is_active = 1, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?
+      UPDATE users SET is_active = 1, last_active_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?
     `);
     this.stmtGetStats = db.prepare(`
       SELECT 
@@ -116,6 +126,12 @@ export class UserDAO {
 
   setLanguage(tgId: number, lang: SupportedLanguage): void {
     this.stmtUpdateLang.run(lang, tgId);
+  }
+
+  touchLastActive(tgId: number): void {
+    try {
+      this.stmtTouchLastActive.run(tgId);
+    } catch {}
   }
 
   toggleMute(tgId: number): number {

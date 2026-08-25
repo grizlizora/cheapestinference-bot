@@ -37,7 +37,13 @@ export function createTelegramBot(
   proxyPool: ProxyPool,
   historyDao?: SlotHistoryDAO
 ): { bot: Bot<BotContext>; dispatcher: NotificationDispatcher } {
-  const bot = new Bot<BotContext>(token);
+  const bot = new Bot<BotContext>(token, {
+    client: config.TELEGRAM_API_ROOT
+      ? {
+          apiRoot: config.TELEGRAM_API_ROOT,
+        }
+      : undefined,
+  });
   const resolvedHistoryDao = historyDao;
 
   // 1. Global Error Boundary
@@ -95,11 +101,17 @@ export function createTelegramBot(
           notifySoldOutGlobal: false,
           notifyModelsGlobal: true,
           notifyPricesGlobal: true,
+          lastActiveAt: Date.now(),
         });
-      } else if (user.is_active === 0) {
-        userDao.reactivateUser(ctx.from.id);
-        user.is_active = 1;
-        dispatcher.getInvertedIndex().updateUserPreferences(ctx.from.id, { isActive: true });
+      } else {
+        userDao.touchLastActive(ctx.from.id);
+        dispatcher.getInvertedIndex().updateUserPreferences(ctx.from.id, { lastActiveAt: Date.now() });
+
+        if (user.is_active === 0) {
+          userDao.reactivateUser(ctx.from.id);
+          user.is_active = 1;
+          dispatcher.getInvertedIndex().updateUserPreferences(ctx.from.id, { isActive: true });
+        }
       }
 
       ctx.user = user;

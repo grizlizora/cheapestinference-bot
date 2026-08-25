@@ -23,6 +23,7 @@ describe("UserDAO & Admin Settings", () => {
         notify_models_global INTEGER NOT NULL DEFAULT 1,
         notify_prices_global INTEGER NOT NULL DEFAULT 1,
         notify_admin_new_users INTEGER NOT NULL DEFAULT 1,
+        last_active_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
@@ -42,6 +43,18 @@ describe("UserDAO & Admin Settings", () => {
     expect(user.first_name).toBe("Test");
     expect(user.notify_admin_new_users).toBe(1);
     expect(user.notify_available_global).toBe(1);
+  });
+
+  it("should update last_active_at via touchLastActive", () => {
+    userDao.upsertUser({
+      telegram_id: 54321,
+      username: "activeuser",
+      first_name: "Active",
+    });
+
+    userDao.touchLastActive(54321);
+    const user = userDao.getByTelegramId(54321);
+    expect(user?.last_active_at).toBeDefined();
   });
 
   it("should toggle notify_admin_new_users on and off", () => {

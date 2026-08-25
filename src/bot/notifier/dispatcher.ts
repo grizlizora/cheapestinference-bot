@@ -76,9 +76,16 @@ export class NotificationDispatcher {
 
   /**
    * Main entrypoint for processing DiffEvents from ScraperOrchestrator
+   * Implements Event Bundling / Coalescing to reduce Telegram message count by 50-75%
    */
   public async handleDiffEvents(events: DiffEvent[]): Promise<void> {
     if (!events || events.length === 0) return;
+
+    // 1. Group events per user across the scrape poll
+    const userEventsMap = new Map<
+      number,
+      { user: PackedUserProfile; matchedEvents: Array<{ event: DiffEvent; priority: BroadcastPriority }> }
+    >();
 
     for (const event of events) {
       let resolvedType: "available" | "sold_out" | "models" | "prices" = "available";
@@ -109,7 +116,24 @@ export class NotificationDispatcher {
       if (subscribers.length === 0) continue;
 
       for (const sub of subscribers) {
-        const msg = this.formatAlertMessage(sub, event, priority);
+        let entry = userEventsMap.get(sub.userId);
+        if (!entry) {
+          entry = { user: sub, matchedEvents: [] };
+          userEventsMap.set(sub.userId, entry);
+        }
+        entry.matchedEvents.push({ event, priority });
+      }
+    }
+
+    // 2. Format and Enqueue messages (Single or Bundled)
+    for (const { user, matchedEvents } of userEventsMap.values()) {
+      if (matchedEvents.length === 1) {
+        const single = matchedEvents[0];
+        const msg = this.formatAlertMessage(user, single.event, single.priority);
+        this.enqueue(msg);
+      } else {
+        // Event Bundling: Bundle multiple updates into a single compact notification
+        const msg = this.formatBundledAlertMessage(user, matchedEvents);
         this.enqueue(msg);
       }
     }
@@ -265,7 +289,6 @@ export class NotificationDispatcher {
 
       if (msg.retries < 5) {
         msg.retries++;
-        // Preserve original priority queue on retry
         const targetQ = this.getQueueByPriority(msg.priority);
         targetQ.unshift(msg);
       }
@@ -275,7 +298,6 @@ export class NotificationDispatcher {
     // 3. Transient Network Errors
     if (msg.retries < 3) {
       msg.retries++;
-      // Preserve original priority queue on retry
       const targetQ = this.getQueueByPriority(msg.priority);
       targetQ.push(msg);
     } else {
@@ -474,6 +496,100 @@ export class NotificationDispatcher {
       keyboard,
       isMuted: user.isMuted,
       priority,
+      retries: 0,
+      enqueuedAt: Date.now(),
+    };
+  }
+
+  /**
+   * Event Bundling: Combines multiple simultaneous events into 1 single notification
+   */
+  private formatBundledAlertMessage(
+    user: PackedUserProfile,
+    matchedEvents: Array<{ event: DiffEvent; priority: BroadcastPriority }>
+  ): OutgoingAlertMessage {
+    const lang = user.language;
+    const count = matchedEvents.length;
+    const timeFormatted = new Date().toISOString().replace("T", " ").substring(0, 19);
+
+    const title =
+      lang === "uk"
+        ? `⚡ <b>CheapestInference — Оновлення слотів (${count})</b>`
+        : lang === "ru"
+        ? `⚡ <b>CheapestInference — Обновления слотов (${count})</b>`
+        : `⚡ <b>CheapestInference — Slot Updates (${count})</b>`;
+
+    const sectionLines: string[] = [];
+    const keyboard = new InlineKeyboard();
+
+    // Determine highest priority across bundled events (P1 > P2 > P3)
+    let highestPriority: BroadcastPriority = "P3";
+    for (const item of matchedEvents) {
+      if (item.priority === "P1") highestPriority = "P1";
+      else if (item.priority === "P2" && highestPriority !== "P1") highestPriority = "P2";
+    }
+
+    let buttonCount = 0;
+
+    for (const { event } of matchedEvents) {
+      const blockName = translate(lang, `common.block_${event.block}`) || event.block;
+      const blockHash = event.block && event.block !== "ALL" ? `#${event.block}` : "";
+      const checkoutUrl = `https://cheapestinference.com/pools/${event.poolSlug}${blockHash}`;
+
+      if (event.type === "SLOT_APPEARED") {
+        sectionLines.push(
+          `🟢 <b>${escapeHtml(event.poolName)}</b> (${escapeHtml(blockName)})\n` +
+          `   💵 $${escapeHtml(event.newPrice || "0")}/mo | 🕒 ${escapeHtml(event.hoursUtc)}\n` +
+          `   🤖 ${(event.models || []).map(escapeHtml).join(", ")}`
+        );
+
+        if (buttonCount < 3) {
+          keyboard.url(
+            `🚀 ${translate(lang, "alerts.btn_claim_slot")} (${blockName})`,
+            checkoutUrl
+          ).row();
+          buttonCount++;
+        }
+      } else if (event.type === "SLOT_DISAPPEARED") {
+        sectionLines.push(
+          `🔴 <b>${escapeHtml(event.poolName)}</b> (${escapeHtml(blockName)}) — <i>${translate(lang, "common.status_sold_out")}</i>`
+        );
+      } else if (event.type === "MODEL_UPGRADE_EVENT") {
+        sectionLines.push(
+          `🆕 <b>${escapeHtml(event.poolName)}</b> — ${translate(lang, "alerts.model_upgrade_header")}\n` +
+          `   🤖 ${(event.models || []).map(escapeHtml).join(", ")}`
+        );
+      } else if (event.type === "SLOT_PRICE_CHANGED") {
+        sectionLines.push(
+          `🏷 <b>${escapeHtml(event.poolName)}</b> (${escapeHtml(blockName)}) — $${escapeHtml(event.previousPrice || "0")} ➡️ <b>$${escapeHtml(event.newPrice || "0")}/mo</b>`
+        );
+      } else {
+        sectionLines.push(`• <b>${escapeHtml(event.poolName)}</b>: ${escapeHtml(event.newStatus || "updated")}`);
+      }
+    }
+
+    const footer =
+      lang === "uk"
+        ? `🕒 <i>Час оновлення: ${timeFormatted} UTC</i>`
+        : lang === "ru"
+        ? `🕒 <i>Время обновления: ${timeFormatted} UTC</i>`
+        : `🕒 <i>Updated at: ${timeFormatted} UTC</i>`;
+
+    const text = `${title}\n\n${sectionLines.join("\n\n")}\n\n${footer}`;
+
+    const firstEvent = matchedEvents[0].event;
+
+    return {
+      id: crypto.randomUUID(),
+      telegramId: user.telegramId,
+      userId: user.userId,
+      poolSlug: firstEvent.poolSlug,
+      blockId: "BUNDLE",
+      eventType: "BUNDLE_EVENT",
+      text,
+      keyboard: buttonCount > 0 ? keyboard : undefined,
+      isMuted: user.isMuted,
+      priority: highestPriority,
       retries: 0,
       enqueuedAt: Date.now(),
     };
