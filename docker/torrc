@@ -1,7 +1,7 @@
 SocksPort 127.0.0.1:9050
 ControlPort 127.0.0.1:9051
 DataDirectory /var/lib/tor
-Log notice stderr
+Log notice file /var/log/tor/notices.log
 ClientOnly 1
 AvoidDiskWrites 1
 MaxMemInQueues 64 MB
