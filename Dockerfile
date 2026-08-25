@@ -11,7 +11,7 @@ COPY package*.json tsconfig.json ./
 RUN npm ci
 
 COPY src ./src
-RUN npm run build && npm prune --production
+RUN npm run build && npm prune --omit=dev
 
 # ==========================================
 # Stage 2: Minimal Production Runtime
