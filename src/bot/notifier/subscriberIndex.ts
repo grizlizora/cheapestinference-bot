@@ -61,7 +61,7 @@ export class SubscriberInvertedIndex {
       this.profiles.set(row.id, {
         userId: row.id,
         telegramId: row.telegram_id,
-        language: (row.language as SupportedLanguage) || "uk",
+        language: (row.language as SupportedLanguage) || "en",
         isMuted: row.is_muted === 1,
         isActive: row.is_active === 1,
         notifyAvailableGlobal: row.notify_available_global === 1,
@@ -144,6 +144,16 @@ export class SubscriberInvertedIndex {
     // 3. Exact Block: 'poolSlug:blockId'
     const blockSet = this.index.get(`${poolSlug}:${blockId}:${eventType}`);
     if (blockSet) for (const id of blockSet) matchedUserIds.add(id);
+
+    // 4. If event is pool-wide (e.g. MODEL_UPGRADE_EVENT), notify all regional subscribers of that pool
+    if (blockId === "ALL") {
+      const asiaSet = this.index.get(`${poolSlug}:asia:${eventType}`);
+      if (asiaSet) for (const id of asiaSet) matchedUserIds.add(id);
+      const europeSet = this.index.get(`${poolSlug}:europe:${eventType}`);
+      if (europeSet) for (const id of europeSet) matchedUserIds.add(id);
+      const americasSet = this.index.get(`${poolSlug}:americas:${eventType}`);
+      if (americasSet) for (const id of americasSet) matchedUserIds.add(id);
+    }
 
     // Filter only active users respecting their global user filters
     const results: PackedUserProfile[] = [];

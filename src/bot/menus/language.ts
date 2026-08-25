@@ -4,17 +4,21 @@ import { UserDAO } from "../../db/dao/users.js";
 import { PoolStateDAO } from "../../db/dao/poolState.js";
 import { SlotHistoryDAO } from "../../db/dao/slotHistory.js";
 import { SupportedLanguage } from "../../types/db.js";
+import { SubscriberInvertedIndex } from "../notifier/subscriberIndex.js";
 import { renderDashboardText, safeEditMessageText } from "./mainDashboard.js";
 
 export function createLanguageMenu(
   userDao: UserDAO,
   poolStateDao: PoolStateDAO,
+  invertedIndex: SubscriberInvertedIndex,
   historyDao?: SlotHistoryDAO
 ) {
   const switchLanguage = async (ctx: BotContext, lang: SupportedLanguage, toast: string) => {
     userDao.setLanguage(ctx.from!.id, lang);
     ctx.user.language = lang;
     ctx.lang = lang;
+    invertedIndex.updateUserPreferences(ctx.from!.id, { language: lang });
+
     await ctx.answerCallbackQuery(toast);
     await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao));
     return ctx.menu.nav("main-dashboard-menu");
@@ -24,9 +28,11 @@ export function createLanguageMenu(
     .text("🇺🇦 Українська", async (ctx) => {
       return switchLanguage(ctx, "uk", "Мову змінено на Українську 🇺🇦");
     })
+    .row()
     .text("🇬🇧 English", async (ctx) => {
       return switchLanguage(ctx, "en", "Language changed to English 🇬🇧");
     })
+    .row()
     .text("🇷🇺 Русский", async (ctx) => {
       return switchLanguage(ctx, "ru", "Язык изменен на Русский 🇷🇺");
     })

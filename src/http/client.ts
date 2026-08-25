@@ -31,8 +31,9 @@ export class RobustHttpClient {
   constructor(private readonly proxyPool: ProxyPool) {
     this.directAgent = new Agent({
       connect: { timeout: 15_000 },
-      keepAliveTimeout: 60_000,
-      keepAliveMaxTimeout: 120_000,
+      keepAliveTimeout: 120_000,
+      keepAliveMaxTimeout: 180_000,
+      keepAliveTimeoutThreshold: 2000,
       pipelining: 1,
     });
     this.proxyPool.setHttpClient(this);
@@ -42,7 +43,7 @@ export class RobustHttpClient {
     if (!proxyUrl) return;
     const existing = this.dispatchers.get(proxyUrl);
     if (existing) {
-      existing.close().catch(() => {});
+      existing.destroy().catch(() => {});
       this.dispatchers.delete(proxyUrl);
     }
   }
@@ -75,6 +76,8 @@ export class RobustHttpClient {
             timeout: timeoutMs + 5_000,
           })
             .then((info) => {
+              info.socket.setNoDelay(true);
+
               if (opts.protocol === "https:") {
                 const tlsSocket = tls.connect({
                   socket: info.socket,
@@ -82,8 +85,10 @@ export class RobustHttpClient {
                   rejectUnauthorized: true,
                   ALPNProtocols: ["http/1.1"],
                 });
+                tlsSocket.setNoDelay(true);
 
                 tlsSocket.setTimeout(10_000, () => {
+                  info.socket.destroy();
                   tlsSocket.destroy(new Error("TLS Handshake Timeout over SOCKS5"));
                 });
 
@@ -91,22 +96,26 @@ export class RobustHttpClient {
                   tlsSocket.setTimeout(0);
                   callback(null, tlsSocket);
                 });
-                tlsSocket.on("error", (err) => callback(err, null));
+                tlsSocket.on("error", (err) => {
+                  info.socket.destroy();
+                  callback(err, null);
+                });
               } else {
                 callback(null, info.socket);
               }
             })
             .catch((err) => callback(err, null));
         },
-        keepAliveTimeout: 45_000,
-        keepAliveMaxTimeout: 90_000,
+        keepAliveTimeout: 120_000,
+        keepAliveMaxTimeout: 180_000,
+        keepAliveTimeoutThreshold: 2000,
       });
     } else {
       dispatcher = new ProxyAgent({
         uri: proxyUrl,
         connect: { timeout: timeoutMs },
-        keepAliveTimeout: 45_000,
-        keepAliveMaxTimeout: 90_000,
+        keepAliveTimeout: 120_000,
+        keepAliveMaxTimeout: 180_000,
       });
     }
 
@@ -170,7 +179,7 @@ export class RobustHttpClient {
         }
       }
     } catch {
-      // Fallback to raw string if decompression throws
+      // Fallback to raw string
     }
     return buffer.toString("utf-8");
   }
@@ -202,7 +211,27 @@ export class RobustHttpClient {
           maxRedirections: 0,
         });
 
-        // Handle HTTP 301, 302, 307, 308 Redirects
+        // Fast 304 Not Modified exit without body allocations
+        if (res.statusCode === 304) {
+          await res.body.dump();
+          const latencyMs = Date.now() - startTime;
+          this.proxyPool.reportSuccess(proxyUrl, latencyMs);
+          return {
+            statusCode: 304,
+            headers: res.headers as Record<string, string | string[] | undefined>,
+            body: "",
+            etag: typeof res.headers["etag"] === "string" ? res.headers["etag"] : opts.etag,
+            lastModified:
+              typeof res.headers["last-modified"] === "string"
+                ? res.headers["last-modified"]
+                : opts.lastModified,
+            latencyMs,
+            usedProxy: proxyUrl,
+            finalUrl: currentUrl,
+          };
+        }
+
+        // Handle Redirects
         if (
           (res.statusCode === 301 ||
             res.statusCode === 302 ||
@@ -213,7 +242,7 @@ export class RobustHttpClient {
           const redirectLocation = res.headers["location"];
           currentUrl = new URL(redirectLocation, currentUrl).toString();
           redirectsCount++;
-          await res.body.arrayBuffer();
+          await res.body.dump();
           continue;
         }
 

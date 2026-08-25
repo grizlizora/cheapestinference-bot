@@ -92,7 +92,7 @@ describe("SlotDiffEngine", () => {
     expect(upgradeEvent?.modelUpgrade?.added.some((m) => m.modelName === "deepseek-r1")).toBe(true);
   });
 
-  it("should reconcile and emit SLOT_DISAPPEARED when a previously active slot is deleted from site", () => {
+  it("should reconcile and emit SLOT_DISAPPEARED with K=2 confirmation when a previously active slot is deleted from site", () => {
     const inStockSnapshot: PoolsSnapshot = JSON.parse(JSON.stringify(sampleSnapshot));
     inStockSnapshot.data[0].blocks[1].status = "available";
     engine.processSnapshot(inStockSnapshot);
@@ -110,7 +110,12 @@ describe("SlotDiffEngine", () => {
       ],
     };
 
-    const events = engine.processSnapshot(deletedSlotSnapshot);
-    expect(events.some((e) => e.type === "SLOT_DISAPPEARED" && e.block === "europe")).toBe(true);
+    // First scan without the slot (K=1): No event emitted yet to prevent false alarms
+    const events1 = engine.processSnapshot(deletedSlotSnapshot);
+    expect(events1.some((e) => e.type === "SLOT_DISAPPEARED" && e.block === "europe")).toBe(false);
+
+    // Second consecutive scan without the slot (K=2): Confirmed disappearance event emitted!
+    const events2 = engine.processSnapshot(deletedSlotSnapshot);
+    expect(events2.some((e) => e.type === "SLOT_DISAPPEARED" && e.block === "europe")).toBe(true);
   });
 });

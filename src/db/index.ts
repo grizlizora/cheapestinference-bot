@@ -19,13 +19,18 @@ export function getDatabase(): Database.Database {
   dbInstance.pragma("journal_mode = WAL");
   dbInstance.pragma("synchronous = NORMAL");
   dbInstance.pragma("foreign_keys = ON");
-  dbInstance.pragma("cache_size = -4000"); // 4MB RAM cache
-  dbInstance.pragma("mmap_size = 30000000000"); // 30GB Memory-Mapped I/O
+  dbInstance.pragma("cache_size = -2000"); // 2MB RAM cache (optimal for constrained cgroups)
+  dbInstance.pragma("mmap_size = 33554432"); // 32MB Memory-Mapped I/O
   dbInstance.pragma("busy_timeout = 5000"); // 5s timeout on lock
   dbInstance.pragma("temp_store = MEMORY");
   dbInstance.pragma("wal_autocheckpoint = 1000");
+
   try {
-    dbInstance.pragma("auto_vacuum = INCREMENTAL");
+    const autoVacuum = dbInstance.pragma("auto_vacuum", { simple: true });
+    if (autoVacuum !== 2) {
+      dbInstance.pragma("auto_vacuum = INCREMENTAL");
+      dbInstance.exec("VACUUM;");
+    }
   } catch {}
 
   // Run schema initialization
@@ -49,6 +54,7 @@ function initSchema(db: Database.Database): void {
       notify_sold_out_global INTEGER NOT NULL DEFAULT 0,
       notify_models_global INTEGER NOT NULL DEFAULT 1,
       notify_prices_global INTEGER NOT NULL DEFAULT 1,
+      notify_admin_new_users INTEGER NOT NULL DEFAULT 1,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
     );

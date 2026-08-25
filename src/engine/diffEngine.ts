@@ -329,25 +329,35 @@ export class SlotDiffEngine {
       }
     }
 
-    // Reconcile and prune vanished pools / slots
+    // Reconcile and prune vanished pools / slots with K=2 confirmation gate
     for (const [key, slot] of this.inMemorySlots.entries()) {
       if (!incomingSlotKeys.has(key)) {
         if (slot.status === "available" || slot.status === "limited") {
-          events.push({
-            id: crypto.randomUUID(),
-            type: "SLOT_DISAPPEARED",
-            poolSlug: slot.poolSlug,
-            poolName: slot.poolName,
-            block: slot.block,
-            models: slot.models,
-            hoursUtc: slot.hoursUtc,
-            previousStatus: slot.status,
-            newStatus: "sold-out",
-            timestamp: now,
-          });
+          const count = (this.pendingDisappearances.get(key) || 0) + 1;
+          this.pendingDisappearances.set(key, count);
+
+          if (count >= 2) {
+            events.push({
+              id: crypto.randomUUID(),
+              type: "SLOT_DISAPPEARED",
+              poolSlug: slot.poolSlug,
+              poolName: slot.poolName,
+              block: slot.block,
+              models: slot.models,
+              hoursUtc: slot.hoursUtc,
+              previousStatus: slot.status,
+              newStatus: "sold-out",
+              timestamp: now,
+            });
+
+            this.historyDao?.recordSlotClosed(slot.poolSlug, slot.block);
+            this.inMemorySlots.delete(key);
+            this.pendingDisappearances.delete(key);
+          }
+        } else {
+          this.inMemorySlots.delete(key);
+          this.pendingDisappearances.delete(key);
         }
-        this.inMemorySlots.delete(key);
-        this.pendingDisappearances.delete(key);
       }
     }
 

@@ -31,65 +31,18 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
       throw new Error(`HTML endpoint responded with HTTP ${res.statusCode}`);
     }
 
-    // 1. Next.js App Router RSC Flight Stream Chunk Parser (self.__next_f.push)
-    const rscRegex = /self\.__next_f\.push\(\[\d+,\s*"([\s\S]*?)"\]\)/g;
-    let match: RegExpExecArray | null;
-    const chunks: string[] = [];
-
-    while ((match = rscRegex.exec(res.body)) !== null) {
-      if (match[1]) {
-        chunks.push(match[1]);
-      }
-    }
-
-    if (chunks.length > 0) {
-      const combinedFlight = chunks
-        .map((c) => c.replace(/\\"/g, '"').replace(/\\\\/g, "\\").replace(/\\n/g, "\n"))
-        .join("");
-
-      const poolArrayMatch = combinedFlight.match(
-        /\{"slug":"(flagship|frontier|core|[\w-]+)",[\s\S]*?"blocks":\[[\s\S]*?\]\}/g
-      );
-
-      if (poolArrayMatch && poolArrayMatch.length > 0) {
-        try {
-          const pools: PoolData[] = [];
-          for (const rawPoolJson of poolArrayMatch) {
-            const parsed = JSON.parse(rawPoolJson);
-            if (parsed.slug && Array.isArray(parsed.blocks)) {
-              pools.push({
-                id: parsed.id || parsed.slug,
-                slug: parsed.slug,
-                modelId: parsed.modelId || parsed.slug,
-                modelName: parsed.modelName || parsed.name || parsed.slug,
-                models: Array.isArray(parsed.models) ? parsed.models : [],
-                description: parsed.description || "",
-                status: parsed.status || "active",
-                minPricePerDay: String(parsed.minPricePerDay || "0"),
-                annualDiscount: parsed.annualDiscount || 0.15,
-                blocks: parsed.blocks.map((b: any) => ({
-                  block: b.block,
-                  hoursUtc: b.hoursUtc || "",
-                  pricePerMonth: String(b.pricePerMonth || "0"),
-                  status: b.status || "limited",
-                })),
-              });
-            }
-          }
-
-          if (pools.length > 0) {
-            return {
-              success: true,
-              modified: true,
-              snapshot: { success: true, data: pools },
-              etag: res.etag,
-              lastModified: res.lastModified,
-              source: "html_rsc_stream",
-              latencyMs: res.latencyMs,
-            };
-          }
-        } catch {}
-      }
+    // 1. Next.js App Router RSC Flight Stream Chunk Parser (supporting Next.js 14/15)
+    const rscPools = this.extractRscPayload(res.body);
+    if (rscPools && rscPools.length > 0) {
+      return {
+        success: true,
+        modified: true,
+        snapshot: { success: true, data: rscPools },
+        etag: res.etag,
+        lastModified: res.lastModified,
+        source: "html_rsc_stream",
+        latencyMs: res.latencyMs,
+      };
     }
 
     // 2. Primary SSR Snapshot extraction: window.__POOLS_SNAPSHOT__
@@ -182,5 +135,77 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
       source: "html_dom",
       latencyMs: res.latencyMs,
     };
+  }
+
+  public extractRscPayload(html: string): PoolData[] | null {
+    const chunkRegex = /self\.__next_f\.push\(\[(\d+),\s*("[\s\S]*?")\]\)/g;
+    let match: RegExpExecArray | null;
+    let combinedFlight = "";
+
+    while ((match = chunkRegex.exec(html)) !== null) {
+      try {
+        const decodedChunk = JSON.parse(match[2]);
+        if (typeof decodedChunk === "string") {
+          combinedFlight += decodedChunk;
+        }
+      } catch {
+        const raw = match[2].slice(1, -1);
+        combinedFlight += raw.replace(/\\"/g, '"').replace(/\\\\/g, "\\").replace(/\\n/g, "\n");
+      }
+    }
+
+    if (!combinedFlight) return null;
+
+    const pools: PoolData[] = [];
+    const slugRegex = /"slug"\s*:\s*"(flagship|frontier|core|[\w-]+)"/g;
+    let slugMatch: RegExpExecArray | null;
+
+    while ((slugMatch = slugRegex.exec(combinedFlight)) !== null) {
+      const startIndex = combinedFlight.lastIndexOf("{", slugMatch.index);
+      if (startIndex === -1) continue;
+
+      let depth = 0;
+      let endIndex = -1;
+      for (let i = startIndex; i < combinedFlight.length; i++) {
+        if (combinedFlight[i] === "{") depth++;
+        else if (combinedFlight[i] === "}") {
+          depth--;
+          if (depth === 0) {
+            endIndex = i + 1;
+            break;
+          }
+        }
+      }
+
+      if (endIndex !== -1) {
+        try {
+          const candidateJson = combinedFlight.substring(startIndex, endIndex);
+          const parsed = JSON.parse(candidateJson);
+          if (parsed.slug && Array.isArray(parsed.blocks) && parsed.blocks.length > 0) {
+            if (!pools.some((p) => p.slug === parsed.slug)) {
+              pools.push({
+                id: parsed.id || parsed.slug,
+                slug: parsed.slug,
+                modelId: parsed.modelId || parsed.slug,
+                modelName: parsed.modelName || parsed.name || parsed.slug,
+                models: Array.isArray(parsed.models) ? parsed.models : [],
+                description: parsed.description || "",
+                status: parsed.status || "active",
+                minPricePerDay: String(parsed.minPricePerDay || "0"),
+                annualDiscount: parsed.annualDiscount || 0.15,
+                blocks: parsed.blocks.map((b: any) => ({
+                  block: b.block,
+                  hoursUtc: b.hoursUtc || "",
+                  pricePerMonth: String(b.pricePerMonth || "0"),
+                  status: b.status || "limited",
+                })),
+              });
+            }
+          }
+        } catch {}
+      }
+    }
+
+    return pools.length > 0 ? pools : null;
   }
 }

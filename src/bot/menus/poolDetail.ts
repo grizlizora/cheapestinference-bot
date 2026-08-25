@@ -3,13 +3,15 @@ import { BotContext } from "../../types/context.js";
 import { PoolStateDAO } from "../../db/dao/poolState.js";
 import { SubscriptionDAO } from "../../db/dao/subscriptions.js";
 import { SlotHistoryDAO } from "../../db/dao/slotHistory.js";
+import { SubscriberInvertedIndex } from "../notifier/subscriberIndex.js";
 import { AvailabilityIntelligenceEngine } from "../../engine/intelligenceEngine.js";
-import { translate } from "../../i18n/index.js";
+import { translate, escapeHtml } from "../../i18n/index.js";
 import { renderDashboardText, safeEditMessageText } from "./mainDashboard.js";
 
 export function createPoolDetailMenu(
   poolStateDao: PoolStateDAO,
   subDao: SubscriptionDAO,
+  invertedIndex: SubscriberInvertedIndex,
   historyDao?: SlotHistoryDAO
 ) {
   return new Menu<BotContext>("pool-detail-menu")
@@ -26,7 +28,7 @@ export function createPoolDetailMenu(
       for (const b of availableBlocks) {
         const blockName = translate(ctx.lang, `common.block_${b.block_id}`) || b.block_id;
         range.url(
-          `🛒 ${ctx.t("alerts.btn_claim_slot")} (${blockName})`,
+          `${ctx.t("alerts.btn_claim_slot")} (${blockName})`,
           `https://cheapestinference.com/pools/${slug}#${b.block_id}`
         ).row();
       }
@@ -38,6 +40,13 @@ export function createPoolDetailMenu(
           : ctx.t("pool_detail.btn_subscribe_pool", { pool_name: slug.toUpperCase() }),
         async (c) => {
           const active = subDao.toggleSubscription(c.user.id, slug, "ALL");
+          invertedIndex.updateSubscription(c.user.id, slug, "ALL", {
+            available: active,
+            soldOut: active,
+            models: active,
+            prices: active,
+          });
+
           const toast = active
             ? c.t("subscriptions.toast_pool_on", { pool: slug.toUpperCase() })
             : c.t("subscriptions.toast_pool_off", { pool: slug.toUpperCase() });
@@ -94,7 +103,7 @@ export function renderPoolDetailText(
   }
 
   const modelsList = models
-    .map((m) => ctx.t("pool_detail.model_item", { model_name: m }))
+    .map((m) => ctx.t("pool_detail.model_item", { model_name: escapeHtml(m) }))
     .join("\n");
 
   const intelligenceEngine = historyDao
@@ -140,8 +149,8 @@ export function renderPoolDetailText(
   const minPriceDay = minPriceNum > 0 ? (minPriceNum / 30).toFixed(2) : "0.00";
 
   return ctx.t("pool_detail.title", {
-    pool_name: first.pool_name,
-    description: first.description || "Unlimited AI inference pool",
+    pool_name: escapeHtml(first.pool_name),
+    description: escapeHtml(first.description || "Unlimited AI inference pool"),
     models_list: modelsList || "  • Custom open-weights models",
     min_price: minPrice,
     min_price_day: minPriceDay,

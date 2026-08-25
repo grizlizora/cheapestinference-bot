@@ -4,6 +4,7 @@ import { PoolStateDAO } from "../../db/dao/poolState.js";
 import { UserDAO } from "../../db/dao/users.js";
 import { SubscriptionDAO } from "../../db/dao/subscriptions.js";
 import { SlotHistoryDAO } from "../../db/dao/slotHistory.js";
+import { SubscriberInvertedIndex } from "../notifier/subscriberIndex.js";
 import { AvailabilityIntelligenceEngine } from "../../engine/intelligenceEngine.js";
 import { createLanguageMenu } from "./language.js";
 import { createPoolDetailMenu, renderPoolDetailText } from "./poolDetail.js";
@@ -34,11 +35,12 @@ export function createMainMenuHierarchy(
   poolStateDao: PoolStateDAO,
   userDao: UserDAO,
   subDao: SubscriptionDAO,
+  invertedIndex: SubscriberInvertedIndex,
   historyDao?: SlotHistoryDAO
 ) {
-  const languageMenu = createLanguageMenu(userDao, poolStateDao, historyDao);
-  const poolDetailMenu = createPoolDetailMenu(poolStateDao, subDao, historyDao);
-  const subscriptionsMenu = createSubscriptionsMenu(subDao, userDao, poolStateDao, historyDao);
+  const languageMenu = createLanguageMenu(userDao, poolStateDao, invertedIndex, historyDao);
+  const poolDetailMenu = createPoolDetailMenu(poolStateDao, subDao, invertedIndex, historyDao);
+  const subscriptionsMenu = createSubscriptionsMenu(subDao, userDao, poolStateDao, invertedIndex, historyDao);
 
   const helpMenu = new Menu<BotContext>("help-menu")
     .url(
@@ -155,7 +157,6 @@ export function renderDashboardText(
 
   const poolSummariesText = summaries
     .map((p) => {
-      // Check if any block has special smart badges
       let statusBadge =
         p.available_count > 0
           ? ctx.t("common.status_available")

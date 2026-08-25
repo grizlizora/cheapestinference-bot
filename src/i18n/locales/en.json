@@ -122,9 +122,15 @@
     "tip_stable_historical": "⏱ <i>Average uptime duration: {duration}.</i>"
   },
   "admin": {
-    "stats_title": "📊 <b>Admin Dashboard & Telemetry</b>\n\n🟢 <b>System Status:</b> {status}\n⏱ <b>Uptime:</b> {uptime}\n\n👥 <b>Users:</b>\n• Total Registered: <b>{total_users}</b>\n• Active Watchers: <b>{active_users}</b>\n• Blocked Bot: <b>{blocked_users}</b>\n• Active Subscription Rules: <b>{active_subscriptions}</b>\n\n🕷 <b>Scraper & Anti-Ban:</b>\n• Last Scrape: <b>{last_scrape_ago}s ago</b> (Latency: {latency}ms)\n• Source: <code>{source}</code>\n• Consecutive Errors: <b>{consecutive_failures}</b>\n• Tor / Proxy Status: <b>{proxy_status}</b>\n\n💾 <b>Process Memory:</b> <b>{memory_mb} MB</b>",
+    "stats_title": "📊 <b>Admin Dashboard & Telemetry</b>\n\n🟢 <b>System Status:</b> {status}\n⏱ <b>Uptime:</b> {uptime}\n\n👥 <b>Users:</b>\n• Total Registered: <b>{total_users}</b>\n• Active Watchers: <b>{active_users}</b>\n• Blocked Bot: <b>{blocked_users}</b>\n• Active Subscription Rules: <b>{active_subscriptions}</b>\n\n🕷 <b>Scraper & Anti-Ban:</b>\n• Last Scrape: <b>{last_scrape_ago}s ago</b> (Latency: {latency}ms)\n• Source: <code>{source}</code>\n• Consecutive Errors: <b>{consecutive_failures}</b>\n• Tor / Proxy Status: <b>{proxy_status}</b>\n\n💾 <b>Process Memory:</b> <b>{memory_mb} MB</b>\n🔔 <b>New User Notifications:</b> <b>{new_users_status}</b>",
     "unauthorized": "⛔ Access denied. Admin command only.",
-    "btn_test_alert": "🧪 Send Test Alert"
+    "btn_test_alert": "🧪 Send Test Alert",
+    "btn_backup": "💾 Download Backup",
+    "btn_toggle_new_users_on": "🔔 New Users: ON ✅",
+    "btn_toggle_new_users_off": "🔔 New Users: OFF ❌",
+    "toast_new_users_on": "🔔 New user admin alerts enabled",
+    "toast_new_users_off": "🔕 New user admin alerts disabled",
+    "new_user_alert": "👤 <b>New User Joined Bot!</b>\n━━━━━━━━━━━━━━━━━━━━━━━━\n• <b>Name:</b> <code>{first_name}</code>\n• <b>Username:</b> {username}\n• <b>Telegram ID:</b> <code>{telegram_id}</code>\n• <b>Language:</b> {language}\n• <b>Total Users:</b> <code>{total_users}</code>"
   },
   "help_text": "ℹ️ <b>How does this bot work?</b>\n\n1. The bot monitors <a href=\"https://cheapestinference.com/pools\">cheapestinference.com/pools</a> 24/7 over an encrypted Tor/proxy pipeline.\n2. Each tier is partitioned into three 8-hour regional blocks (Asia, Europe, Americas).\n3. Live slot availability is updated in real time via dashboard buttons.\n4. Use <b>🔔 My Subscriptions</b> to configure notifications for specific tiers or regions.\n5. The moment a slot opens, you receive an instant alert with a direct checkout link!\n\n👨‍💻 <b>Author Contact & Support:</b>\nTelegram: <a href=\"https://t.me/grizlizora\">@grizlizora</a>"
 }

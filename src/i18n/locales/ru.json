@@ -47,7 +47,7 @@
     "global_enabled": "ВКЛЮЧЕНО ✅",
     "global_disabled": "ВЫКЛЮЧЕНО ❌",
     "sound_enabled": "Звук включен 🔊",
-    "sound_muted": "Без звука 🔇",
+    "sound_muted": "Без звуку 🔇",
     "filter_on": "ВКЛЮЧЕНО ✅",
     "filter_off": "ВЫКЛЮЧЕНО ❌",
     "btn_toggle_avail_on": "⚡ Свободные слоты: ВКЛ ✅",
@@ -122,9 +122,15 @@
     "tip_stable_historical": "⏱ <i>Среднее время доступности: {duration}.</i>"
   },
   "admin": {
-    "stats_title": "📊 <b>Панель администратора & Телеметрия</b>\n\n🟢 <b>Статус системы:</b> {status}\n⏱ <b>Аптайм:</b> {uptime}\n\n👥 <b>Пользователи:</b>\n• Всего зарегистрировано: <b>{total_users}</b>\n• Активных наблюдателей: <b>{active_users}</b>\n• Заблокировали бота: <b>{blocked_users}</b>\n• Активных правил подписок: <b>{active_subscriptions}</b>\n\n🕷 <b>Скрейпер & Anti-Ban:</b>\n• Последний опрос: <b>{last_scrape_ago}с назад</b> (Задержка: {latency}мс)\n• Источник данных: <code>{source}</code>\n• Ошибок подряд: <b>{consecutive_failures}</b>\n• Режим Tor / Прокси: <b>{proxy_status}</b>\n\n💾 <b>Память процесса:</b> <b>{memory_mb} MB</b>",
+    "stats_title": "📊 <b>Панель администратора & Телеметрия</b>\n\n🟢 <b>Статус системы:</b> {status}\n⏱ <b>Аптайм:</b> {uptime}\n\n👥 <b>Пользователи:</b>\n• Всего зарегистрировано: <b>{total_users}</b>\n• Активных наблюдателей: <b>{active_users}</b>\n• Заблокировали бота: <b>{blocked_users}</b>\n• Активных правил подписок: <b>{active_subscriptions}</b>\n\n🕷 <b>Скрейпер & Anti-Ban:</b>\n• Последний опрос: <b>{last_scrape_ago}с назад</b> (Задержка: {latency}мс)\n• Источник данных: <code>{source}</code>\n• Ошибок подряд: <b>{consecutive_failures}</b>\n• Режим Tor / Прокси: <b>{proxy_status}</b>\n\n💾 <b>Память процесса:</b> <b>{memory_mb} MB</b>\n🔔 <b>Уведомления о новых пользователях:</b> <b>{new_users_status}</b>",
     "unauthorized": "⛔ Доступ ограничен. Команда только для администраторов.",
-    "btn_test_alert": "🧪 Отправить тестовое уведомление"
+    "btn_test_alert": "🧪 Отправить тест",
+    "btn_backup": "💾 Скачать бэкап",
+    "btn_toggle_new_users_on": "🔔 Новые пользователи: ВКЛ ✅",
+    "btn_toggle_new_users_off": "🔔 Новые пользователи: ВЫКЛ ❌",
+    "toast_new_users_on": "🔔 Уведомления о новых пользователях включены",
+    "toast_new_users_off": "🔕 Уведомления о новых пользователях выключены",
+    "new_user_alert": "👤 <b>Новый пользователь в боте!</b>\n━━━━━━━━━━━━━━━━━━━━━━━━\n• <b>Имя:</b> <code>{first_name}</code>\n• <b>Username:</b> {username}\n• <b>Telegram ID:</b> <code>{telegram_id}</code>\n• <b>Язык интерфейса:</b> {language}\n• <b>Всего пользователей:</b> <code>{total_users}</code>"
   },
   "help_text": "ℹ️ <b>Как работает этот бот?</b>\n\n1. Бот круглосуточно проверяет страницу <a href=\"https://cheapestinference.com/pools\">cheapestinference.com/pools</a> через анонимный Tor/прокси канал.\n2. Каждый тариф разделен на три 8-часовых региональных блока (Азия, Европа, Америка).\n3. Актуальное наличие слотов отображается в реальном времени в меню бота.\n4. В разделе <b>🔔 Мои уведомления</b> настройте персональные уведомления на нужные вам тарифы или отдельные регионы.\n5. Как только слот появляется — вы моментально получаете сообщение с прямой ссылкой на покупку!\n\n👨‍💻 <b>Связь с автором / Поддержка:</b>\nTelegram: <a href=\"https://t.me/grizlizora\">@grizlizora</a>"
 }

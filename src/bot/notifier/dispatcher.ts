@@ -6,7 +6,7 @@ import { NotificationLogDAO } from "../../db/dao/notificationLogs.js";
 import { SlotHistoryDAO } from "../../db/dao/slotHistory.js";
 import { SubscriberInvertedIndex, PackedUserProfile } from "./subscriberIndex.js";
 import { CircularRingBuffer } from "./circularRingBuffer.js";
-import { SupportedLanguage, translate } from "../../i18n/index.js";
+import { translate, escapeHtml } from "../../i18n/index.js";
 
 export type BroadcastPriority = "P0" | "P1" | "P2" | "P3";
 
@@ -31,6 +31,16 @@ export class NotificationDispatcher {
   private p1Queue = new CircularRingBuffer<OutgoingAlertMessage>(16384);
   private p2Queue = new CircularRingBuffer<OutgoingAlertMessage>(8192);
   private p3Queue = new CircularRingBuffer<OutgoingAlertMessage>(4096);
+
+  // Deficit Weighted Round-Robin (DWRR) State
+  private p0Deficit = 0;
+  private p1Deficit = 0;
+  private p2Deficit = 0;
+  private p3Deficit = 0;
+  private readonly quantumP0 = 10;
+  private readonly quantumP1 = 5;
+  private readonly quantumP2 = 2;
+  private readonly quantumP3 = 1;
 
   private isWorkerRunning = false;
   private isPaused = false;
@@ -106,24 +116,25 @@ export class NotificationDispatcher {
   }
 
   public enqueue(msg: OutgoingAlertMessage): void {
-    switch (msg.priority) {
-      case "P0":
-        this.p0Queue.push(msg);
-        break;
-      case "P1":
-        this.p1Queue.push(msg);
-        break;
-      case "P2":
-        this.p2Queue.push(msg);
-        break;
-      case "P3":
-      default:
-        this.p3Queue.push(msg);
-        break;
-    }
+    const q = this.getQueueByPriority(msg.priority);
+    q.push(msg);
 
     if (!this.isWorkerRunning) {
       this.startWorkerLoop();
+    }
+  }
+
+  private getQueueByPriority(priority: BroadcastPriority): CircularRingBuffer<OutgoingAlertMessage> {
+    switch (priority) {
+      case "P0":
+        return this.p0Queue;
+      case "P1":
+        return this.p1Queue;
+      case "P2":
+        return this.p2Queue;
+      case "P3":
+      default:
+        return this.p3Queue;
     }
   }
 
@@ -160,7 +171,7 @@ export class NotificationDispatcher {
       }
 
       if (this.tokens >= 1) {
-        const item = this.selectNextItem();
+        const item = this.selectNextItemDWRR();
         if (item) {
           this.tokens -= 1;
           this.dispatchSingleMessage(item).catch(() => {});
@@ -177,13 +188,45 @@ export class NotificationDispatcher {
   }
 
   /**
-   * Deficit Round-Robin Item Selection (P0 -> P1 -> P2 -> P3)
+   * Deficit Weighted Round-Robin (DWRR) Item Selection
+   * Guarantees that lower-priority alerts (P3 sold out, P2 models) are never starved during P1 bursts
    */
-  private selectNextItem(): OutgoingAlertMessage | undefined {
-    if (!this.p0Queue.isEmpty()) return this.p0Queue.pop();
+  private selectNextItemDWRR(): OutgoingAlertMessage | undefined {
+    // P0 Interactive messages always take absolute immediate precedence
+    if (!this.p0Queue.isEmpty()) {
+      return this.p0Queue.pop();
+    }
+
+    // Allocate deficit quanta if all active queues are depleted of deficit
+    if (this.p1Deficit <= 0 && this.p2Deficit <= 0 && this.p3Deficit <= 0) {
+      if (!this.p1Queue.isEmpty()) this.p1Deficit += this.quantumP1;
+      if (!this.p2Queue.isEmpty()) this.p2Deficit += this.quantumP2;
+      if (!this.p3Queue.isEmpty()) this.p3Deficit += this.quantumP3;
+    }
+
+    // Drain P1
+    if (!this.p1Queue.isEmpty() && this.p1Deficit > 0) {
+      this.p1Deficit--;
+      return this.p1Queue.pop();
+    }
+
+    // Drain P2
+    if (!this.p2Queue.isEmpty() && this.p2Deficit > 0) {
+      this.p2Deficit--;
+      return this.p2Queue.pop();
+    }
+
+    // Drain P3
+    if (!this.p3Queue.isEmpty() && this.p3Deficit > 0) {
+      this.p3Deficit--;
+      return this.p3Queue.pop();
+    }
+
+    // Fallback: Return any available message in priority order
     if (!this.p1Queue.isEmpty()) return this.p1Queue.pop();
     if (!this.p2Queue.isEmpty()) return this.p2Queue.pop();
     if (!this.p3Queue.isEmpty()) return this.p3Queue.pop();
+
     return undefined;
   }
 
@@ -222,7 +265,9 @@ export class NotificationDispatcher {
 
       if (msg.retries < 5) {
         msg.retries++;
-        this.p1Queue.unshift(msg);
+        // Preserve original priority queue on retry
+        const targetQ = this.getQueueByPriority(msg.priority);
+        targetQ.unshift(msg);
       }
       return;
     }
@@ -230,7 +275,9 @@ export class NotificationDispatcher {
     // 3. Transient Network Errors
     if (msg.retries < 3) {
       msg.retries++;
-      this.p2Queue.push(msg);
+      // Preserve original priority queue on retry
+      const targetQ = this.getQueueByPriority(msg.priority);
+      targetQ.push(msg);
     } else {
       console.error(`❌ [NotificationDispatcher] Dropping message to ${msg.telegramId} after 3 retries: ${err.message}`);
     }
@@ -245,17 +292,21 @@ export class NotificationDispatcher {
     const blockName = translate(lang, `common.block_${event.block}`) || event.block;
     const timeFormatted = new Date(event.timestamp).toISOString().replace("T", " ").substring(0, 19);
 
+    const blockHash = event.block && event.block !== "ALL" ? `#${event.block}` : "";
+    const poolUrl = `https://cheapestinference.com/pools/${event.poolSlug}`;
+    const checkoutUrl = `${poolUrl}${blockHash}`;
+
     let text = "";
     let keyboard: InlineKeyboard | undefined;
 
     if (event.type === "SLOT_APPEARED") {
       const header = translate(lang, "alerts.slot_appeared_header");
       const body = translate(lang, "alerts.slot_appeared_body", {
-        pool_name: event.poolName,
-        block_name: blockName,
-        hours_utc: event.hoursUtc,
-        models: (event.models || []).join(", "),
-        price: event.newPrice || "0",
+        pool_name: escapeHtml(event.poolName),
+        block_name: escapeHtml(blockName),
+        hours_utc: escapeHtml(event.hoursUtc),
+        models: (event.models || []).map(escapeHtml).join(", "),
+        price: escapeHtml(event.newPrice || "0"),
         timestamp: timeFormatted,
       });
 
@@ -265,20 +316,20 @@ export class NotificationDispatcher {
         const analytics = this.historyDao.getSlotAnalytics(event.poolSlug, event.block);
         if (analytics.avgDurationFormatted) {
           text += translate(lang, "alerts.analytics_duration_tip", {
-            duration: analytics.avgDurationFormatted,
+            duration: escapeHtml(analytics.avgDurationFormatted),
           });
         }
       }
 
       keyboard = new InlineKeyboard().url(
         translate(lang, "alerts.btn_claim_slot"),
-        `https://cheapestinference.com/pools/${event.poolSlug}#${event.block}`
+        checkoutUrl
       );
     } else if (event.type === "SLOT_DISAPPEARED") {
       const header = translate(lang, "alerts.slot_disappeared_header");
       const body = translate(lang, "alerts.slot_disappeared_body", {
-        pool_name: event.poolName,
-        block_name: blockName,
+        pool_name: escapeHtml(event.poolName),
+        block_name: escapeHtml(blockName),
         timestamp: timeFormatted,
       });
       text = `${header}\n\n${body}`;
@@ -290,37 +341,40 @@ export class NotificationDispatcher {
         for (const up of event.modelUpgrade.upgraded) {
           diffLines.push(
             translate(lang, "alerts.model_item_upgraded", {
-              old_model: up.previousModelName || "",
-              new_model: up.modelName,
+              old_model: escapeHtml(up.previousModelName || ""),
+              new_model: escapeHtml(up.modelName),
             })
           );
         }
         for (const add of event.modelUpgrade.added) {
           diffLines.push(
             translate(lang, "alerts.model_item_added", {
-              model_name: add.modelName,
+              model_name: escapeHtml(add.modelName),
             })
           );
         }
         for (const rem of event.modelUpgrade.removed) {
           diffLines.push(
             translate(lang, "alerts.model_item_removed", {
-              model_name: rem.modelName,
+              model_name: escapeHtml(rem.modelName),
             })
           );
         }
       }
 
       const body = translate(lang, "alerts.model_upgrade_body", {
-        pool_name: event.poolName,
-        model_diff_block: diffLines.length > 0 ? diffLines.join("\n") : "• " + (event.models || []).join(", "),
-        all_models: (event.models || []).join(", "),
+        pool_name: escapeHtml(event.poolName),
+        model_diff_block:
+          diffLines.length > 0
+            ? diffLines.join("\n")
+            : "• " + (event.models || []).map(escapeHtml).join(", "),
+        all_models: (event.models || []).map(escapeHtml).join(", "),
       });
 
       text = `${header}\n\n${body}`;
       keyboard = new InlineKeyboard().url(
         translate(lang, "common.open_site"),
-        `https://cheapestinference.com/pools/${event.poolSlug}`
+        poolUrl
       );
     } else if (event.type === "SLOT_PRICE_CHANGED") {
       const header = translate(lang, "alerts.slot_price_changed_header");
@@ -336,18 +390,18 @@ export class NotificationDispatcher {
       }
 
       const body = translate(lang, "alerts.slot_price_changed_body", {
-        pool_name: event.poolName,
-        block_name: blockName,
-        old_price: event.previousPrice || "0",
-        new_price: event.newPrice || "0",
+        pool_name: escapeHtml(event.poolName),
+        block_name: escapeHtml(blockName),
+        old_price: escapeHtml(event.previousPrice || "0"),
+        new_price: escapeHtml(event.newPrice || "0"),
         delta_badge: deltaBadge,
-        hours_utc: event.hoursUtc,
+        hours_utc: escapeHtml(event.hoursUtc),
       });
 
       text = `${header}\n\n${body}`;
       keyboard = new InlineKeyboard().url(
         translate(lang, "alerts.btn_claim_slot"),
-        `https://cheapestinference.com/pools/${event.poolSlug}#${event.block}`
+        checkoutUrl
       );
     } else if (event.type === "POOL_BASE_PRICE_CHANGED" || event.type === "PRICE_CHANGED") {
       const header = translate(lang, "alerts.pool_base_price_header");
@@ -363,23 +417,27 @@ export class NotificationDispatcher {
       }
 
       const body = translate(lang, "alerts.pool_base_price_body", {
-        pool_name: event.poolName,
-        old_price: event.previousPrice || "0",
-        new_price: event.newPrice || "0",
+        pool_name: escapeHtml(event.poolName),
+        old_price: escapeHtml(event.previousPrice || "0"),
+        new_price: escapeHtml(event.newPrice || "0"),
         delta_badge: deltaBadge,
-        models: (event.models || []).join(", "),
+        models: (event.models || []).map(escapeHtml).join(", "),
       });
 
       text = `${header}\n\n${body}`;
       keyboard = new InlineKeyboard().url(
         translate(lang, "common.open_site"),
-        `https://cheapestinference.com/pools/${event.poolSlug}`
+        poolUrl
       );
     } else if (event.type === "TIER_UPDATED_EVENT") {
       const header = translate(lang, "alerts.tier_updated_header");
       const diffLines: string[] = [];
       if (event.tierUpdate?.newDescription) {
-        diffLines.push(translate(lang, "alerts.tier_desc_change", { new_description: event.tierUpdate.newDescription }));
+        diffLines.push(
+          translate(lang, "alerts.tier_desc_change", {
+            new_description: escapeHtml(event.tierUpdate.newDescription),
+          })
+        );
       }
       if (event.tierUpdate?.newAnnualDiscount) {
         diffLines.push(
@@ -391,7 +449,7 @@ export class NotificationDispatcher {
       }
 
       const body = translate(lang, "alerts.tier_updated_body", {
-        pool_name: event.poolName,
+        pool_name: escapeHtml(event.poolName),
         tier_diff_block: diffLines.join("\n"),
         timestamp: timeFormatted,
       });
@@ -399,11 +457,10 @@ export class NotificationDispatcher {
       text = `${header}\n\n${body}`;
       keyboard = new InlineKeyboard().url(
         translate(lang, "common.open_site"),
-        `https://cheapestinference.com/pools/${event.poolSlug}`
+        poolUrl
       );
     } else {
-      // General Fallback
-      text = `🚨 <b>CheapestInference Alert</b>\n\nPool: <b>${event.poolName}</b> (${blockName})\nStatus: <b>${event.newStatus}</b>`;
+      text = `🚨 <b>CheapestInference Alert</b>\n\nPool: <b>${escapeHtml(event.poolName)}</b> (${escapeHtml(blockName)})\nStatus: <b>${escapeHtml(event.newStatus || "updated")}</b>`;
     }
 
     return {

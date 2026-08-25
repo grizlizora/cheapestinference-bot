@@ -11,12 +11,13 @@ export class UserDAO {
   private stmtToggleSoldOut: Database.Statement;
   private stmtToggleModels: Database.Statement;
   private stmtTogglePrices: Database.Statement;
+  private stmtToggleAdminNewUsers: Database.Statement;
   private stmtDeactivate: Database.Statement;
   private stmtReactivate: Database.Statement;
   private stmtGetStats: Database.Statement;
 
   constructor(public readonly db: Database.Database) {
-    // Run schema migration for new user preference columns
+    // Run schema migration for user preference columns
     try {
       db.exec(`
         ALTER TABLE users ADD COLUMN notify_available_global INTEGER NOT NULL DEFAULT 1;
@@ -35,6 +36,11 @@ export class UserDAO {
     try {
       db.exec(`
         ALTER TABLE users ADD COLUMN notify_prices_global INTEGER NOT NULL DEFAULT 1;
+      `);
+    } catch {}
+    try {
+      db.exec(`
+        ALTER TABLE users ADD COLUMN notify_admin_new_users INTEGER NOT NULL DEFAULT 1;
       `);
     } catch {}
 
@@ -67,6 +73,9 @@ export class UserDAO {
     `);
     this.stmtTogglePrices = db.prepare(`
       UPDATE users SET notify_prices_global = CASE WHEN notify_prices_global = 1 THEN 0 ELSE 1 END, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?
+    `);
+    this.stmtToggleAdminNewUsers = db.prepare(`
+      UPDATE users SET notify_admin_new_users = CASE WHEN notify_admin_new_users = 1 THEN 0 ELSE 1 END, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?
     `);
     this.stmtDeactivate = db.prepare(`
       UPDATE users SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?
@@ -137,6 +146,12 @@ export class UserDAO {
     this.stmtTogglePrices.run(tgId);
     const user = this.getByTelegramId(tgId);
     return user ? user.notify_prices_global : 1;
+  }
+
+  toggleAdminNewUsers(tgId: number): number {
+    this.stmtToggleAdminNewUsers.run(tgId);
+    const user = this.getByTelegramId(tgId);
+    return user ? (user.notify_admin_new_users ?? 1) : 1;
   }
 
   deactivateUser(tgId: number): void {

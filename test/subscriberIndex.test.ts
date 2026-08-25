@@ -20,6 +20,7 @@ describe("SubscriberInvertedIndex", () => {
         notify_sold_out_global INTEGER NOT NULL DEFAULT 0,
         notify_models_global INTEGER NOT NULL DEFAULT 1,
         notify_prices_global INTEGER NOT NULL DEFAULT 1,
+        notify_admin_new_users INTEGER NOT NULL DEFAULT 1,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
@@ -65,6 +66,41 @@ describe("SubscriberInvertedIndex", () => {
     expect(matchedTgIds).toContain(1002);
     expect(matchedTgIds).toContain(1003);
     expect(matchedTgIds).not.toContain(1004);
+
+    // When a pool-level MODEL_UPGRADE_EVENT fires on Flagship (blockId = 'ALL'), regional subscribers also receive it!
+    const matchesModelUpgrade = index.resolveSubscribers("flagship", "ALL", "models");
+    const matchedModelTgIds = matchesModelUpgrade.map((u) => u.telegramId);
+    expect(matchedModelTgIds).toContain(1001); // Global
+    expect(matchedModelTgIds).toContain(1002); // Pool
+    expect(matchedModelTgIds).toContain(1003); // Regional Europe
+  });
+
+  it("should support synchronous live write-through updates in RAM", () => {
+    const index = new SubscriberInvertedIndex(db);
+
+    // Register user dynamically in RAM
+    index.upsertUserProfile({
+      userId: 5,
+      telegramId: 1005,
+      language: "en",
+      isMuted: false,
+      isActive: true,
+      notifyAvailableGlobal: true,
+      notifySoldOutGlobal: false,
+      notifyModelsGlobal: true,
+      notifyPricesGlobal: true,
+    });
+
+    // Add subscription dynamically
+    index.updateSubscription(5, "core", "asia", { available: true });
+
+    const matches = index.resolveSubscribers("core", "asia", "available");
+    expect(matches.map((u) => u.telegramId)).toContain(1005);
+
+    // Toggle off dynamically
+    index.updateSubscription(5, "core", "asia", { available: false });
+    const matchesAfter = index.resolveSubscribers("core", "asia", "available");
+    expect(matchesAfter.map((u) => u.telegramId)).not.toContain(1005);
   });
 
   it("should instantly evict deactivated or blocked users", () => {

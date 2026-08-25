@@ -53,7 +53,6 @@ export class ScraperOrchestrator extends EventEmitter {
     if (this.running) return;
     this.running = true;
     console.log("🕷 [ScraperOrchestrator] Starting polling loop...");
-    // Schedule first periodic poll after calculated delay to prevent immediate duplicate
     this.scheduleNext(this.calculateDelayMs());
   }
 
@@ -132,10 +131,7 @@ export class ScraperOrchestrator extends EventEmitter {
       // Validate snapshot integrity
       this.sanityGuard.validateSnapshot(result.snapshot);
 
-      // Persist latest state to database
-      this.poolStateDao.saveSnapshot(result.snapshot);
-
-      // Compute diffs against previous baseline
+      // 1. FAST PATH: Compute diffs and dispatch alerts IMMEDIATELY at T+0ms
       const events = this.diffEngine.processSnapshot(result.snapshot);
 
       this.emit("heartbeat", {
@@ -148,6 +144,15 @@ export class ScraperOrchestrator extends EventEmitter {
       if (events.length > 0) {
         this.emit("diff_events", events);
       }
+
+      // 2. Persist state to SQLite asynchronously without blocking alert dispatch
+      queueMicrotask(() => {
+        try {
+          this.poolStateDao.saveSnapshot(result.snapshot!);
+        } catch (e: any) {
+          this.emit("warn", `Failed to save snapshot to SQLite: ${e.message}`);
+        }
+      });
 
       return events;
     } catch (err: any) {
@@ -166,7 +171,7 @@ export class ScraperOrchestrator extends EventEmitter {
       const apiResult = await this.apiEngine.fetch(
         this.apiEtag,
         this.apiLastModified,
-        8_000
+        3_500 // Fast 3.5s timeout for ultra-fast failover
       );
       if (apiResult.etag) this.apiEtag = apiResult.etag;
       if (apiResult.lastModified) this.apiLastModified = apiResult.lastModified;

@@ -13,6 +13,14 @@ const dictionaries: Record<SupportedLanguage, typeof uk> = {
   ru: ru as typeof uk,
 };
 
+export function escapeHtml(str: string): string {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 export function resolveDefaultLanguage(rawLangCode?: string | null): SupportedLanguage {
   if (!rawLangCode) return "en";
 
@@ -30,47 +38,33 @@ export function resolveDefaultLanguage(rawLangCode?: string | null): SupportedLa
   return "en";
 }
 
+function lookupKey(dict: any, keys: string[]): string | undefined {
+  let curr = dict;
+  for (const k of keys) {
+    if (curr && typeof curr === "object" && k in curr) {
+      curr = curr[k];
+    } else {
+      return undefined;
+    }
+  }
+  return typeof curr === "string" ? curr : undefined;
+}
+
 export function translate(
   lang: SupportedLanguage,
   key: string,
   params?: Record<string, string | number>
 ): string {
-  const dict = dictionaries[lang] || dictionaries[DEFAULT_LANGUAGE];
   const keys = key.split(".");
-  let current: any = dict;
+  const str =
+    lookupKey(dictionaries[lang], keys) ??
+    lookupKey(dictionaries[DEFAULT_LANGUAGE], keys) ??
+    lookupKey(dictionaries.uk, keys) ??
+    key;
 
-  for (const k of keys) {
-    if (current && typeof current === "object" && k in current) {
-      current = current[k];
-    } else {
-      // Fallback to English, then Ukrainian
-      let fallback: any = dictionaries.en;
-      for (const fk of keys) {
-        if (fallback && typeof fallback === "object" && fk in fallback) {
-          fallback = fallback[fk];
-        } else {
-          let ukFallback: any = dictionaries.uk;
-          for (const ukk of keys) {
-            if (ukFallback && typeof ukFallback === "object" && ukk in ukFallback) {
-              ukFallback = ukFallback[ukk];
-            } else {
-              return key;
-            }
-          }
-          current = ukFallback;
-          break;
-        }
-      }
-      if (current === dict) current = fallback;
-      break;
-    }
-  }
+  if (!params) return str;
 
-  if (typeof current !== "string") return key;
-
-  if (!params) return current;
-
-  return current.replace(/{(\w+)}/g, (_, match) => {
+  return str.replace(/{(\w+)}/g, (_, match) => {
     return params[match] !== undefined ? String(params[match]) : `{${match}}`;
   });
 }

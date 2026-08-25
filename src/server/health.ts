@@ -11,19 +11,38 @@ export function createHealthServer(
     const rawUrl = req.url || "/";
     const pathname = rawUrl.split("?")[0].replace(/\/+$/, "") || "/";
 
-    if (pathname === "/health" || pathname === "/" || pathname === "/ping") {
+    // Handle CORS Preflight
+    if (req.method === "OPTIONS") {
+      res.writeHead(204, {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      });
+      res.end();
+      return;
+    }
+
+    if (
+      pathname === "/health" ||
+      pathname === "/" ||
+      pathname === "/ping" ||
+      pathname === "/live"
+    ) {
       const telemetry = scraper.getTelemetry();
       const proxyStatus = proxyPool.getStatus();
 
-      const isHealthy = telemetry.consecutiveFailures < 5;
-      const statusCode = isHealthy ? 200 : 503;
+      // Return HTTP 200 for process liveness to prevent destructive restart loops on Render / HF Spaces
+      const isDegraded = telemetry.consecutiveFailures > 0;
+      const statusCode = 200;
 
       res.writeHead(statusCode, {
         "Content-Type": "application/json",
         "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        "Surrogate-Control": "no-store",
         "Pragma": "no-cache",
         "Expires": "0",
         "Connection": "close",
+        "Access-Control-Allow-Origin": "*",
       });
 
       if (req.method === "HEAD") {
@@ -32,7 +51,7 @@ export function createHealthServer(
       }
 
       const payload = {
-        status: telemetry.consecutiveFailures === 0 ? "healthy" : "degraded",
+        status: isDegraded ? "degraded" : "healthy",
         uptimeSeconds: Math.floor(process.uptime()),
         timestamp: new Date().toISOString(),
         memoryUsageMb: {

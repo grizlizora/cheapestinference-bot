@@ -1,12 +1,22 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
+import { pipeline } from "node:stream/promises";
 import Database from "better-sqlite3";
 import { InputFile } from "grammy";
 import { BotContext } from "../../types/context.js";
 import { config } from "../../config/env.js";
 import { UserDAO } from "../../db/dao/users.js";
 import { SubscriptionDAO } from "../../db/dao/subscriptions.js";
+import { escapeHtml } from "../../i18n/index.js";
+
+async function computeFileSha256(filePath: string): Promise<string> {
+  const hash = crypto.createHash("sha256");
+  const stream = fs.createReadStream(filePath);
+  await pipeline(stream, hash);
+  return hash.digest("hex");
+}
 
 export function createBackupHandler(
   db: Database.Database,
@@ -31,21 +41,30 @@ export function createBackupHandler(
     );
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const tmpBackupPath = path.resolve(`/tmp/backup_cheapestinference_${timestamp}.db`);
+    const randomSuffix = crypto.randomBytes(3).toString("hex");
+    const tmpBackupPath = path.join(
+      os.tmpdir(),
+      `backup_cheapestinference_${timestamp}_${randomSuffix}.db`
+    );
 
     try {
+      if (fs.existsSync(tmpBackupPath)) {
+        try {
+          fs.rmSync(tmpBackupPath, { force: true });
+        } catch {}
+      }
+
       const startTime = Date.now();
 
-      // Zero-lock live snapshot
+      // Zero-lock live snapshot (holds SQLITE_READLOCK, active writes append to WAL uninterrupted)
       db.prepare("VACUUM INTO ?").run(tmpBackupPath);
 
       const durationMs = Date.now() - startTime;
       const fileStats = fs.statSync(tmpBackupPath);
       const sizeMb = (fileStats.size / (1024 * 1024)).toFixed(2);
 
-      // Compute SHA-256 checksum
-      const fileBuffer = fs.readFileSync(tmpBackupPath);
-      const sha256Hash = crypto.createHash("sha256").update(fileBuffer).digest("hex");
+      // Compute SHA-256 via streaming (O(1) memory < 64KB)
+      const sha256Hash = await computeFileSha256(tmpBackupPath);
 
       const userStats = userDao.getUserStats();
       const activeSubs = subDao.getTotalActiveSubscriptions();
@@ -75,13 +94,13 @@ export function createBackupHandler(
       }
     } catch (err: any) {
       console.error("❌ [Backup Error] Failed to generate/send SQLite snapshot:", err);
-      await ctx.reply(`❌ <b>Backup failed:</b> <code>${err.message}</code>`, {
+      await ctx.reply(`❌ <b>Backup failed:</b> <code>${escapeHtml(err.message)}</code>`, {
         parse_mode: "HTML",
       });
     } finally {
       if (fs.existsSync(tmpBackupPath)) {
         try {
-          fs.unlinkSync(tmpBackupPath);
+          fs.rmSync(tmpBackupPath, { force: true });
         } catch {}
       }
     }

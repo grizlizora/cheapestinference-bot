@@ -4,12 +4,14 @@ import { SubscriptionDAO } from "../../db/dao/subscriptions.js";
 import { UserDAO } from "../../db/dao/users.js";
 import { PoolStateDAO } from "../../db/dao/poolState.js";
 import { SlotHistoryDAO } from "../../db/dao/slotHistory.js";
+import { SubscriberInvertedIndex } from "../notifier/subscriberIndex.js";
 import { renderDashboardText, safeEditMessageText } from "./mainDashboard.js";
 
 export function createSubscriptionsMenu(
   subDao: SubscriptionDAO,
   userDao: UserDAO,
   poolStateDao: PoolStateDAO,
+  invertedIndex: SubscriberInvertedIndex,
   historyDao?: SlotHistoryDAO
 ) {
   return new Menu<BotContext>("subscriptions-menu")
@@ -22,6 +24,10 @@ export function createSubscriptionsMenu(
       async (ctx) => {
         const val = userDao.toggleAvailable(ctx.from!.id);
         ctx.user.notify_available_global = val;
+        invertedIndex.updateUserPreferences(ctx.from!.id, {
+          notifyAvailableGlobal: val === 1,
+        });
+
         const toast =
           val === 1
             ? ctx.t("subscriptions.toast_avail_on")
@@ -43,6 +49,10 @@ export function createSubscriptionsMenu(
       async (ctx) => {
         const val = userDao.toggleSoldOut(ctx.from!.id);
         ctx.user.notify_sold_out_global = val;
+        invertedIndex.updateUserPreferences(ctx.from!.id, {
+          notifySoldOutGlobal: val === 1,
+        });
+
         const toast =
           val === 1
             ? ctx.t("subscriptions.toast_sold_on")
@@ -64,6 +74,10 @@ export function createSubscriptionsMenu(
       async (ctx) => {
         const val = userDao.toggleModels(ctx.from!.id);
         ctx.user.notify_models_global = val;
+        invertedIndex.updateUserPreferences(ctx.from!.id, {
+          notifyModelsGlobal: val === 1,
+        });
+
         const toast =
           val === 1
             ? ctx.t("subscriptions.toast_models_on")
@@ -85,6 +99,10 @@ export function createSubscriptionsMenu(
       async (ctx) => {
         const val = userDao.togglePrices(ctx.from!.id);
         ctx.user.notify_prices_global = val;
+        invertedIndex.updateUserPreferences(ctx.from!.id, {
+          notifyPricesGlobal: val === 1,
+        });
+
         const toast =
           val === 1
             ? ctx.t("subscriptions.toast_prices_on")
@@ -107,6 +125,13 @@ export function createSubscriptionsMenu(
       },
       async (ctx) => {
         const active = subDao.toggleSubscription(ctx.user.id, "ALL", "ALL");
+        invertedIndex.updateSubscription(ctx.user.id, "ALL", "ALL", {
+          available: active,
+          soldOut: active,
+          models: active,
+          prices: active,
+        });
+
         const toast = active
           ? ctx.t("subscriptions.toast_global_on")
           : ctx.t("subscriptions.toast_global_off");
@@ -127,6 +152,10 @@ export function createSubscriptionsMenu(
       async (ctx) => {
         const newMuted = userDao.toggleMute(ctx.from!.id);
         ctx.user.is_muted = newMuted;
+        invertedIndex.updateUserPreferences(ctx.from!.id, {
+          isMuted: newMuted === 1,
+        });
+
         const toast =
           newMuted === 1
             ? ctx.t("subscriptions.toast_sound_muted")
@@ -166,6 +195,13 @@ export function createSubscriptionsMenu(
               : ctx.t("subscriptions.pool_inactive", { name: pool.name }),
             async (c) => {
               const active = subDao.toggleSubscription(c.user.id, pool.slug, "ALL");
+              invertedIndex.updateSubscription(c.user.id, pool.slug, "ALL", {
+                available: active,
+                soldOut: active,
+                models: active,
+                prices: active,
+              });
+
               const toast = active
                 ? c.t("subscriptions.toast_pool_on", { pool: pool.name })
                 : c.t("subscriptions.toast_pool_off", { pool: pool.name });
@@ -189,6 +225,13 @@ export function createSubscriptionsMenu(
                 : ctx.t("subscriptions.slot_inactive", { name: blockTitle, hours: block.hours }),
               async (c) => {
                 const active = subDao.toggleSubscription(c.user.id, pool.slug, block.id);
+                invertedIndex.updateSubscription(c.user.id, pool.slug, block.id, {
+                  available: active,
+                  soldOut: active,
+                  models: active,
+                  prices: active,
+                });
+
                 const toast = active
                   ? c.t("subscriptions.toast_slot_on", {
                       pool: pool.name,

@@ -8,10 +8,11 @@ export class CircularRingBuffer<T> {
   private count = 0;
   private capacity: number;
   private mask: number;
+  private readonly minCapacity: number;
 
   constructor(initialCapacityPowerOfTwo = 1024) {
-    // Capacity must be a power of 2 for fast bitwise masking: (x & mask)
-    this.capacity = 1 << Math.ceil(Math.log2(Math.max(16, initialCapacityPowerOfTwo)));
+    this.minCapacity = 1 << Math.ceil(Math.log2(Math.max(16, initialCapacityPowerOfTwo)));
+    this.capacity = this.minCapacity;
     this.mask = this.capacity - 1;
     this.buffer = new Array<T | undefined>(this.capacity);
   }
@@ -35,7 +36,12 @@ export class CircularRingBuffer<T> {
   }
 
   public pop(): T | undefined {
-    if (this.count === 0) return undefined;
+    if (this.count === 0) {
+      if (this.capacity > this.minCapacity) {
+        this.shrink();
+      }
+      return undefined;
+    }
     const item = this.buffer[this.head];
     this.buffer[this.head] = undefined; // Allow GC of referenced payload
     this.head = (this.head + 1) & this.mask;
@@ -56,6 +62,8 @@ export class CircularRingBuffer<T> {
   }
 
   public clear(): void {
+    this.capacity = this.minCapacity;
+    this.mask = this.capacity - 1;
     this.buffer = new Array<T | undefined>(this.capacity);
     this.head = 0;
     this.tail = 0;
@@ -74,5 +82,14 @@ export class CircularRingBuffer<T> {
     }
     this.head = 0;
     this.tail = this.count;
+  }
+
+  private shrink(): void {
+    this.capacity = this.minCapacity;
+    this.mask = this.capacity - 1;
+    this.buffer = new Array<T | undefined>(this.capacity);
+    this.head = 0;
+    this.tail = 0;
+    this.count = 0;
   }
 }

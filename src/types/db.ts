@@ -12,6 +12,7 @@ export interface UserRecord {
   notify_sold_out_global: number; // 1 = Enabled, 0 = Disabled
   notify_models_global: number; // 1 = Enabled, 0 = Disabled
   notify_prices_global: number; // 1 = Enabled, 0 = Disabled
+  notify_admin_new_users: number; // 1 = Admin wants new user alerts, 0 = Disabled
   created_at: string;
   updated_at: string;
 }
@@ -38,7 +39,7 @@ export interface PoolStateRecord {
   id: number;
   pool_slug: string;
   pool_name: string;
-  models_json: string; // JSON string array of models
+  models_json: string;
   block_id: string;
   status: string;
   hours_utc: string;

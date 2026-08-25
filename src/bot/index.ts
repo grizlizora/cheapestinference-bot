@@ -14,11 +14,18 @@ import {
 } from "./menus/mainDashboard.js";
 import { renderSubscriptionsText } from "./menus/subscriptions.js";
 import { createStartHandler } from "./handlers/start.js";
-import { createAdminHandler } from "./handlers/admin.js";
+import { createLanguageHandler } from "./handlers/language.js";
+import { createAdminHandler, renderAdminText, createAdminKeyboard } from "./handlers/admin.js";
 import { createBackupHandler } from "./handlers/backup.js";
 import { NotificationDispatcher } from "./notifier/dispatcher.js";
 import { config } from "../config/env.js";
-import { translate, resolveDefaultLanguage, SupportedLanguage } from "../i18n/index.js";
+import {
+  translate,
+  resolveDefaultLanguage,
+  getLanguageFlag,
+  escapeHtml,
+  SupportedLanguage,
+} from "../i18n/index.js";
 
 export function createTelegramBot(
   token: string,
@@ -52,10 +59,20 @@ export function createTelegramBot(
     })
   );
 
-  // 4. User context loader & universal language resolution
+  // 4. Shared Notification Dispatcher with In-Memory Inverted Index
+  const dispatcher = new NotificationDispatcher(
+    bot,
+    userDao,
+    logDao,
+    resolvedHistoryDao
+  );
+
+  // 5. User context loader & universal language resolution
   bot.use(async (ctx, next) => {
     if (ctx.from) {
       let user = userDao.getByTelegramId(ctx.from.id);
+      let isBrandNew = false;
+
       if (!user) {
         const lang = resolveDefaultLanguage(ctx.from.language_code);
         user = userDao.upsertUser({
@@ -65,13 +82,55 @@ export function createTelegramBot(
           language: lang,
         });
         (ctx as any).isNewUser = true;
+        isBrandNew = true;
+
+        // Register in In-Memory Inverted Index immediately
+        dispatcher.getInvertedIndex().upsertUserProfile({
+          userId: user.id,
+          telegramId: user.telegram_id,
+          language: lang,
+          isMuted: false,
+          isActive: true,
+          notifyAvailableGlobal: true,
+          notifySoldOutGlobal: false,
+          notifyModelsGlobal: true,
+          notifyPricesGlobal: true,
+        });
       } else if (user.is_active === 0) {
         userDao.reactivateUser(ctx.from.id);
         user.is_active = 1;
+        dispatcher.getInvertedIndex().updateUserPreferences(ctx.from.id, { isActive: true });
       }
 
       ctx.user = user;
       ctx.lang = (user.language as SupportedLanguage) || "en";
+
+      // 6. Notify Admins on New User Registration (if enabled)
+      if (isBrandNew) {
+        const userStats = userDao.getUserStats();
+        const usernameStr = ctx.from.username ? `@${escapeHtml(ctx.from.username)}` : "<i>немає</i>";
+        const langFlag = getLanguageFlag(ctx.lang);
+
+        for (const adminId of config.ADMIN_USER_IDS) {
+          const adminUser = userDao.getByTelegramId(adminId);
+          const adminLang = (adminUser?.language as SupportedLanguage) || "uk";
+          const wantsAlerts = (adminUser?.notify_admin_new_users ?? 1) === 1;
+
+          if (wantsAlerts) {
+            const adminMsg = translate(adminLang, "admin.new_user_alert", {
+              first_name: escapeHtml(ctx.from.first_name),
+              username: usernameStr,
+              telegram_id: ctx.from.id,
+              language: langFlag,
+              total_users: userStats.total,
+            });
+
+            bot.api
+              .sendMessage(adminId, adminMsg, { parse_mode: "HTML" })
+              .catch(() => {});
+          }
+        }
+      }
     } else {
       ctx.lang = "en";
     }
@@ -82,24 +141,17 @@ export function createTelegramBot(
     await next();
   });
 
-  // 5. Shared Notification Dispatcher with In-Memory Inverted Index
-  const dispatcher = new NotificationDispatcher(
-    bot,
-    userDao,
-    logDao,
-    resolvedHistoryDao
-  );
-
-  // 6. Navigation Menus Hierarchy
+  // 7. Navigation Menus Hierarchy
   const { mainDashboardMenu, languageMenu, subscriptionsMenu } = createMainMenuHierarchy(
     poolStateDao,
     userDao,
     subDao,
+    dispatcher.getInvertedIndex(),
     resolvedHistoryDao
   );
   bot.use(mainDashboardMenu);
 
-  // 7. Command Handlers
+  // 8. Command Handlers
   bot.command(
     "start",
     createStartHandler(userDao, poolStateDao, languageMenu, mainDashboardMenu, resolvedHistoryDao)
@@ -123,17 +175,69 @@ export function createTelegramBot(
     });
   });
 
-  bot.command("language", async (ctx) => {
-    await ctx.reply(ctx.t("onboarding.welcome_title"), {
-      parse_mode: "HTML",
-      reply_markup: languageMenu,
-      link_preview_options: { is_disabled: true },
-    });
-  });
+  bot.command("language", createLanguageHandler(languageMenu));
 
   bot.command("admin", createAdminHandler(userDao, subDao, scraper, proxyPool));
   bot.command("stats", createAdminHandler(userDao, subDao, scraper, proxyPool));
   bot.command("backup", createBackupHandler(userDao.db, userDao, subDao));
+
+  // Admin Interactive Callback Handlers
+  bot.callbackQuery("admin_toggle_new_users", async (ctx) => {
+    if (!ctx.from) return;
+    const newVal = userDao.toggleAdminNewUsers(ctx.from.id);
+    const toast =
+      newVal === 1
+        ? ctx.t("admin.toast_new_users_on")
+        : ctx.t("admin.toast_new_users_off");
+    await ctx.answerCallbackQuery(toast);
+    const text = renderAdminText(ctx, userDao, subDao, scraper, proxyPool);
+    const keyboard = createAdminKeyboard(ctx, userDao);
+    await ctx.editMessageText(text, { parse_mode: "HTML", reply_markup: keyboard }).catch(() => {});
+  });
+
+  bot.callbackQuery("admin_refresh", async (ctx) => {
+    await ctx.answerCallbackQuery({ text: ctx.t("common.refreshed_toast"), show_alert: false });
+    const text = renderAdminText(ctx, userDao, subDao, scraper, proxyPool);
+    const keyboard = createAdminKeyboard(ctx, userDao);
+    await ctx.editMessageText(text, { parse_mode: "HTML", reply_markup: keyboard }).catch(() => {});
+  });
+
+  bot.callbackQuery("admin_backup", async (ctx) => {
+    await ctx.answerCallbackQuery();
+    await createBackupHandler(userDao.db, userDao, subDao)(ctx);
+  });
+
+  bot.callbackQuery("admin_test_alert", async (ctx) => {
+    await ctx.answerCallbackQuery();
+    await dispatcher.handleDiffEvents([
+      {
+        id: crypto.randomUUID(),
+        type: "MODEL_UPGRADE_EVENT",
+        poolSlug: "frontier",
+        poolName: "Frontier Pool",
+        block: "ALL",
+        models: ["glm-5.3", "minimax-m3", "qwen-3.5-turbo"],
+        hoursUtc: "",
+        timestamp: Date.now(),
+        modelUpgrade: {
+          added: [{ type: "added", modelName: "qwen-3.5-turbo", family: "qwen", newVersion: "3.5" }],
+          upgraded: [
+            {
+              type: "upgraded",
+              modelName: "glm-5.3",
+              previousModelName: "glm-5.2",
+              family: "glm",
+              oldVersion: "5.2",
+              newVersion: "5.3",
+              changeNote: "GLM 5.2 ➡️ GLM 5.3",
+            },
+          ],
+          removed: [],
+          allActiveModels: ["glm-5.3", "minimax-m3", "qwen-3.5-turbo"],
+        },
+      },
+    ]);
+  });
 
   bot.command("help", async (ctx) => {
     const keyboard = new InlineKeyboard().url(
