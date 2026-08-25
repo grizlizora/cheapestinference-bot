@@ -49,6 +49,17 @@ export function createTelegramBot(
   // 1. Global Error Boundary
   bot.catch((err) => {
     const ctx = err.ctx;
+    const errAny = err.error as any;
+    const msg =
+      errAny?.message ||
+      errAny?.description ||
+      String(err.error || "");
+    if (
+      msg.includes("message is not modified") ||
+      msg.includes("query is too old")
+    ) {
+      return; // Ignore benign Telegram responses
+    }
     console.error(
       `❌ [Telegram Bot Error] Error while handling update ${ctx.update.update_id}:`,
       err.error
@@ -248,35 +259,8 @@ export function createTelegramBot(
 
   bot.callbackQuery("admin_test_alert", async (ctx) => {
     if (!(await requireAdmin(ctx))) return;
-    await ctx.answerCallbackQuery({ text: "🚀 Test alert broadcast sent!", show_alert: false });
-    await dispatcher.handleDiffEvents([
-      {
-        id: crypto.randomUUID(),
-        type: "MODEL_UPGRADE_EVENT",
-        poolSlug: "frontier",
-        poolName: "Frontier Pool",
-        block: "ALL",
-        models: ["glm-5.3", "minimax-m3", "qwen-3.5-turbo"],
-        hoursUtc: "",
-        timestamp: Date.now(),
-        modelUpgrade: {
-          added: [{ type: "added", modelName: "qwen-3.5-turbo", family: "qwen", newVersion: "3.5" }],
-          upgraded: [
-            {
-              type: "upgraded",
-              modelName: "glm-5.3",
-              previousModelName: "glm-5.2",
-              family: "glm",
-              oldVersion: "5.2",
-              newVersion: "5.3",
-              changeNote: "GLM 5.2 ➡️ GLM 5.3",
-            },
-          ],
-          removed: [],
-          allActiveModels: ["glm-5.3", "minimax-m3", "qwen-3.5-turbo"],
-        },
-      },
-    ]);
+    await ctx.answerCallbackQuery({ text: "🚀 Тестове сповіщення надіслано!", show_alert: false });
+    await dispatcher.sendTestAlert(ctx.from!.id, ctx.lang, "slot");
   });
 
   bot.command("help", async (ctx) => {
@@ -303,38 +287,11 @@ export function createTelegramBot(
       return;
     }
 
-    await ctx.reply("🧪 <i>Dispatching test alert through high-concurrency queue...</i>", {
+    await ctx.reply("🧪 <i>Надсилаю реалістичне тестове сповіщення про відкриття слота...</i>", {
       parse_mode: "HTML",
     });
 
-    await dispatcher.handleDiffEvents([
-      {
-        id: crypto.randomUUID(),
-        type: "MODEL_UPGRADE_EVENT",
-        poolSlug: "frontier",
-        poolName: "Frontier Pool",
-        block: "ALL",
-        models: ["glm-5.3", "minimax-m3", "qwen-3.5-turbo"],
-        hoursUtc: "",
-        timestamp: Date.now(),
-        modelUpgrade: {
-          added: [{ type: "added", modelName: "qwen-3.5-turbo", family: "qwen", newVersion: "3.5" }],
-          upgraded: [
-            {
-              type: "upgraded",
-              modelName: "glm-5.3",
-              previousModelName: "glm-5.2",
-              family: "glm",
-              oldVersion: "5.2",
-              newVersion: "5.3",
-              changeNote: "GLM 5.2 ➡️ GLM 5.3",
-            },
-          ],
-          removed: [],
-          allActiveModels: ["glm-5.3", "minimax-m3", "qwen-3.5-turbo"],
-        },
-      },
-    ]);
+    await dispatcher.sendTestAlert(ctx.from.id, ctx.lang, "slot");
   });
 
   // Localized command scopes in Telegram UI

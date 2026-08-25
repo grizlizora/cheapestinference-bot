@@ -6,7 +6,7 @@ import { NotificationLogDAO } from "../../db/dao/notificationLogs.js";
 import { SlotHistoryDAO } from "../../db/dao/slotHistory.js";
 import { SubscriberInvertedIndex, PackedUserProfile } from "./subscriberIndex.js";
 import { CircularRingBuffer } from "./circularRingBuffer.js";
-import { translate, escapeHtml } from "../../i18n/index.js";
+import { translate, escapeHtml, SupportedLanguage } from "../../i18n/index.js";
 
 export type BroadcastPriority = "P0" | "P1" | "P2" | "P3";
 
@@ -603,6 +603,106 @@ export class NotificationDispatcher {
       retries: 0,
       enqueuedAt: Date.now(),
     };
+  }
+
+  /**
+   * Direct Realistic Test Alert Delivery (P0 Priority)
+   */
+  public async sendTestAlert(
+    targetTgId: number,
+    lang: SupportedLanguage = "uk",
+    eventType: "slot" | "model" | "bundle" = "slot"
+  ): Promise<void> {
+    const profile: PackedUserProfile = this.getInvertedIndex().getProfileByTgId(targetTgId) || {
+      userId: 0,
+      telegramId: targetTgId,
+      language: lang,
+      isMuted: false,
+      isActive: true,
+      notifyAvailableGlobal: true,
+      notifySoldOutGlobal: true,
+      notifyModelsGlobal: true,
+      notifyPricesGlobal: true,
+      lastActiveAt: Date.now(),
+    };
+
+    if (eventType === "slot") {
+      const event: DiffEvent = {
+        id: crypto.randomUUID(),
+        type: "SLOT_APPEARED",
+        poolSlug: "frontier",
+        poolName: "Frontier Pool",
+        block: "europe",
+        models: ["deepseek-r1", "qwen-2.5-coder-32b", "glm-5.3"],
+        hoursUtc: "08:00 – 16:00 UTC",
+        newPrice: "149",
+        newStatus: "available",
+        timestamp: Date.now(),
+      };
+      const msg = this.formatAlertMessage(profile, event, "P0");
+      this.enqueue(msg);
+    } else if (eventType === "bundle") {
+      const events: DiffEvent[] = [
+        {
+          id: crypto.randomUUID(),
+          type: "SLOT_APPEARED",
+          poolSlug: "frontier",
+          poolName: "Frontier Pool",
+          block: "europe",
+          models: ["deepseek-r1", "glm-5.3"],
+          hoursUtc: "08:00 – 16:00 UTC",
+          newPrice: "149",
+          newStatus: "available",
+          timestamp: Date.now(),
+        },
+        {
+          id: crypto.randomUUID(),
+          type: "SLOT_APPEARED",
+          poolSlug: "core",
+          poolName: "Core Pool",
+          block: "asia",
+          models: ["qwen-2.5-72b", "llama-3.3-70b"],
+          hoursUtc: "00:00 – 08:00 UTC",
+          newPrice: "99",
+          newStatus: "available",
+          timestamp: Date.now(),
+        },
+      ];
+      const msg = this.formatBundledAlertMessage(
+        profile,
+        events.map((e) => ({ event: e, priority: "P0" }))
+      );
+      this.enqueue(msg);
+    } else {
+      const event: DiffEvent = {
+        id: crypto.randomUUID(),
+        type: "MODEL_UPGRADE_EVENT",
+        poolSlug: "frontier",
+        poolName: "Frontier Pool",
+        block: "ALL",
+        models: ["glm-5.3", "minimax-m3", "qwen-3.5-turbo"],
+        hoursUtc: "",
+        timestamp: Date.now(),
+        modelUpgrade: {
+          added: [{ type: "added", modelName: "qwen-3.5-turbo", family: "qwen", newVersion: "3.5" }],
+          upgraded: [
+            {
+              type: "upgraded",
+              modelName: "glm-5.3",
+              previousModelName: "glm-5.2",
+              family: "glm",
+              oldVersion: "5.2",
+              newVersion: "5.3",
+              changeNote: "GLM 5.2 ➡️ GLM 5.3",
+            },
+          ],
+          removed: [],
+          allActiveModels: ["glm-5.3", "minimax-m3", "qwen-3.5-turbo"],
+        },
+      };
+      const msg = this.formatAlertMessage(profile, event, "P0");
+      this.enqueue(msg);
+    }
   }
 
   private flushBlockedUsersToDb(): void {
