@@ -2,13 +2,13 @@
   "common": {
     "back": "⬅️ Назад",
     "refresh": "🔄 Обновить",
-    "refreshed_toast": "⚡ Данные обновлены в реальном времени с сайта!",
+    "refreshed_toast": "⚡ Данные обновлены с сайта!",
     "status_available": "🟢 Доступно",
     "status_limited": "🟡 Мало мест",
-    "status_sold_out": "🔴 Распродано (Sold out)",
-    "block_asia": "🌏 Азия",
-    "block_europe": "🌍 Европа",
-    "block_americas": "🌎 Америка",
+    "status_sold_out": "🔴 Распродано",
+    "block_asia": "Азия",
+    "block_europe": "Европа",
+    "block_americas": "Америка",
     "hours_suffix": "UTC",
     "currency_month": "мес",
     "currency_day": "день",
@@ -17,26 +17,26 @@
     "unknown": "Неизвестно"
   },
   "onboarding": {
-    "welcome_title": "👋 <b>Добро пожаловать в CheapestInference Slot Monitor!</b>\n\nЭтот бот отслеживает появление и закрытие слотов в тарифах <b>Flagship, Frontier и Core</b> на сайте <a href=\"https://cheapestinference.com/pools\">cheapestinference.com</a> в реальном времени.\n\nПожалуйста, выберите удобный язык интерфейса:",
+    "welcome_title": "👋 <b>Добро пожаловать в CheapestInference Slot Monitor!</b>\n\nЭтот бот в реальном времени отслеживает появление и закрытие свободных слотов по тарифам <b>Flagship, Frontier и Core</b> на сайте <a href=\"https://cheapestinference.com/pools\">cheapestinference.com</a>.\n\nПожалуйста, выберите удобный язык интерфейса:",
     "language_selected": "✅ Язык установлен: <b>Русский 🇷🇺</b>"
   },
   "menu": {
-    "dashboard_title": "📊 <b>CheapestInference — Мониторинг слотов</b>\n\nТекущий статус пулов и 8-часовых региональных блоков:\n\n{pool_summaries}\n\n🕒 <i>Последняя проверка: {updated_at}</i>",
-    "pool_summary_card": "• <b>{pool_name}</b> {status_badge}\n  🤖 Модели: <code>{models}</code>\n  💵 От <b>${min_price}/мес</b> ({available_count}/3 блоков свободно)\n  🔗 <a href=\"{url}\">Страница пула</a>",
+    "dashboard_title": "📊 <b>CheapestInference — Мониторинг слотов</b>\n\nАктуальное состояние тарифов и региональных блоков:\n\n{pool_summaries}\n\n🕒 <i>Последнее обновление: {updated_at}</i>",
+    "pool_summary_card": "📦 <b>{pool_name}</b>\n• Статус: {status_badge} <i>({available_count}/3 блоков свободно)</i>\n• Модели: <code>{models}</code>\n• Стоимость: от <b>${min_price}/мес</b>\n🔗 <a href=\"{url}\">Страница тарифа на сайте</a>",
     "loading_data": "⏳ <i>Загрузка данных с сайта...</i>",
     "btn_flagship": "🚀 Flagship Пул",
     "btn_frontier": "⚡ Frontier Пул",
     "btn_core": "🧠 Core Пул",
     "btn_subscriptions": "🔔 Мои уведомления",
-    "btn_language": "🌐 Изменить язык",
+    "btn_language": "🌐 Сменить язык",
     "btn_refresh": "🔄 Обновить данные",
     "btn_help": "ℹ️ Инструкция"
   },
   "pool_detail": {
-    "title": "🏷️ <b>Пул {pool_name}</b>\n\n📝 <b>Описание:</b> {description}\n\n🤖 <b>Включенные модели (безлимит токенов):</b>\n{models_list}\n\n💰 <b>Стоимость:</b>\n• От <b>${min_price}/мес</b> (~${min_price_day}/день)\n• Скидка при оплате за год: <b>{annual_discount}%</b>\n\n🕒 <b>Региональные 8-часовые блоки (UTC):</b>\n{blocks_list}\n\n🔗 <b>Официальная ссылка:</b> <a href=\"{url}\">{url}</a>",
-    "no_data": "⚠️ Данные для <b>{pool}</b> еще загружаются. Попробуйте обновить через минуту.",
+    "title": "🏷 <b>{pool_name}</b>\n\n📝 <b>Описание:</b>\n<i>{description}</i>\n\n🤖 <b>Включенные модели (безлимит):</b>\n{models_list}\n\n💰 <b>Стоимость:</b>\n• От <b>${min_price}/мес</b> (~${min_price_day}/день)\n• Скидка при оплате за год: <b>{annual_discount}%</b>\n\n🕒 <b>Региональные 8-часовые блоки (UTC):</b>\n{blocks_list}\n\n🔗 <b>Официальная ссылка:</b> <a href=\"{url}\">{url}</a>",
+    "no_data": "⚠️ Данные для <b>{pool}</b> еще загружаются. Попробуйте обновить через пару секунд.",
     "model_item": "  • <code>{model_name}</code>",
-    "block_row": "{block_icon} <b>{block_name}</b> ({hours_utc}): {status_badge} — <b>${price}/мес</b>",
+    "block_row": "{block_icon} <b>{block_name}</b> ({hours_utc}):\n   {status_badge} — <b>${price}/мес</b>",
     "btn_subscribe_pool": "🔔 Подписаться на весь пул {pool_name}",
     "btn_unsubscribe_pool": "🔕 Отписаться от пула {pool_name}",
     "btn_open_site": "🛒 Заказать на сайте"

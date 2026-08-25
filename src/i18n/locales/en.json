@@ -2,13 +2,13 @@
   "common": {
     "back": "⬅️ Back",
     "refresh": "🔄 Refresh",
-    "refreshed_toast": "⚡ Data refreshed live from website!",
+    "refreshed_toast": "⚡ Live data refreshed from website!",
     "status_available": "🟢 Available",
     "status_limited": "🟡 Limited",
     "status_sold_out": "🔴 Sold Out",
-    "block_asia": "🌏 Asia",
-    "block_europe": "🌍 Europe",
-    "block_americas": "🌎 Americas",
+    "block_asia": "Asia",
+    "block_europe": "Europe",
+    "block_americas": "Americas",
     "hours_suffix": "UTC",
     "currency_month": "mo",
     "currency_day": "day",
@@ -17,28 +17,28 @@
     "unknown": "Unknown"
   },
   "onboarding": {
-    "welcome_title": "👋 <b>Welcome to CheapestInference Slot Monitor!</b>\n\nThis bot tracks real-time GPU/LLM inference slot availability across <b>Flagship, Frontier, and Core</b> pools on <a href=\"https://cheapestinference.com/pools\">cheapestinference.com</a>.\n\nPlease select your preferred language to get started:",
+    "welcome_title": "👋 <b>Welcome to CheapestInference Slot Monitor!</b>\n\nThis bot tracks live availability for <b>Flagship, Frontier, and Core</b> compute pools on <a href=\"https://cheapestinference.com/pools\">cheapestinference.com</a>.\n\nPlease select your preferred language:",
     "language_selected": "✅ Language set to: <b>English 🇬🇧</b>"
   },
   "menu": {
-    "dashboard_title": "📊 <b>CheapestInference — Slot Availability Dashboard</b>\n\nLive status of all compute pools and 8-hour regional blocks:\n\n{pool_summaries}\n\n🕒 <i>Last checked: {updated_at}</i>",
-    "pool_summary_card": "• <b>{pool_name}</b> {status_badge}\n  🤖 Models: <code>{models}</code>\n  💵 From <b>${min_price}/mo</b> ({available_count}/3 blocks available)\n  🔗 <a href=\"{url}\">View pool</a>",
-    "loading_data": "⏳ <i>Loading live pool data from server...</i>",
+    "dashboard_title": "📊 <b>CheapestInference — Slot Availability</b>\n\nLive status of compute pools and regional 8-hour blocks:\n\n{pool_summaries}\n\n🕒 <i>Last updated: {updated_at}</i>",
+    "pool_summary_card": "📦 <b>{pool_name}</b>\n• Status: {status_badge} <i>({available_count}/3 blocks available)</i>\n• Models: <code>{models}</code>\n• Price: from <b>${min_price}/mo</b>\n🔗 <a href=\"{url}\">Open tier on site</a>",
+    "loading_data": "⏳ <i>Loading live data from site...</i>",
     "btn_flagship": "🚀 Flagship Pool",
     "btn_frontier": "⚡ Frontier Pool",
     "btn_core": "🧠 Core Pool",
     "btn_subscriptions": "🔔 My Alerts",
     "btn_language": "🌐 Change Language",
     "btn_refresh": "🔄 Refresh Data",
-    "btn_help": "ℹ️ Help & Guide"
+    "btn_help": "ℹ️ Instructions"
   },
   "pool_detail": {
-    "title": "🏷️ <b>{pool_name} Pool</b>\n\n📝 <b>Description:</b> {description}\n\n🤖 <b>Included Models (Unlimited Tokens):</b>\n{models_list}\n\n💰 <b>Pricing:</b>\n• From <b>${min_price}/mo</b> (~${min_price_day}/day)\n• Annual discount: <b>{annual_discount}%</b>\n\n🕒 <b>Regional 8-hour Blocks (UTC):</b>\n{blocks_list}\n\n🔗 <b>Official Page:</b> <a href=\"{url}\">{url}</a>",
-    "no_data": "⚠️ <b>{pool}</b> data not loaded yet. Click refresh in a moment.",
+    "title": "🏷 <b>{pool_name}</b>\n\n📝 <b>Description:</b>\n<i>{description}</i>\n\n🤖 <b>Included Models (Unlimited):</b>\n{models_list}\n\n💰 <b>Pricing:</b>\n• From <b>${min_price}/mo</b> (~${min_price_day}/day)\n• Annual billing discount: <b>{annual_discount}%</b>\n\n🕒 <b>Regional 8-Hour Blocks (UTC):</b>\n{blocks_list}\n\n🔗 <b>Official Link:</b> <a href=\"{url}\">{url}</a>",
+    "no_data": "⚠️ Data for <b>{pool}</b> is currently loading. Please refresh in a moment.",
     "model_item": "  • <code>{model_name}</code>",
-    "block_row": "{block_icon} <b>{block_name}</b> ({hours_utc}): {status_badge} — <b>${price}/mo</b>",
-    "btn_subscribe_pool": "🔔 Subscribe to All {pool_name} Slots",
-    "btn_unsubscribe_pool": "🔕 Unsubscribe from {pool_name}",
+    "block_row": "{block_icon} <b>{block_name}</b> ({hours_utc}):\n   {status_badge} — <b>${price}/mo</b>",
+    "btn_subscribe_pool": "🔔 Subscribe to entire {pool_name} pool",
+    "btn_unsubscribe_pool": "🔕 Unsubscribe from {pool_name} pool",
     "btn_open_site": "🛒 Order on Website"
   },
   "subscriptions": {

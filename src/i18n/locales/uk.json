@@ -5,10 +5,10 @@
     "refreshed_toast": "⚡ Дані щойно оновлено з сайту!",
     "status_available": "🟢 Доступно",
     "status_limited": "🟡 Мало місць",
-    "status_sold_out": "🔴 Розпродано (Sold out)",
-    "block_asia": "🌏 Азія",
-    "block_europe": "🌍 Європа",
-    "block_americas": "🌎 Америка",
+    "status_sold_out": "🔴 Розпродано",
+    "block_asia": "Азія",
+    "block_europe": "Європа",
+    "block_americas": "Америка",
     "hours_suffix": "UTC",
     "currency_month": "міс",
     "currency_day": "день",
@@ -22,7 +22,7 @@
   },
   "menu": {
     "dashboard_title": "📊 <b>CheapestInference — Моніторинг слотів</b>\n\nАктуальний стан тарифів та регіональних блоків:\n\n{pool_summaries}\n\n🕒 <i>Останнє оновлення: {updated_at}</i>",
-    "pool_summary_card": "• <b>{pool_name}</b> {status_badge}\n  🤖 Моделі: <code>{models}</code>\n  💵 Від <b>${min_price}/міс</b> ({available_count}/3 блоків вільно)\n  🔗 <a href=\"{url}\">Сторінка пулу</a>",
+    "pool_summary_card": "📦 <b>{pool_name}</b>\n• Статус: {status_badge} <i>({available_count}/3 блоків вільно)</i>\n• Моделі: <code>{models}</code>\n• Вартість: від <b>${min_price}/міс</b>\n🔗 <a href=\"{url}\">Сторінка тарифу на сайті</a>",
     "loading_data": "⏳ <i>Завантаження даних із сайту...</i>",
     "btn_flagship": "🚀 Flagship Пул",
     "btn_frontier": "⚡ Frontier Пул",
@@ -33,10 +33,10 @@
     "btn_help": "ℹ️ Інструкція"
   },
   "pool_detail": {
-    "title": "🏷️ <b>Пул {pool_name}</b>\n\n📝 <b>Опис:</b> {description}\n\n🤖 <b>Включені моделі (безліміт):</b>\n{models_list}\n\n💰 <b>Вартість:</b>\n• Від <b>${min_price}/міс</b> (~${min_price_day}/день)\n• Знижка при оплаті за рік: <b>{annual_discount}%</b>\n\n🕒 <b>Регіональні 8-годинні блоки (UTC):</b>\n{blocks_list}\n\n🔗 <b>Офіційне посилання:</b> <a href=\"{url}\">{url}</a>",
+    "title": "🏷 <b>{pool_name}</b>\n\n📝 <b>Опис:</b>\n<i>{description}</i>\n\n🤖 <b>Включені моделі (безліміт):</b>\n{models_list}\n\n💰 <b>Вартість:</b>\n• Від <b>${min_price}/міс</b> (~${min_price_day}/день)\n• Знижка при оплаті за рік: <b>{annual_discount}%</b>\n\n🕒 <b>Регіональні 8-годинні блоки (UTC):</b>\n{blocks_list}\n\n🔗 <b>Офіційне посилання:</b> <a href=\"{url}\">{url}</a>",
     "no_data": "⚠️ Дані для <b>{pool}</b> ще завантажуються. Спробуйте оновити за мить.",
     "model_item": "  • <code>{model_name}</code>",
-    "block_row": "{block_icon} <b>{block_name}</b> ({hours_utc}): {status_badge} — <b>${price}/міс</b>",
+    "block_row": "{block_icon} <b>{block_name}</b> ({hours_utc}):\n   {status_badge} — <b>${price}/міс</b>",
     "btn_subscribe_pool": "🔔 Підписатися на весь пул {pool_name}",
     "btn_unsubscribe_pool": "🔕 Відписатися від пулу {pool_name}",
     "btn_open_site": "🛒 Замовити на сайті"

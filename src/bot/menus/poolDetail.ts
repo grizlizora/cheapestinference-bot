@@ -134,15 +134,17 @@ export function renderPoolDetailText(
     .join("\n");
 
   const prices = blocks.map((b) => parseFloat(b.price_month)).filter((p) => !isNaN(p));
-  const minPrice = prices.length > 0 ? Math.min(...prices).toFixed(2) : first.min_price_day;
+  const minPriceNum = prices.length > 0 ? Math.min(...prices) : parseFloat(first.min_price_day) || 0;
+  const minPrice = minPriceNum > 0 ? minPriceNum.toFixed(2) : "0.00";
+  const minPriceDay = minPriceNum > 0 ? (minPriceNum / 30).toFixed(2) : "0.00";
 
   return ctx.t("pool_detail.title", {
     pool_name: first.pool_name,
     description: first.description || "Unlimited AI inference pool",
     models_list: modelsList || "  • Custom open-weights models",
     min_price: minPrice,
-    min_price_day: first.min_price_day || "0.00",
-    annual_discount: Math.round(first.annual_discount * 100),
+    min_price_day: minPriceDay,
+    annual_discount: Math.round((first.annual_discount || 0.15) * 100),
     blocks_list: blocksList,
     url: `https://cheapestinference.com/pools/${slug}`,
   });
