@@ -2,12 +2,15 @@ import { Menu } from "@grammyjs/menu";
 import { BotContext } from "../../types/context.js";
 import { PoolStateDAO } from "../../db/dao/poolState.js";
 import { SubscriptionDAO } from "../../db/dao/subscriptions.js";
+import { SlotHistoryDAO } from "../../db/dao/slotHistory.js";
+import { AvailabilityIntelligenceEngine } from "../../engine/intelligenceEngine.js";
 import { translate } from "../../i18n/index.js";
 import { renderDashboardText, safeEditMessageText } from "./mainDashboard.js";
 
 export function createPoolDetailMenu(
   poolStateDao: PoolStateDAO,
-  subDao: SubscriptionDAO
+  subDao: SubscriptionDAO,
+  historyDao?: SlotHistoryDAO
 ) {
   return new Menu<BotContext>("pool-detail-menu")
     .dynamic((ctx, range) => {
@@ -39,7 +42,7 @@ export function createPoolDetailMenu(
             ? c.t("subscriptions.toast_pool_on", { pool: slug.toUpperCase() })
             : c.t("subscriptions.toast_pool_off", { pool: slug.toUpperCase() });
           await c.answerCallbackQuery(toast);
-          await safeEditMessageText(c, renderPoolDetailText(c, poolStateDao));
+          await safeEditMessageText(c, renderPoolDetailText(c, poolStateDao, historyDao));
           try {
             c.menu.update();
           } catch {}
@@ -54,7 +57,7 @@ export function createPoolDetailMenu(
             text: c.t("common.refreshed_toast"),
             show_alert: false,
           });
-          await safeEditMessageText(c, renderPoolDetailText(c, poolStateDao));
+          await safeEditMessageText(c, renderPoolDetailText(c, poolStateDao, historyDao));
           try {
             c.menu.update();
           } catch {}
@@ -64,12 +67,16 @@ export function createPoolDetailMenu(
     .back(
       (ctx) => ctx.t("common.back"),
       async (ctx) => {
-        await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao));
+        await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao));
       }
     );
 }
 
-export function renderPoolDetailText(ctx: BotContext, poolStateDao: PoolStateDAO): string {
+export function renderPoolDetailText(
+  ctx: BotContext,
+  poolStateDao: PoolStateDAO,
+  historyDao?: SlotHistoryDAO
+): string {
   const slug = ctx.session.tempPoolSlug || "flagship";
   const blocks = poolStateDao.getPoolBlocks(slug);
 
@@ -89,24 +96,40 @@ export function renderPoolDetailText(ctx: BotContext, poolStateDao: PoolStateDAO
     .map((m) => ctx.t("pool_detail.model_item", { model_name: m }))
     .join("\n");
 
+  const intelligenceEngine = historyDao
+    ? new AvailabilityIntelligenceEngine(historyDao)
+    : null;
+
   const blocksList = blocks
     .map((b) => {
       const blockName = ctx.t(`common.block_${b.block_id}`) || b.block_id;
-      const statusBadge =
-        b.status === "available"
-          ? ctx.t("common.status_available")
-          : b.status === "limited"
-          ? ctx.t("common.status_limited")
-          : ctx.t("common.status_sold_out");
+      const smart = intelligenceEngine
+        ? intelligenceEngine.getSmartStatus(slug, b.block_id, b.status, ctx.lang)
+        : null;
+
+      const statusBadge = smart
+        ? smart.badge
+        : b.status === "available"
+        ? ctx.t("common.status_available")
+        : b.status === "limited"
+        ? ctx.t("common.status_limited")
+        : ctx.t("common.status_sold_out");
+
       const icon = b.block_id === "asia" ? "🌏" : b.block_id === "europe" ? "🌍" : "🌎";
 
-      return ctx.t("pool_detail.block_row", {
+      let row = ctx.t("pool_detail.block_row", {
         block_icon: icon,
         block_name: blockName,
         hours_utc: b.hours_utc,
         status_badge: statusBadge,
         price: b.price_month,
       });
+
+      if (smart?.predictionTip && b.status !== "sold-out") {
+        row += `\n   ${smart.predictionTip}`;
+      }
+
+      return row;
     })
     .join("\n");
 

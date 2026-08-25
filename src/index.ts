@@ -10,6 +10,7 @@ import { SanityGuard } from "./engine/sanityGuard.js";
 import { SlotDiffEngine } from "./engine/diffEngine.js";
 import { ScraperOrchestrator } from "./engine/scraperOrchestrator.js";
 import { PoolStateDAO } from "./db/dao/poolState.js";
+import { SlotHistoryDAO } from "./db/dao/slotHistory.js";
 import { createTelegramBot } from "./bot/index.js";
 import { createHealthServer } from "./server/health.js";
 
@@ -21,6 +22,7 @@ async function bootstrap() {
   // 1. Initialize SQLite Database
   const db = getDatabase();
   const poolStateDao = new PoolStateDAO(db);
+  const slotHistoryDao = new SlotHistoryDAO(db);
   console.log(`📦 [Database] SQLite connected at: ${config.DB_PATH}`);
 
   // 2. Initialize Proxy / Tor Subsystem
@@ -54,7 +56,7 @@ async function bootstrap() {
   const jsonApiEngine = new JsonApiEngine(httpClient);
   const htmlSnapshotEngine = new HtmlSnapshotEngine(httpClient);
   const sanityGuard = new SanityGuard();
-  const diffEngine = new SlotDiffEngine();
+  const diffEngine = new SlotDiffEngine(slotHistoryDao);
 
   // 4. Initialize Scraper Orchestrator
   const scraper = new ScraperOrchestrator(
@@ -94,7 +96,7 @@ async function bootstrap() {
   scraper.start();
 
   // 7. Initialize and Start Telegram Bot via grammY runner
-  const { bot } = createTelegramBot(config.BOT_TOKEN, db, scraper, proxyPool);
+  const { bot } = createTelegramBot(config.BOT_TOKEN, db, scraper, proxyPool, slotHistoryDao);
   const runner = run(bot);
   console.log("🤖 [Bot] Telegram bot is active and listening for updates.");
 

@@ -1,4 +1,5 @@
 import { DiffEvent, PoolData, PoolsSnapshot } from "../types/domain.js";
+import { SlotHistoryDAO } from "../db/dao/slotHistory.js";
 
 interface TrackedSlot {
   poolSlug: string;
@@ -16,6 +17,8 @@ export class SlotDiffEngine {
   private inMemoryPools = new Map<string, PoolData>();
   private pendingDisappearances = new Map<string, number>();
   private isInitialized = false;
+
+  constructor(private readonly historyDao?: SlotHistoryDAO) {}
 
   public isReady(): boolean {
     return this.isInitialized;
@@ -102,6 +105,12 @@ export class SlotDiffEngine {
           });
 
           if (block.status === "available" || block.status === "limited") {
+            this.historyDao?.recordSlotOpened(
+              pool.slug,
+              block.block,
+              block.status,
+              block.pricePerMonth
+            );
             events.push({
               id: crypto.randomUUID(),
               type: "SLOT_APPEARED",
@@ -128,6 +137,12 @@ export class SlotDiffEngine {
           if (!wasInStock && isNowInStock) {
             // SLOT_APPEARED: Fast path K=1 (immediate notification)
             this.pendingDisappearances.delete(key);
+            this.historyDao?.recordSlotOpened(
+              pool.slug,
+              block.block,
+              block.status,
+              block.pricePerMonth
+            );
             events.push({
               id: crypto.randomUUID(),
               type: "SLOT_APPEARED",
@@ -149,6 +164,7 @@ export class SlotDiffEngine {
             this.pendingDisappearances.set(key, pendingCount);
 
             if (pendingCount >= 2) {
+              this.historyDao?.recordSlotClosed(pool.slug, block.block);
               events.push({
                 id: crypto.randomUUID(),
                 type: "SLOT_DISAPPEARED",
@@ -167,29 +183,22 @@ export class SlotDiffEngine {
               this.pendingDisappearances.delete(key);
             }
           } else {
-            // limited <-> available
-            events.push({
-              id: crypto.randomUUID(),
-              type: "SLOT_STATUS_CHANGED",
-              poolSlug: pool.slug,
-              poolName: pool.modelName,
-              block: block.block,
-              models: pool.models || [],
-              hoursUtc: block.hoursUtc,
-              previousStatus: prevSlot.status,
-              newStatus: block.status,
-              newPrice: block.pricePerMonth,
-              timestamp: now,
-            });
+            // Transitions like limited -> available or available -> limited
             prevSlot.status = block.status;
           }
         } else {
-          // Status same, reset pending disappearance
-          this.pendingDisappearances.delete(key);
+          // If status confirmed same, clear pending disappearances
+          if (this.pendingDisappearances.has(key)) {
+            this.pendingDisappearances.delete(key);
+          }
         }
 
-        // Price change
-        if (prevSlot.pricePerMonth !== block.pricePerMonth) {
+        // Price changed check
+        if (
+          prevSlot.pricePerMonth !== block.pricePerMonth &&
+          block.pricePerMonth !== "" &&
+          block.pricePerMonth !== "0"
+        ) {
           events.push({
             id: crypto.randomUUID(),
             type: "PRICE_CHANGED",
@@ -198,44 +207,40 @@ export class SlotDiffEngine {
             block: block.block,
             models: pool.models || [],
             hoursUtc: block.hoursUtc,
-            previousStatus: prevSlot.status,
-            newStatus: block.status,
             previousPrice: prevSlot.pricePerMonth,
             newPrice: block.pricePerMonth,
+            newStatus: block.status,
             timestamp: now,
           });
           prevSlot.pricePerMonth = block.pricePerMonth;
         }
 
-        // Always update metadata
-        prevSlot.models = pool.models || [];
-        prevSlot.poolName = pool.modelName;
         prevSlot.hoursUtc = block.hoursUtc;
+        prevSlot.models = pool.models || [];
         prevSlot.lastSeenAt = now;
       }
     }
 
-    // Reconcile decommissioned / removed slots
-    for (const [key, slot] of this.inMemorySlots.entries()) {
+    // Reconcile deleted / decommissioned slots that vanished from response
+    for (const [key, trackedSlot] of this.inMemorySlots.entries()) {
       if (!incomingSlotKeys.has(key)) {
-        if (slot.status === "available" || slot.status === "limited") {
+        if (trackedSlot.status === "available" || trackedSlot.status === "limited") {
+          this.historyDao?.recordSlotClosed(trackedSlot.poolSlug, trackedSlot.block);
           events.push({
             id: crypto.randomUUID(),
             type: "SLOT_DISAPPEARED",
-            poolSlug: slot.poolSlug,
-            poolName: slot.poolName,
-            block: slot.block,
-            models: slot.models,
-            hoursUtc: slot.hoursUtc,
-            previousStatus: slot.status,
+            poolSlug: trackedSlot.poolSlug,
+            poolName: trackedSlot.poolName,
+            block: trackedSlot.block,
+            models: trackedSlot.models,
+            hoursUtc: trackedSlot.hoursUtc,
+            previousStatus: trackedSlot.status,
             newStatus: "sold-out",
-            previousPrice: slot.pricePerMonth,
-            newPrice: slot.pricePerMonth,
+            newPrice: trackedSlot.pricePerMonth,
             timestamp: now,
           });
         }
         this.inMemorySlots.delete(key);
-        this.pendingDisappearances.delete(key);
       }
     }
 
@@ -243,11 +248,6 @@ export class SlotDiffEngine {
   }
 
   private bootstrap(snapshot: PoolsSnapshot): void {
-    const now = Date.now();
-    this.inMemorySlots.clear();
-    this.inMemoryPools.clear();
-    this.pendingDisappearances.clear();
-
     for (const pool of snapshot.data) {
       this.inMemoryPools.set(pool.slug, pool);
       for (const block of pool.blocks) {
@@ -260,12 +260,13 @@ export class SlotDiffEngine {
           hoursUtc: block.hoursUtc,
           status: block.status,
           pricePerMonth: block.pricePerMonth,
-          lastSeenAt: now,
+          lastSeenAt: Date.now(),
         });
       }
     }
-
     this.isInitialized = true;
-    console.log(`✅ [SlotDiffEngine] Bootstrapped baseline with ${this.inMemorySlots.size} slots across ${this.inMemoryPools.size} pools.`);
+    console.log(
+      `✅ [SlotDiffEngine] Bootstrapped baseline with ${this.inMemorySlots.size} slots across ${this.inMemoryPools.size} pools.`
+    );
   }
 }

@@ -3,6 +3,8 @@ import { BotContext } from "../../types/context.js";
 import { PoolStateDAO } from "../../db/dao/poolState.js";
 import { SubscriptionDAO } from "../../db/dao/subscriptions.js";
 import { UserDAO } from "../../db/dao/users.js";
+import { SlotHistoryDAO } from "../../db/dao/slotHistory.js";
+import { AvailabilityIntelligenceEngine } from "../../engine/intelligenceEngine.js";
 import { createLanguageMenu } from "./language.js";
 import { createPoolDetailMenu, renderPoolDetailText } from "./poolDetail.js";
 import { createSubscriptionsMenu, renderSubscriptionsText } from "./subscriptions.js";
@@ -30,10 +32,11 @@ export async function safeEditMessageText(
 export function createMainMenu(
   poolStateDao: PoolStateDAO,
   subDao: SubscriptionDAO,
-  userDao: UserDAO
+  userDao: UserDAO,
+  historyDao?: SlotHistoryDAO
 ) {
   const languageMenu = createLanguageMenu(userDao, poolStateDao);
-  const poolDetailMenu = createPoolDetailMenu(poolStateDao, subDao);
+  const poolDetailMenu = createPoolDetailMenu(poolStateDao, subDao, historyDao);
   const subscriptionsMenu = createSubscriptionsMenu(subDao, userDao, poolStateDao);
 
   const helpMenu = new Menu<BotContext>("help-menu")
@@ -42,7 +45,7 @@ export function createMainMenu(
     .back(
       (ctx) => ctx.t("common.back"),
       async (ctx) => {
-        await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao));
+        await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao));
       }
     );
 
@@ -51,34 +54,31 @@ export function createMainMenu(
       const summaries = poolStateDao.getPoolSummaries();
       const pools =
         summaries.length > 0
-          ? summaries
+          ? summaries.map((s) => ({
+              slug: s.slug,
+              name: s.name,
+              available: s.available_count > 0,
+              isLimited: s.blocks.some((b) => b.status === "limited"),
+            }))
           : [
-              { slug: "flagship", name: "Flagship" },
-              { slug: "frontier", name: "Frontier" },
-              { slug: "core", name: "Core" },
+              { slug: "flagship", name: "Flagship", available: false, isLimited: false },
+              { slug: "frontier", name: "Frontier", available: false, isLimited: false },
+              { slug: "core", name: "Core", available: false, isLimited: false },
             ];
 
-      for (let i = 0; i < pools.length; i++) {
-        const p = pools[i];
-        const icon =
-          p.slug === "flagship"
-            ? "🚀"
-            : p.slug === "frontier"
-            ? "⚡"
-            : p.slug === "core"
-            ? "🧠"
-            : "📦";
-        const label = `${icon} ${p.name}`;
-
-        range.text(label, async (c) => {
-          c.session.tempPoolSlug = p.slug;
-          await safeEditMessageText(c, renderPoolDetailText(c, poolStateDao));
-          return c.menu.nav("pool-detail-menu");
-        });
-
-        if (i % 2 === 1) range.row();
+      for (const pool of pools) {
+        const icon = pool.available ? (pool.isLimited ? "🟡" : "🟢") : "🔴";
+        range
+          .text(`${icon} ${pool.name}`, async (c) => {
+            c.session.tempPoolSlug = pool.slug;
+            await safeEditMessageText(
+              c,
+              renderPoolDetailText(c, poolStateDao, historyDao)
+            );
+            return c.menu.nav("pool-detail-menu");
+          })
+          .row();
       }
-      if (pools.length % 2 !== 0) range.row();
     })
     .text(
       (ctx) => ctx.t("menu.btn_subscriptions"),
@@ -87,25 +87,25 @@ export function createMainMenu(
         return ctx.menu.nav("subscriptions-menu");
       }
     )
-    .text(
-      (ctx) => ctx.t("menu.btn_help"),
-      async (ctx) => {
-        await safeEditMessageText(ctx, ctx.t("help_text"));
-        return ctx.menu.nav("help-menu");
-      }
-    )
     .row()
     .text(
-      (ctx) => ctx.t("menu.btn_refresh"),
+      (ctx) => ctx.t("common.refresh"),
       async (ctx) => {
         await ctx.answerCallbackQuery({
           text: ctx.t("common.refreshed_toast"),
           show_alert: false,
         });
-        await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao));
+        await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao));
         try {
           ctx.menu.update();
         } catch {}
+      }
+    )
+    .text(
+      (ctx) => ctx.t("common.help"),
+      async (ctx) => {
+        await safeEditMessageText(ctx, ctx.t("help_text"));
+        return ctx.menu.nav("help-menu");
       }
     )
     .text(
@@ -127,7 +127,8 @@ export function createMainMenu(
 
 export function renderDashboardText(
   ctx: BotContext,
-  poolStateDao: PoolStateDAO
+  poolStateDao: PoolStateDAO,
+  historyDao?: SlotHistoryDAO
 ): string {
   const summaries = poolStateDao.getPoolSummaries();
 
@@ -140,10 +141,13 @@ export function renderDashboardText(
 
   const poolSummariesText = summaries
     .map((p) => {
-      const statusBadge =
-        p.available_count > 0
-          ? ctx.t("common.status_available")
-          : ctx.t("common.status_sold_out");
+      let statusBadge = ctx.t("common.status_sold_out");
+      if (p.available_count > 0) {
+        const hasLimited = p.blocks.some((b) => b.status === "limited");
+        statusBadge = hasLimited
+          ? ctx.t("common.status_limited")
+          : ctx.t("common.status_available");
+      }
 
       return ctx.t("menu.pool_summary_card", {
         pool_name: p.fullName || p.name,
@@ -151,6 +155,7 @@ export function renderDashboardText(
         models: p.models.join(", ") || "Active LLMs",
         min_price: p.min_price,
         available_count: p.available_count,
+        total_blocks: p.total_blocks || 3,
         url: `https://cheapestinference.com/pools/${p.slug}`,
       });
     })

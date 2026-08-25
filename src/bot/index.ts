@@ -6,6 +6,7 @@ import { UserDAO } from "../db/dao/users.js";
 import { SubscriptionDAO } from "../db/dao/subscriptions.js";
 import { PoolStateDAO } from "../db/dao/poolState.js";
 import { NotificationLogDAO } from "../db/dao/notificationLogs.js";
+import { SlotHistoryDAO } from "../db/dao/slotHistory.js";
 import { ScraperOrchestrator } from "../engine/scraperOrchestrator.js";
 import { ProxyPool } from "../proxy/proxyPool.js";
 import { NotificationDispatcher } from "./notifier/dispatcher.js";
@@ -21,12 +22,14 @@ export function createTelegramBot(
   token: string,
   db: Database.Database,
   scraper: ScraperOrchestrator,
-  proxyPool: ProxyPool
+  proxyPool: ProxyPool,
+  historyDao?: SlotHistoryDAO
 ) {
   const userDao = new UserDAO(db);
   const subDao = new SubscriptionDAO(db);
   const poolStateDao = new PoolStateDAO(db);
   const logDao = new NotificationLogDAO(db);
+  const resolvedHistoryDao = historyDao || new SlotHistoryDAO(db);
 
   const bot = new Bot<BotContext>(token);
 
@@ -75,18 +78,19 @@ export function createTelegramBot(
   const { mainDashboardMenu, languageMenu, subscriptionsMenu } = createMainMenu(
     poolStateDao,
     subDao,
-    userDao
+    userDao,
+    resolvedHistoryDao
   );
   bot.use(mainDashboardMenu);
 
   // 5. Register Commands
   bot.command(
     "start",
-    createStartHandler(userDao, poolStateDao, languageMenu, mainDashboardMenu)
+    createStartHandler(userDao, poolStateDao, languageMenu, mainDashboardMenu, resolvedHistoryDao)
   );
 
   bot.command("menu", async (ctx) => {
-    await ctx.reply(renderDashboardText(ctx, poolStateDao), {
+    await ctx.reply(renderDashboardText(ctx, poolStateDao, resolvedHistoryDao), {
       reply_markup: mainDashboardMenu,
       parse_mode: "HTML",
       link_preview_options: { is_disabled: true },
@@ -94,7 +98,7 @@ export function createTelegramBot(
   });
 
   bot.command("dashboard", async (ctx) => {
-    await ctx.reply(renderDashboardText(ctx, poolStateDao), {
+    await ctx.reply(renderDashboardText(ctx, poolStateDao, resolvedHistoryDao), {
       reply_markup: mainDashboardMenu,
       parse_mode: "HTML",
       link_preview_options: { is_disabled: true },
@@ -149,7 +153,13 @@ export function createTelegramBot(
       parse_mode: "HTML",
     });
 
-    const dispatcher = new NotificationDispatcher(bot, subDao, userDao, logDao);
+    const dispatcher = new NotificationDispatcher(
+      bot,
+      subDao,
+      userDao,
+      logDao,
+      resolvedHistoryDao
+    );
     await dispatcher.sendSingleAlert(
       ctx.user.id,
       ctx.from.id,
@@ -177,16 +187,22 @@ export function createTelegramBot(
       { command: "menu", description: "Open slot availability dashboard" },
       { command: "alerts", description: "Manage slot subscriptions & sound" },
       { command: "language", description: "Change language / Змінити мову" },
-      { command: "help", description: "How the bot works & guide" },
+      { command: "help", description: "How the bot works & author contact" },
       { command: "stats", description: "Platform telemetry & status (Admin)" },
     ])
     .catch((err) => console.warn("Failed to set Telegram commands:", err));
 
   // 7. Notification Dispatcher wired to Scraper diff_events
-  const dispatcher = new NotificationDispatcher(bot, subDao, userDao, logDao);
+  const dispatcher = new NotificationDispatcher(
+    bot,
+    subDao,
+    userDao,
+    logDao,
+    resolvedHistoryDao
+  );
   scraper.on("diff_events", (events) => {
     dispatcher.handleDiffEvents(events);
   });
 
-  return { bot, userDao, subDao, poolStateDao, logDao, dispatcher };
+  return { bot, userDao, subDao, poolStateDao, logDao, historyDao: resolvedHistoryDao, dispatcher };
 }
