@@ -111,6 +111,83 @@ export class SubscriptionDAO {
     }
   }
 
+  /**
+   * Cascading Master Toggle for an entire pool:
+   * Toggling "Весь пул" synchronizes the pool ('ALL') and all its regional blocks ('asia', 'europe', 'americas').
+   */
+  togglePoolWithBlocks(userId: number, poolSlug: string, blockIds: string[] = ["asia", "europe", "americas"]): boolean {
+    const isCurrentlySubscribed = this.hasSubscription(userId, poolSlug, "ALL");
+    const newState = !isCurrentlySubscribed;
+
+    const tx = this.db.transaction(() => {
+      this.setSubscription(userId, poolSlug, "ALL", newState);
+      for (const b of blockIds) {
+        this.setSubscription(userId, poolSlug, b, newState);
+      }
+    });
+    tx();
+
+    return newState;
+  }
+
+  /**
+   * Child Block Toggle:
+   * Toggles a single regional block, and auto-updates the parent "Весь пул" state if all blocks are now active or not.
+   */
+  toggleBlockAndUpdatePool(
+    userId: number,
+    poolSlug: string,
+    blockId: string,
+    allBlockIds: string[] = ["asia", "europe", "americas"]
+  ): boolean {
+    const isCurrentlySubscribed = this.hasSubscription(userId, poolSlug, blockId);
+    const newBlockState = !isCurrentlySubscribed;
+
+    const tx = this.db.transaction(() => {
+      this.setSubscription(userId, poolSlug, blockId, newBlockState);
+
+      // Check if all child blocks are now active
+      let allActive = true;
+      for (const b of allBlockIds) {
+        const sub = b === blockId ? newBlockState : this.hasSubscription(userId, poolSlug, b);
+        if (!sub) {
+          allActive = false;
+          break;
+        }
+      }
+
+      this.setSubscription(userId, poolSlug, "ALL", allActive);
+    });
+    tx();
+
+    return newBlockState;
+  }
+
+  /**
+   * Global Master Toggle:
+   * Synchronizes Global ('ALL:ALL') and all pools/blocks.
+   */
+  toggleGlobalWithAllPools(
+    userId: number,
+    pools: Array<{ slug: string; blocks: string[] }>
+  ): boolean {
+    const isGlobal = this.hasSubscription(userId, "ALL", "ALL");
+    const newState = !isGlobal;
+
+    const tx = this.db.transaction(() => {
+      this.setSubscription(userId, "ALL", "ALL", newState);
+      for (const p of pools) {
+        this.setSubscription(userId, p.slug, "ALL", newState);
+        for (const b of p.blocks) {
+          this.setSubscription(userId, p.slug, b, newState);
+        }
+      }
+    });
+    tx();
+
+    return newState;
+  }
+
   getTotalActiveSubscriptions(): number {
     const row = this.stmtCountActiveSubs.get() as any;
     return Number(row?.total || 0);

@@ -8,6 +8,8 @@ import { AvailabilityIntelligenceEngine } from "../../engine/intelligenceEngine.
 import { translate, escapeHtml } from "../../i18n/index.js";
 import { renderDashboardText, safeEditMessageText } from "./mainDashboard.js";
 
+const DEFAULT_BLOCK_IDS = ["asia", "europe", "americas"];
+
 export function createPoolDetailMenu(
   poolStateDao: PoolStateDAO,
   subDao: SubscriptionDAO,
@@ -33,19 +35,29 @@ export function createPoolDetailMenu(
         ).row();
       }
 
-      // Toggle subscription for this pool
+      // Toggle subscription for this pool (Cascading to all its regional blocks)
       range.text(
         isSubscribedToPool
           ? ctx.t("pool_detail.btn_unsubscribe_pool", { pool_name: slug.toUpperCase() })
           : ctx.t("pool_detail.btn_subscribe_pool", { pool_name: slug.toUpperCase() }),
         async (c) => {
-          const active = subDao.toggleSubscription(c.user.id, slug, "ALL");
+          const active = subDao.togglePoolWithBlocks(c.user.id, slug, DEFAULT_BLOCK_IDS);
+
           invertedIndex.updateSubscription(c.user.id, slug, "ALL", {
             available: active,
             soldOut: active,
             models: active,
             prices: active,
           });
+
+          for (const bId of DEFAULT_BLOCK_IDS) {
+            invertedIndex.updateSubscription(c.user.id, slug, bId, {
+              available: active,
+              soldOut: active,
+              models: active,
+              prices: active,
+            });
+          }
 
           const toast = active
             ? c.t("subscriptions.toast_pool_on", { pool: slug.toUpperCase() })
