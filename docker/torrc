@@ -5,7 +5,7 @@ DataDirectory /var/lib/tor
 Log notice stdout
 ClientOnly 1
 AvoidDiskWrites 1
-MaxMemInQueues 16 MB
+MaxMemInQueues 32 MB
 DisableDebuggerAttachment 1
 MaxCircuitDirtiness 30
 CircuitBuildTimeout 10

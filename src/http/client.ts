@@ -78,6 +78,14 @@ export class RobustHttpClient {
 
       dispatcher = new Agent({
         connect: (opts: any, callback: any) => {
+          const destHost = opts.hostname || opts.host;
+          const destPort =
+            opts.port && parseInt(opts.port, 10) > 0
+              ? parseInt(opts.port, 10)
+              : opts.protocol === "http:"
+              ? 80
+              : 443;
+
           SocksClient.createConnection({
             proxy: {
               host,
@@ -88,8 +96,8 @@ export class RobustHttpClient {
             },
             command: "connect",
             destination: {
-              host: opts.hostname,
-              port: parseInt(opts.port, 10),
+              host: destHost,
+              port: destPort,
             },
             timeout: timeoutMs + 5_000,
           })
@@ -99,7 +107,7 @@ export class RobustHttpClient {
               if (opts.protocol === "https:") {
                 const tlsSocket = tls.connect({
                   socket: info.socket,
-                  servername: opts.servername || opts.hostname,
+                  servername: opts.servername || destHost,
                   rejectUnauthorized: true,
                   ALPNProtocols: ["http/1.1"],
                 });
