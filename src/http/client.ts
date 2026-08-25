@@ -10,6 +10,7 @@ export interface HttpRequestOptions {
   lastModified?: string;
   isHtmlFallback?: boolean;
   timeoutMs?: number;
+  maxRedirects?: number;
 }
 
 export interface HttpResponse {
@@ -20,6 +21,7 @@ export interface HttpResponse {
   lastModified?: string;
   latencyMs: number;
   usedProxy: string | null;
+  finalUrl: string;
 }
 
 export class RobustHttpClient {
@@ -28,7 +30,7 @@ export class RobustHttpClient {
 
   constructor(private readonly proxyPool: ProxyPool) {
     this.directAgent = new Agent({
-      connect: { timeout: 10_000 },
+      connect: { timeout: 15_000 },
       keepAliveTimeout: 60_000,
       keepAliveMaxTimeout: 120_000,
       pipelining: 1,
@@ -60,7 +62,7 @@ export class RobustHttpClient {
               host: opts.hostname,
               port: parseInt(opts.port, 10) || (opts.protocol === "https:" ? 443 : 80),
             },
-            timeout: timeoutMs,
+            timeout: timeoutMs + 10_000,
           })
             .then((info) => {
               if (opts.protocol === "https:") {
@@ -77,15 +79,15 @@ export class RobustHttpClient {
             })
             .catch((err) => callback(err, null));
         },
-        keepAliveTimeout: 30_000,
-        keepAliveMaxTimeout: 60_000,
+        keepAliveTimeout: 45_000,
+        keepAliveMaxTimeout: 90_000,
       });
     } else {
       dispatcher = new ProxyAgent({
         uri: proxyUrl,
         connect: { timeout: timeoutMs },
-        keepAliveTimeout: 30_000,
-        keepAliveMaxTimeout: 60_000,
+        keepAliveTimeout: 45_000,
+        keepAliveMaxTimeout: 90_000,
       });
     }
 
@@ -151,50 +153,81 @@ export class RobustHttpClient {
 
   public async get(opts: HttpRequestOptions): Promise<HttpResponse> {
     const proxyUrl = this.proxyPool.getNextProxyUrl();
-    const timeoutMs = opts.timeoutMs ?? 15_000;
+    const timeoutMs = opts.timeoutMs ?? 20_000;
+    const maxRedirects = opts.maxRedirects ?? 5;
     const startTime = Date.now();
     const dispatcher = this.getOrCreateDispatcher(proxyUrl, timeoutMs);
-    const headers = this.getBrowserHeaders(!!opts.isHtmlFallback, opts.etag, opts.lastModified);
 
-    try {
-      const res = await request(opts.url, {
-        method: "GET",
-        headers,
-        dispatcher,
-        headersTimeout: timeoutMs,
-        bodyTimeout: timeoutMs,
-      });
+    let currentUrl = opts.url;
+    let redirectsCount = 0;
 
-      const latencyMs = Date.now() - startTime;
-      const rawBuffer = Buffer.from(await res.body.arrayBuffer());
-      const contentEncoding = res.headers["content-encoding"] as string | undefined;
-      const bodyText = this.decompressBody(rawBuffer, contentEncoding);
+    while (redirectsCount <= maxRedirects) {
+      const headers = this.getBrowserHeaders(
+        !!opts.isHtmlFallback,
+        opts.etag,
+        opts.lastModified
+      );
 
-      const responseEtag =
-        typeof res.headers["etag"] === "string" ? res.headers["etag"] : undefined;
-      const responseLastModified =
-        typeof res.headers["last-modified"] === "string"
-          ? res.headers["last-modified"]
-          : undefined;
+      try {
+        const res = await request(currentUrl, {
+          method: "GET",
+          headers,
+          dispatcher,
+          headersTimeout: timeoutMs,
+          bodyTimeout: timeoutMs,
+          maxRedirections: 0, // Handled explicitly below
+        });
 
-      if (res.statusCode >= 200 && res.statusCode < 400) {
-        this.proxyPool.reportSuccess(proxyUrl, latencyMs);
-      } else {
-        await this.proxyPool.reportFailure(proxyUrl, res.statusCode);
+        // Handle HTTP 301, 302, 307, 308 Redirects
+        if (
+          (res.statusCode === 301 ||
+            res.statusCode === 302 ||
+            res.statusCode === 307 ||
+            res.statusCode === 308) &&
+          typeof res.headers["location"] === "string"
+        ) {
+          const redirectLocation = res.headers["location"];
+          currentUrl = new URL(redirectLocation, currentUrl).toString();
+          redirectsCount++;
+          // Consume response body to release socket
+          await res.body.arrayBuffer();
+          continue;
+        }
+
+        const latencyMs = Date.now() - startTime;
+        const rawBuffer = Buffer.from(await res.body.arrayBuffer());
+        const contentEncoding = res.headers["content-encoding"] as string | undefined;
+        const bodyText = this.decompressBody(rawBuffer, contentEncoding);
+
+        const responseEtag =
+          typeof res.headers["etag"] === "string" ? res.headers["etag"] : undefined;
+        const responseLastModified =
+          typeof res.headers["last-modified"] === "string"
+            ? res.headers["last-modified"]
+            : undefined;
+
+        if (res.statusCode >= 200 && res.statusCode < 400) {
+          this.proxyPool.reportSuccess(proxyUrl, latencyMs);
+        } else {
+          await this.proxyPool.reportFailure(proxyUrl, res.statusCode);
+        }
+
+        return {
+          statusCode: res.statusCode,
+          headers: res.headers as Record<string, string | string[] | undefined>,
+          body: bodyText,
+          etag: responseEtag,
+          lastModified: responseLastModified,
+          latencyMs,
+          usedProxy: proxyUrl,
+          finalUrl: currentUrl,
+        };
+      } catch (err: any) {
+        await this.proxyPool.reportFailure(proxyUrl, 500);
+        throw err;
       }
-
-      return {
-        statusCode: res.statusCode,
-        headers: res.headers as Record<string, string | string[] | undefined>,
-        body: bodyText,
-        etag: responseEtag,
-        lastModified: responseLastModified,
-        latencyMs,
-        usedProxy: proxyUrl,
-      };
-    } catch (err: any) {
-      await this.proxyPool.reportFailure(proxyUrl, 500);
-      throw err;
     }
+
+    throw new Error(`Exceeded maximum redirect limit of ${maxRedirects}`);
   }
 }
