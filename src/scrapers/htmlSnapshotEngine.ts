@@ -139,7 +139,7 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
   }
 
   public extractRscPayload(html: string): PoolData[] | null {
-    const chunkRegex = /self\.__next_f\.push\(\[(\d+),\s*("[\s\S]*?")\]\)/g;
+    const chunkRegex = /(?:self\.__next_f|\(self\.__next_f=self\.__next_f\|\|\[\]\))\.push\(\[(\d+),\s*("[\s\S]*?")\]\)/g;
     let match: RegExpExecArray | null;
     let combinedFlight = "";
 
@@ -165,48 +165,68 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
       const startIndex = combinedFlight.lastIndexOf("{", slugMatch.index);
       if (startIndex === -1) continue;
 
-      let depth = 0;
-      let endIndex = -1;
-      for (let i = startIndex; i < combinedFlight.length; i++) {
-        if (combinedFlight[i] === "{") depth++;
-        else if (combinedFlight[i] === "}") {
-          depth--;
-          if (depth === 0) {
-            endIndex = i + 1;
-            break;
+      const candidateJson = this.extractBalancedJsonObject(combinedFlight, startIndex);
+      if (!candidateJson) continue;
+
+      try {
+        const parsed = JSON.parse(candidateJson);
+        if (parsed.slug && Array.isArray(parsed.blocks) && parsed.blocks.length > 0) {
+          if (!pools.some((p) => p.slug === parsed.slug)) {
+            pools.push({
+              id: parsed.id || parsed.slug,
+              slug: parsed.slug,
+              modelId: parsed.modelId || parsed.slug,
+              modelName: parsed.modelName || parsed.name || parsed.slug,
+              models: Array.isArray(parsed.models) ? parsed.models : [],
+              description: parsed.description || "",
+              status: parsed.status || "active",
+              minPricePerDay: String(parsed.minPricePerDay || "0"),
+              annualDiscount: parsed.annualDiscount || 0.15,
+              blocks: parsed.blocks.map((b: any) => ({
+                block: b.block,
+                hoursUtc: b.hoursUtc || "",
+                pricePerMonth: String(b.pricePerMonth || "0"),
+                status: b.status || "limited",
+              })),
+            });
           }
         }
-      }
-
-      if (endIndex !== -1) {
-        try {
-          const candidateJson = combinedFlight.substring(startIndex, endIndex);
-          const parsed = JSON.parse(candidateJson);
-          if (parsed.slug && Array.isArray(parsed.blocks) && parsed.blocks.length > 0) {
-            if (!pools.some((p) => p.slug === parsed.slug)) {
-              pools.push({
-                id: parsed.id || parsed.slug,
-                slug: parsed.slug,
-                modelId: parsed.modelId || parsed.slug,
-                modelName: parsed.modelName || parsed.name || parsed.slug,
-                models: Array.isArray(parsed.models) ? parsed.models : [],
-                description: parsed.description || "",
-                status: parsed.status || "active",
-                minPricePerDay: String(parsed.minPricePerDay || "0"),
-                annualDiscount: parsed.annualDiscount || 0.15,
-                blocks: parsed.blocks.map((b: any) => ({
-                  block: b.block,
-                  hoursUtc: b.hoursUtc || "",
-                  pricePerMonth: String(b.pricePerMonth || "0"),
-                  status: b.status || "limited",
-                })),
-              });
-            }
-          }
-        } catch {}
-      }
+      } catch {}
     }
 
     return pools.length > 0 ? pools : null;
+  }
+
+  private extractBalancedJsonObject(str: string, startIndex: number): string | null {
+    let depth = 0;
+    let inString = false;
+    let isEscaped = false;
+
+    for (let i = startIndex; i < str.length; i++) {
+      const char = str[i];
+      if (isEscaped) {
+        isEscaped = false;
+        continue;
+      }
+      if (char === "\\") {
+        isEscaped = true;
+        continue;
+      }
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (!inString) {
+        if (char === "{") {
+          depth++;
+        } else if (char === "}") {
+          depth--;
+          if (depth === 0) {
+            return str.substring(startIndex, i + 1);
+          }
+        }
+      }
+    }
+    return null;
   }
 }

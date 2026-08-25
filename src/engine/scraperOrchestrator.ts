@@ -182,8 +182,8 @@ export class ScraperOrchestrator extends EventEmitter {
         3_500 // Fast 3.5s timeout for ultra-fast failover
       );
       this.apiConsecutiveErrors = 0;
-      if (apiResult.etag) this.apiEtag = apiResult.etag;
-      if (apiResult.lastModified) this.apiLastModified = apiResult.lastModified;
+      this.apiEtag = apiResult.etag ?? undefined;
+      this.apiLastModified = apiResult.lastModified ?? undefined;
       return apiResult;
     } catch (apiErr: any) {
       this.apiConsecutiveErrors++;

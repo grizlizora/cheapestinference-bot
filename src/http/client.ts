@@ -32,6 +32,7 @@ export interface HttpResponse {
 
 export class RobustHttpClient {
   private dispatchers = new Map<string, Dispatcher>();
+  private tlsSessionCache = new Map<string, Buffer>();
   private directAgent: Agent;
 
   constructor(private readonly proxyPool: ProxyPool) {
@@ -47,30 +48,42 @@ export class RobustHttpClient {
       keepAliveMaxTimeout: 180_000,
       keepAliveTimeoutThreshold: 2000,
       pipelining: 1,
+      connections: 32,
+      strictContentLength: false,
     });
     this.proxyPool.setHttpClient(this);
   }
 
-  public invalidateDispatcher(proxyUrl: string | null): void {
-    if (!proxyUrl) return;
+  public invalidateDispatcher(proxyUrl: string): void {
     const existing = this.dispatchers.get(proxyUrl);
     if (existing) {
-      existing.destroy().catch(() => {});
       this.dispatchers.delete(proxyUrl);
+      try {
+        existing.destroy();
+      } catch {}
     }
+  }
+
+  public destroy(): void {
+    try {
+      this.directAgent.destroy();
+    } catch {}
+    for (const d of this.dispatchers.values()) {
+      try {
+        d.destroy();
+      } catch {}
+    }
+    this.dispatchers.clear();
+    this.tlsSessionCache.clear();
   }
 
   private getOrCreateDispatcher(proxyUrl: string | null, timeoutMs: number): Dispatcher {
     if (!proxyUrl) return this.directAgent;
+    let dispatcher = this.dispatchers.get(proxyUrl);
+    if (dispatcher) return dispatcher;
 
-    if (this.dispatchers.has(proxyUrl)) {
-      return this.dispatchers.get(proxyUrl)!;
-    }
-
-    let dispatcher: Dispatcher;
-
-    if (proxyUrl.startsWith("socks5://") || proxyUrl.startsWith("socks5h://")) {
-      const parsed = new URL(proxyUrl);
+    const parsed = new URL(proxyUrl);
+    if (parsed.protocol.startsWith("socks")) {
       const host = parsed.hostname;
       const port = parseInt(parsed.port, 10) || 1080;
       const user = parsed.username || undefined;
@@ -104,14 +117,21 @@ export class RobustHttpClient {
             .then((info) => {
               info.socket.setNoDelay(true);
 
-              if (opts.protocol === "https:") {
+              if (opts.protocol === "https:" || destPort === 443) {
+                const cachedSession = this.tlsSessionCache.get(destHost);
                 const tlsSocket = tls.connect({
                   socket: info.socket,
                   servername: opts.servername || destHost,
                   rejectUnauthorized: true,
                   ALPNProtocols: ["http/1.1"],
+                  session: cachedSession,
                 });
                 tlsSocket.setNoDelay(true);
+
+                // Capture TLS session ticket for 1-RTT / 0-RTT resumption
+                tlsSocket.on("session", (sessionBuffer: Buffer) => {
+                  this.tlsSessionCache.set(destHost, sessionBuffer);
+                });
 
                 const tlsTimeout = Math.min(timeoutMs, 10_000);
                 tlsSocket.setTimeout(tlsTimeout, () => {
@@ -136,6 +156,8 @@ export class RobustHttpClient {
         keepAliveTimeout: 120_000,
         keepAliveMaxTimeout: 180_000,
         keepAliveTimeoutThreshold: 2000,
+        connections: 32,
+        strictContentLength: false,
       });
     } else {
       dispatcher = new ProxyAgent({
@@ -143,6 +165,7 @@ export class RobustHttpClient {
         connect: { timeout: timeoutMs },
         keepAliveTimeout: 120_000,
         keepAliveMaxTimeout: 180_000,
+        connections: 32,
       });
     }
 

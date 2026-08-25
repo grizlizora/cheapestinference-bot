@@ -28,8 +28,15 @@ export class TorManager {
     this.minInterval = opts.minNewnymIntervalMs ?? 10_000;
   }
 
+  private sessionNonce = Date.now().toString(36);
+
+  public rotateStreamIsolation(): string {
+    this.sessionNonce = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    return this.getSocksUrl();
+  }
+
   public getSocksUrl(): string {
-    return `socks5h://${this.socksHost}:${this.socksPort}`;
+    return `socks5h://tor_${this.sessionNonce}:auth@${this.socksHost}:${this.socksPort}`;
   }
 
   public async isSocksReady(): Promise<boolean> {

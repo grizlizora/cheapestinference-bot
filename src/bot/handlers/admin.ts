@@ -71,6 +71,7 @@ export function createAdminKeyboard(ctx: BotContext, userDao: UserDAO): InlineKe
     )
     .row()
     .text(ctx.t("admin.btn_backup"), "admin_backup")
+    .row()
     .text(ctx.t("admin.btn_test_alert"), "admin_test_alert")
     .row()
     .text(ctx.t("common.refresh"), "admin_refresh");

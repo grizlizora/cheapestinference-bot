@@ -144,6 +144,7 @@ async function bootstrap() {
       await runner.stop();
     }
     await dispatcher.flushPending().catch(() => {});
+    httpClient.destroy();
     healthServer.close();
     closeDatabase();
     console.log("👋 [Shutdown] All services stopped. Goodbye!");

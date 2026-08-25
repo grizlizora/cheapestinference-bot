@@ -2,9 +2,13 @@ import { describe, it, expect } from "vitest";
 import { TorManager } from "../src/proxy/torManager.js";
 
 describe("TorManager", () => {
-  it("should format SOCKS5h URL correctly", () => {
+  it("should format SOCKS5h URL with stream isolation correctly", () => {
     const tor = new TorManager({ socksHost: "127.0.0.1", socksPort: 9050 });
-    expect(tor.getSocksUrl()).toBe("socks5h://127.0.0.1:9050");
+    expect(tor.getSocksUrl()).toMatch(/^socks5h:\/\/tor_[a-z0-9]+:auth@127\.0\.0\.1:9050$/);
+    const url1 = tor.getSocksUrl();
+    const url2 = tor.rotateStreamIsolation();
+    expect(url1).not.toBe(url2);
+    expect(url2).toMatch(/^socks5h:\/\/tor_[a-z0-9]+:auth@127\.0\.0\.1:9050$/);
   });
 
   it("should deduplicate concurrent renewCircuit calls using mutex promise", async () => {

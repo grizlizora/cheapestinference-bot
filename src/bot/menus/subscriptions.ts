@@ -218,6 +218,7 @@ export function createSubscriptionsMenu(
       ];
 
       for (const pool of pools) {
+        const poolBlocks = poolStateDao.getPoolBlocks(pool.slug);
         const isPoolSub = subDao.hasSubscription(ctx.user.id, pool.slug, "ALL");
         range
           .text(
@@ -254,8 +255,8 @@ export function createSubscriptionsMenu(
               }
 
               const toast = active
-                ? c.t("subscriptions.toast_pool_on", { pool: pool.name })
-                : c.t("subscriptions.toast_pool_off", { pool: pool.name });
+                ? c.t("subscriptions.toast_pool_on", { name: pool.name })
+                : c.t("subscriptions.toast_pool_off", { name: pool.name });
               await c.answerCallbackQuery(toast);
               await safeEditMessageText(c, renderSubscriptionsText(c, subDao));
               try {
@@ -268,12 +269,13 @@ export function createSubscriptionsMenu(
         for (const block of blocks) {
           const isSlotSub = subDao.hasSubscription(ctx.user.id, pool.slug, block.id);
           const blockTitle = ctx.t(block.nameKey);
+          const blockHours = poolBlocks.find((b) => b.block_id === block.id)?.hours_utc || block.hours;
 
           range
             .text(
               isSlotSub
-                ? ctx.t("subscriptions.slot_active", { name: blockTitle, hours: block.hours })
-                : ctx.t("subscriptions.slot_inactive", { name: blockTitle, hours: block.hours }),
+                ? ctx.t("subscriptions.slot_active", { name: blockTitle, hours: blockHours })
+                : ctx.t("subscriptions.slot_inactive", { name: blockTitle, hours: blockHours }),
               async (c) => {
                 // Child Block Toggle: Auto-updates parent "Весь пул" state
                 const active = subDao.toggleBlockAndUpdatePool(c.user.id, pool.slug, block.id, DEFAULT_BLOCK_IDS);
@@ -303,14 +305,8 @@ export function createSubscriptionsMenu(
                 }
 
                 const toast = active
-                  ? c.t("subscriptions.toast_slot_on", {
-                      pool: pool.name,
-                      block: `${blockTitle} (${block.hours})`,
-                    })
-                  : c.t("subscriptions.toast_slot_off", {
-                      pool: pool.name,
-                      block: `${blockTitle} (${block.hours})`,
-                    });
+                  ? c.t("subscriptions.toast_slot_on", { name: blockTitle })
+                  : c.t("subscriptions.toast_slot_off", { name: blockTitle });
                 await c.answerCallbackQuery(toast);
                 await safeEditMessageText(c, renderSubscriptionsText(c, subDao));
                 try {
@@ -322,11 +318,12 @@ export function createSubscriptionsMenu(
         }
       }
     })
-    .back(
+    .text(
       (ctx) => ctx.t("common.back"),
       async (ctx) => {
         await ctx.answerCallbackQuery();
         await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao));
+        return ctx.menu.nav("main-dashboard-menu");
       }
     );
 }

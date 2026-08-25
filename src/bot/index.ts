@@ -259,7 +259,7 @@ export function createTelegramBot(
 
   bot.callbackQuery("admin_test_alert", async (ctx) => {
     if (!(await requireAdmin(ctx))) return;
-    await ctx.answerCallbackQuery({ text: "🚀 Тестове сповіщення надіслано!", show_alert: false });
+    await ctx.answerCallbackQuery({ text: ctx.t("admin.toast_test_alert_sent"), show_alert: false });
     await dispatcher.sendTestAlert(ctx.from!.id, ctx.lang, "slot");
   });
 
@@ -287,7 +287,7 @@ export function createTelegramBot(
       return;
     }
 
-    await ctx.reply("🧪 <i>Надсилаю реалістичне тестове сповіщення про відкриття слота...</i>", {
+    await ctx.reply(ctx.t("admin.test_alert_sending"), {
       parse_mode: "HTML",
     });
 

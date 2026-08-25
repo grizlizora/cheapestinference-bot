@@ -151,12 +151,13 @@ export class SubscriberInvertedIndex {
 
     // 4. If event is pool-wide (e.g. MODEL_UPGRADE_EVENT), notify all regional subscribers of that pool
     if (blockId === "ALL") {
-      const asiaSet = this.index.get(`${poolSlug}:asia:${eventType}`);
-      if (asiaSet) for (const id of asiaSet) matchedUserIds.add(id);
-      const europeSet = this.index.get(`${poolSlug}:europe:${eventType}`);
-      if (europeSet) for (const id of europeSet) matchedUserIds.add(id);
-      const americasSet = this.index.get(`${poolSlug}:americas:${eventType}`);
-      if (americasSet) for (const id of americasSet) matchedUserIds.add(id);
+      const prefix = `${poolSlug}:`;
+      const suffix = `:${eventType}`;
+      for (const [key, set] of this.index.entries()) {
+        if (key.startsWith(prefix) && key.endsWith(suffix) && !key.includes(":ALL:")) {
+          for (const id of set) matchedUserIds.add(id);
+        }
+      }
     }
 
     // Filter only active users respecting their global user filters

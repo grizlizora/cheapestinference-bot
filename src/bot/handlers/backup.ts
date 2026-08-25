@@ -36,7 +36,7 @@ export function createBackupHandler(
     }
 
     const statusMsg = await ctx.reply(
-      "⏳ <i>Generating hot online database snapshot (`VACUUM INTO`)...</i>",
+      ctx.t("admin.backup_in_progress"),
       { parse_mode: "HTML" }
     );
 

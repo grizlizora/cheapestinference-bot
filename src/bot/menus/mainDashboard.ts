@@ -19,7 +19,11 @@ export async function safeEditMessageText(
   extra: any = { parse_mode: "HTML", link_preview_options: { is_disabled: true } }
 ) {
   try {
-    await ctx.editMessageText(text, extra);
+    const finalExtra = { ...extra };
+    if (!finalExtra.reply_markup && ctx.callbackQuery?.message?.reply_markup) {
+      finalExtra.reply_markup = ctx.callbackQuery.message.reply_markup;
+    }
+    await ctx.editMessageText(text, finalExtra);
   } catch (err: any) {
     if (
       err?.description?.includes("message is not modified") ||

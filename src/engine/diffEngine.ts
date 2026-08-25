@@ -241,6 +241,7 @@ export class SlotDiffEngine {
               timestamp: now,
             });
             prevSlot.status = block.status;
+            prevSlot.pricePerMonth = block.pricePerMonth;
           } else if (wasInStock && isNowSoldOut) {
             // K=2 Confirmation Gate
             const pendingCount = (this.pendingDisappearances.get(key) || 0) + 1;

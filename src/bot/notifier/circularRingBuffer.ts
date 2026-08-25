@@ -37,15 +37,15 @@ export class CircularRingBuffer<T> {
 
   public pop(): T | undefined {
     if (this.count === 0) {
-      if (this.capacity > this.minCapacity) {
-        this.shrink();
-      }
       return undefined;
     }
     const item = this.buffer[this.head];
     this.buffer[this.head] = undefined; // Allow GC of referenced payload
     this.head = (this.head + 1) & this.mask;
     this.count--;
+    if (this.count === 0 && this.capacity > this.minCapacity) {
+      this.shrink();
+    }
     return item;
   }
 

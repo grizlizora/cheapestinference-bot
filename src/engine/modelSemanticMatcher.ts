@@ -123,7 +123,8 @@ export class ModelSemanticMatcher {
           !usedRemoved.has(rem.normalized) &&
           rem.family !== "other" &&
           rem.family === added.family &&
-          rem.variant === added.variant
+          rem.variant === added.variant &&
+          (rem.paramSize === added.paramSize || (!rem.paramSize && !added.paramSize))
       );
 
       if (match) {

@@ -108,11 +108,12 @@ export class ProxyPool {
     // HTTP 429 (Rate Limit) or 403 (Cloudflare WAF Block)
     if (statusCode === 429 || statusCode === 403) {
       if (entry.type === "tor" && this.torManager) {
-        console.warn("🧅 [ProxyPool] Tor IP throttled/blocked. Renewing Tor circuit in background...");
-        entry.bannedUntil = Date.now() + 2_000; // 2s cooldown while circuit builds
-        void this.torManager.renewCircuit().catch(() => {});
+        console.warn("🧅 [ProxyPool] Tor IP throttled/blocked. Instantly rotating SOCKS5 stream isolation circuit...");
         this.httpClient?.invalidateDispatcher(entry.url);
+        entry.url = this.torManager.rotateStreamIsolation();
+        entry.bannedUntil = null; // Instantly ready with fresh circuit
         entry.consecutiveErrors = 0;
+        void this.torManager.renewCircuit().catch(() => {});
         return;
       }
 
