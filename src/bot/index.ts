@@ -291,5 +291,99 @@ export function createTelegramBot(
     });
   });
 
+  // Test notification command (Admin Only)
+  bot.command("testalert", async (ctx) => {
+    if (!ctx.from) return;
+    const isAdmin =
+      config.ADMIN_USER_IDS.length === 0 ||
+      config.ADMIN_USER_IDS.includes(ctx.from.id);
+
+    if (!isAdmin) {
+      await ctx.reply(ctx.t("admin.unauthorized"));
+      return;
+    }
+
+    await ctx.reply("🧪 <i>Dispatching test alert through high-concurrency queue...</i>", {
+      parse_mode: "HTML",
+    });
+
+    await dispatcher.handleDiffEvents([
+      {
+        id: crypto.randomUUID(),
+        type: "MODEL_UPGRADE_EVENT",
+        poolSlug: "frontier",
+        poolName: "Frontier Pool",
+        block: "ALL",
+        models: ["glm-5.3", "minimax-m3", "qwen-3.5-turbo"],
+        hoursUtc: "",
+        timestamp: Date.now(),
+        modelUpgrade: {
+          added: [{ type: "added", modelName: "qwen-3.5-turbo", family: "qwen", newVersion: "3.5" }],
+          upgraded: [
+            {
+              type: "upgraded",
+              modelName: "glm-5.3",
+              previousModelName: "glm-5.2",
+              family: "glm",
+              oldVersion: "5.2",
+              newVersion: "5.3",
+              changeNote: "GLM 5.2 ➡️ GLM 5.3",
+            },
+          ],
+          removed: [],
+          allActiveModels: ["glm-5.3", "minimax-m3", "qwen-3.5-turbo"],
+        },
+      },
+    ]);
+  });
+
+  // Localized command scopes in Telegram UI
+  bot.api
+    .setMyCommands(
+      [
+        { command: "start", description: "Головне меню та моніторинг слотів" },
+        { command: "menu", description: "Відкрити дашборд доступності" },
+        { command: "alerts", description: "Керування підписками та фільтрами" },
+        { command: "language", description: "Змінити мову інтерфейсу" },
+        { command: "help", description: "Інструкція та контакт автора" },
+        { command: "stats", description: "Телеметрія системи (Admin)" },
+        { command: "backup", description: "Завантажити бекап бази (Admin)" },
+      ],
+      { language_code: "uk" }
+    )
+    .catch(() => {});
+
+  bot.api
+    .setMyCommands(
+      [
+        { command: "start", description: "Главное меню и мониторинг слотов" },
+        { command: "menu", description: "Открыть дашборд доступности" },
+        { command: "alerts", description: "Управление подписками и фильтрами" },
+        { command: "language", description: "Сменить язык интерфейса" },
+        { command: "help", description: "Инструкция и контакт автора" },
+        { command: "stats", description: "Телеметрия системы (Admin)" },
+        { command: "backup", description: "Скачать бэкап базы (Admin)" },
+      ],
+      { language_code: "ru" }
+    )
+    .catch(() => {});
+
+  bot.api
+    .setMyCommands([
+      { command: "start", description: "Main dashboard & live slot monitor" },
+      { command: "menu", description: "Open slot availability dashboard" },
+      { command: "alerts", description: "Manage subscriptions & alert filters" },
+      { command: "language", description: "Change language / Змінити мову" },
+      { command: "help", description: "How the bot works & author contact" },
+      { command: "stats", description: "System telemetry (Admin)" },
+      { command: "backup", description: "Download SQLite database backup (Admin)" },
+    ])
+    .catch(() => {});
+
+  // Wire Scraper diff_events to dispatcher
+  scraper.on("diff_events", async (events) => {
+    await dispatcher.handleDiffEvents(events);
+  });
+
   return { bot, dispatcher };
 }
