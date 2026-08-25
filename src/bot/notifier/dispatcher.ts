@@ -313,6 +313,30 @@ export class NotificationDispatcher {
     }
   }
 
+  private formatPriceDeltaBadge(
+    delta: number,
+    pct: number,
+    lang: SupportedLanguage
+  ): string {
+    const currencyMonth = translate(lang, "common.currency_month") || "mo";
+    const absDelta = Math.abs(delta) % 1 === 0 ? Math.abs(delta).toFixed(0) : Math.abs(delta).toFixed(2);
+    const absPct = Math.abs(pct) % 1 === 0 ? Math.abs(pct).toFixed(0) : Math.abs(pct).toFixed(1);
+
+    if (delta < 0) {
+      return translate(lang, "alerts.price_discount_badge", {
+        delta: absDelta,
+        percentage: absPct,
+        currency_month: currencyMonth,
+      });
+    } else {
+      return translate(lang, "alerts.price_increase_badge", {
+        delta: absDelta,
+        percentage: absPct,
+        currency_month: currencyMonth,
+      });
+    }
+  }
+
   private formatAlertMessage(
     user: PackedUserProfile,
     event: DiffEvent,
@@ -321,6 +345,7 @@ export class NotificationDispatcher {
     const lang = user.language;
     const blockName = translate(lang, `common.block_${event.block}`) || event.block;
     const timeFormatted = new Date(event.timestamp).toISOString().replace("T", " ").substring(0, 19);
+    const currencyMonth = translate(lang, "common.currency_month") || "mo";
 
     const blockHash = event.block && event.block !== "ALL" ? `#${event.block}` : "";
     const poolUrl = `https://cheapestinference.com/pools/${event.poolSlug}`;
@@ -330,17 +355,29 @@ export class NotificationDispatcher {
     let keyboard: InlineKeyboard | undefined;
 
     if (event.type === "SLOT_APPEARED") {
-      const header = translate(lang, "alerts.slot_appeared_header");
+      const isLimited = event.newStatus === "limited";
+      const statusIcon = isLimited ? "🟡" : "🟢";
+      const statusBadge = isLimited
+        ? translate(lang, "common.status_limited")
+        : translate(lang, "common.status_available");
+
+      const header = translate(lang, "alerts.slot_appeared_header", {
+        status_icon: statusIcon,
+        pool_name: escapeHtml(event.poolName),
+      });
+
       const body = translate(lang, "alerts.slot_appeared_body", {
         pool_name: escapeHtml(event.poolName),
         block_name: escapeHtml(blockName),
         hours_utc: escapeHtml(event.hoursUtc),
-        models: (event.models || []).map(escapeHtml).join(", "),
+        models: (event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", "),
         price: escapeHtml(event.newPrice || "0"),
+        currency_month: currencyMonth,
+        status_badge: statusBadge,
         timestamp: timeFormatted,
       });
 
-      text = `${header}\n\n${body}`;
+      text = `${header}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${body}`;
 
       if (this.historyDao) {
         const analytics = this.historyDao.getSlotAnalytics(event.poolSlug, event.block);
@@ -351,20 +388,27 @@ export class NotificationDispatcher {
         }
       }
 
-      keyboard = new InlineKeyboard().url(
-        translate(lang, "alerts.btn_claim_slot"),
-        checkoutUrl
-      );
+      const btnLabel = translate(lang, "alerts.btn_claim_slot_block", {
+        block_name: blockName,
+        price: escapeHtml(event.newPrice || "0"),
+        currency_month: currencyMonth,
+      });
+
+      keyboard = new InlineKeyboard().url(btnLabel, checkoutUrl);
     } else if (event.type === "SLOT_DISAPPEARED") {
-      const header = translate(lang, "alerts.slot_disappeared_header");
+      const header = translate(lang, "alerts.slot_disappeared_header", {
+        pool_name: escapeHtml(event.poolName),
+      });
       const body = translate(lang, "alerts.slot_disappeared_body", {
         pool_name: escapeHtml(event.poolName),
         block_name: escapeHtml(blockName),
         timestamp: timeFormatted,
       });
-      text = `${header}\n\n${body}`;
+      text = `${header}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${body}`;
     } else if (event.type === "MODEL_UPGRADE_EVENT") {
-      const header = translate(lang, "alerts.model_upgrade_header");
+      const header = translate(lang, "alerts.model_upgrade_header", {
+        pool_name: escapeHtml(event.poolName),
+      });
       const diffLines: string[] = [];
 
       if (event.modelUpgrade) {
@@ -392,77 +436,84 @@ export class NotificationDispatcher {
         }
       }
 
+      const allModelsList = (event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ");
+
       const body = translate(lang, "alerts.model_upgrade_body", {
         pool_name: escapeHtml(event.poolName),
         model_diff_block:
           diffLines.length > 0
             ? diffLines.join("\n")
-            : "• " + (event.models || []).map(escapeHtml).join(", "),
-        all_models: (event.models || []).map(escapeHtml).join(", "),
+            : "• " + allModelsList,
+        all_models: allModelsList,
+        model_count: (event.models || []).length,
       });
 
-      text = `${header}\n\n${body}`;
+      text = `${header}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${body}`;
       keyboard = new InlineKeyboard().url(
         translate(lang, "common.open_site"),
         poolUrl
       );
     } else if (event.type === "SLOT_PRICE_CHANGED") {
-      const header = translate(lang, "alerts.slot_price_changed_header");
-      let deltaBadge = "";
-      if (event.slotPrice) {
-        const sign = event.slotPrice.priceDelta > 0 ? "+" : "";
-        deltaBadge = `${sign}$${event.slotPrice.priceDelta}/mo (${sign}${event.slotPrice.percentageDelta}%)`;
-        if (event.slotPrice.isDiscount) {
-          const dropLabel = translate(lang, "alerts.price_drop_badge") || "Price Drop!";
-          deltaBadge = `🟢 <b>${deltaBadge} (${dropLabel})</b>`;
-        } else {
-          deltaBadge = `🔴 <b>${deltaBadge}</b>`;
-        }
-      }
+      const isDiscount = (event.slotPrice?.priceDelta || 0) < 0;
+      const trendIcon = isDiscount ? "📉" : "📈";
+      const header = translate(lang, "alerts.slot_price_changed_header", {
+        trend_icon: trendIcon,
+        pool_name: escapeHtml(event.poolName),
+      });
+
+      const deltaBadge = event.slotPrice
+        ? this.formatPriceDeltaBadge(event.slotPrice.priceDelta, event.slotPrice.percentageDelta, lang)
+        : "";
 
       const body = translate(lang, "alerts.slot_price_changed_body", {
         pool_name: escapeHtml(event.poolName),
         block_name: escapeHtml(blockName),
         old_price: escapeHtml(event.previousPrice || "0"),
         new_price: escapeHtml(event.newPrice || "0"),
+        currency_month: currencyMonth,
         delta_badge: deltaBadge,
         hours_utc: escapeHtml(event.hoursUtc),
       });
 
-      text = `${header}\n\n${body}`;
-      keyboard = new InlineKeyboard().url(
-        translate(lang, "alerts.btn_claim_slot"),
-        checkoutUrl
-      );
+      text = `${header}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${body}`;
+
+      const btnLabel = translate(lang, "alerts.btn_claim_slot_block", {
+        block_name: blockName,
+        price: escapeHtml(event.newPrice || "0"),
+        currency_month: currencyMonth,
+      });
+
+      keyboard = new InlineKeyboard().url(btnLabel, checkoutUrl);
     } else if (event.type === "POOL_BASE_PRICE_CHANGED" || event.type === "PRICE_CHANGED") {
-      const header = translate(lang, "alerts.pool_base_price_header");
-      let deltaBadge = "";
-      if (event.basePrice) {
-        const sign = event.basePrice.priceDelta > 0 ? "+" : "";
-        deltaBadge = `${sign}$${event.basePrice.priceDelta}/mo (${sign}${event.basePrice.percentageDelta}%)`;
-        if (event.basePrice.priceDelta < 0) {
-          const dropLabel = translate(lang, "alerts.price_drop_badge") || "Price Drop!";
-          deltaBadge = `🟢 <b>${deltaBadge} (${dropLabel})</b>`;
-        } else {
-          deltaBadge = `🔴 <b>${deltaBadge}</b>`;
-        }
-      }
+      const isDiscount = (event.basePrice?.priceDelta || 0) < 0;
+      const trendIcon = isDiscount ? "📉" : "📈";
+      const header = translate(lang, "alerts.pool_base_price_header", {
+        trend_icon: trendIcon,
+        pool_name: escapeHtml(event.poolName),
+      });
+
+      const deltaBadge = event.basePrice
+        ? this.formatPriceDeltaBadge(event.basePrice.priceDelta, event.basePrice.percentageDelta, lang)
+        : "";
 
       const body = translate(lang, "alerts.pool_base_price_body", {
         pool_name: escapeHtml(event.poolName),
         old_price: escapeHtml(event.previousPrice || "0"),
         new_price: escapeHtml(event.newPrice || "0"),
+        currency_month: currencyMonth,
         delta_badge: deltaBadge,
-        models: (event.models || []).map(escapeHtml).join(", "),
+        models: (event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", "),
       });
 
-      text = `${header}\n\n${body}`;
+      text = `${header}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${body}`;
       keyboard = new InlineKeyboard().url(
         translate(lang, "common.open_site"),
         poolUrl
       );
     } else if (event.type === "TIER_UPDATED_EVENT") {
-      const header = translate(lang, "alerts.tier_updated_header");
+      const header = translate(lang, "alerts.tier_updated_header", {
+        pool_name: escapeHtml(event.poolName),
+      });
       const diffLines: string[] = [];
       if (event.tierUpdate?.newDescription) {
         diffLines.push(
@@ -486,17 +537,24 @@ export class NotificationDispatcher {
         timestamp: timeFormatted,
       });
 
-      text = `${header}\n\n${body}`;
+      text = `${header}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${body}`;
+      keyboard = new InlineKeyboard().url(
+        translate(lang, "common.open_site"),
+        poolUrl
+      );
     } else if (event.type === "NEW_POOL_EVENT") {
-      const header = translate(lang, "alerts.new_pool_header");
+      const header = translate(lang, "alerts.new_pool_header", {
+        pool_name: escapeHtml(event.poolName),
+      });
       const body = translate(lang, "alerts.new_pool_body", {
         pool_name: escapeHtml(event.poolName),
-        models: (event.models || []).map(escapeHtml).join(", "),
+        models: (event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", "),
         min_price: escapeHtml(event.newPrice || "0"),
+        currency_month: currencyMonth,
         description: escapeHtml((event.metadata?.description as string) || "High-performance compute pool"),
       });
 
-      text = `${header}\n\n${body}`;
+      text = `${header}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${body}`;
       keyboard = new InlineKeyboard().url(
         translate(lang, "common.open_site"),
         poolUrl
@@ -521,9 +579,6 @@ export class NotificationDispatcher {
     };
   }
 
-  /**
-   * Event Bundling: Combines multiple simultaneous events into 1 single notification
-   */
   private formatBundledAlertMessage(
     user: PackedUserProfile,
     matchedEvents: Array<{ event: DiffEvent; priority: BroadcastPriority }>
@@ -531,18 +586,14 @@ export class NotificationDispatcher {
     const lang = user.language;
     const count = matchedEvents.length;
     const timeFormatted = new Date().toISOString().replace("T", " ").substring(0, 19);
+    const currencyMonth = translate(lang, "common.currency_month") || "mo";
 
-    const title =
-      lang === "uk"
-        ? `⚡ <b>CheapestInference — Оновлення слотів (${count})</b>`
-        : lang === "ru"
-        ? `⚡ <b>CheapestInference — Обновления слотов (${count})</b>`
-        : `⚡ <b>CheapestInference — Slot Updates (${count})</b>`;
+    const title = translate(lang, "alerts.batch_title", { count }) ||
+      `⚡ <b>CheapestInference — Slot Updates (${count})</b>`;
 
     const sectionLines: string[] = [];
     const keyboard = new InlineKeyboard();
 
-    // Determine highest priority across bundled events (P1 > P2 > P3)
     let highestPriority: BroadcastPriority = "P3";
     for (const item of matchedEvents) {
       if (item.priority === "P1") highestPriority = "P1";
@@ -558,39 +609,40 @@ export class NotificationDispatcher {
 
       if (event.type === "SLOT_APPEARED") {
         sectionLines.push(
-          `🟢 <b>${escapeHtml(event.poolName)}</b> (${escapeHtml(blockName)})\n` +
-          `   💵 $${escapeHtml(event.newPrice || "0")}/mo | 🕒 ${escapeHtml(event.hoursUtc)}\n` +
-          `   🤖 ${(event.models || []).map(escapeHtml).join(", ")}`
+          `🟢 <b>${escapeHtml(event.poolName)} • ${escapeHtml(blockName)}</b>\n` +
+          `💰 <code>$${escapeHtml(event.newPrice || "0")}/${currencyMonth}</code> | 🕒 <code>${escapeHtml(event.hoursUtc)}</code>\n` +
+          `🤖 ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
         );
 
         if (buttonCount < 3) {
-          keyboard.url(
-            `${translate(lang, "alerts.btn_claim_slot")} (${blockName})`,
-            checkoutUrl
-          ).row();
+          const btnLabel = `⚡ ${escapeHtml(event.poolSlug.toUpperCase())} (${blockName}) • $${escapeHtml(event.newPrice || "0")}`;
+          keyboard.url(btnLabel, checkoutUrl).row();
           buttonCount++;
         }
       } else if (event.type === "SLOT_DISAPPEARED") {
         sectionLines.push(
-          `🔴 <b>${escapeHtml(event.poolName)}</b> (${escapeHtml(blockName)}) — <i>${translate(lang, "common.status_sold_out")}</i>`
+          `🔒 <b>${escapeHtml(event.poolName)} • ${escapeHtml(blockName)}</b> — <i>${translate(lang, "common.status_sold_out")}</i>`
         );
       } else if (event.type === "MODEL_UPGRADE_EVENT") {
         sectionLines.push(
-          `🆕 <b>${escapeHtml(event.poolName)}</b> — ${translate(lang, "alerts.model_upgrade_header")}\n` +
-          `   🤖 ${(event.models || []).map(escapeHtml).join(", ")}`
+          `🚀 <b>${escapeHtml(event.poolName)} • ${translate(lang, "alerts.model_upgrade_header")}</b>\n` +
+          `🤖 ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
         );
       } else if (event.type === "SLOT_PRICE_CHANGED") {
+        const deltaStr = event.slotPrice
+          ? ` (${this.formatPriceDeltaBadge(event.slotPrice.priceDelta, event.slotPrice.percentageDelta, lang)})`
+          : "";
         sectionLines.push(
-          `🏷 <b>${escapeHtml(event.poolName)}</b> (${escapeHtml(blockName)}) — $${escapeHtml(event.previousPrice || "0")} ➡️ <b>$${escapeHtml(event.newPrice || "0")}/mo</b>`
+          `🏷 <b>${escapeHtml(event.poolName)} • ${escapeHtml(blockName)}</b>\n` +
+          `💰 <s>$${escapeHtml(event.previousPrice || "0")}</s> ➔ <b>$${escapeHtml(event.newPrice || "0")}/${currencyMonth}</b>${deltaStr}`
         );
       } else if (event.type === "POOL_BASE_PRICE_CHANGED" || event.type === "PRICE_CHANGED") {
-        let delta = "";
-        if (event.basePrice) {
-          const sign = event.basePrice.priceDelta > 0 ? "+" : "";
-          delta = ` (${sign}$${event.basePrice.priceDelta}/mo, ${sign}${event.basePrice.percentageDelta}%)`;
-        }
+        const deltaStr = event.basePrice
+          ? ` (${this.formatPriceDeltaBadge(event.basePrice.priceDelta, event.basePrice.percentageDelta, lang)})`
+          : "";
         sectionLines.push(
-          `💰 <b>${escapeHtml(event.poolName)}</b> — $${escapeHtml(event.previousPrice || "0")} ➡️ <b>$${escapeHtml(event.newPrice || "0")}/mo</b>${delta}`
+          `💰 <b>${escapeHtml(event.poolName)}</b>\n` +
+          `💵 <s>$${escapeHtml(event.previousPrice || "0")}</s> ➔ <b>$${escapeHtml(event.newPrice || "0")}/${currencyMonth}</b>${deltaStr}`
         );
       } else if (event.type === "TIER_UPDATED_EVENT") {
         sectionLines.push(
@@ -599,7 +651,7 @@ export class NotificationDispatcher {
       } else if (event.type === "NEW_POOL_EVENT") {
         sectionLines.push(
           `✨ <b>${escapeHtml(event.poolName)}</b> — ${translate(lang, "alerts.new_pool_header")}\n` +
-          `   🤖 ${(event.models || []).map(escapeHtml).join(", ")}`
+          `🤖 ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
         );
       } else {
         sectionLines.push(`• <b>${escapeHtml(event.poolName)}</b> (${escapeHtml(blockName)}): ${escapeHtml(event.newStatus || "updated")}`);
@@ -621,7 +673,7 @@ export class NotificationDispatcher {
         ? `🕒 <i>Время обновления: ${timeFormatted} UTC</i>`
         : `🕒 <i>Updated at: ${timeFormatted} UTC</i>`;
 
-    const text = `${title}\n\n${sectionLines.join("\n\n")}\n\n${footer}`;
+    const text = `${title}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${sectionLines.join("\n───\n")}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${footer}`;
 
     const firstEvent = matchedEvents[0].event;
 

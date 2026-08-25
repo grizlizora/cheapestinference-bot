@@ -53,7 +53,7 @@ describe("i18n subsystem", () => {
     expect(slotUk).toBe("✅ 🌏 Азія (00-08)");
 
     const batchEn = translate("en", "alerts.batch_title", { count: 3 });
-    expect(batchEn).toBe("🚨 <b>CheapestInference Updates (3)</b>");
+    expect(batchEn).toBe("⚡ <b>CheapestInference — Slot Updates (3)</b>");
   });
 
   it("should return appropriate flag label", () => {
