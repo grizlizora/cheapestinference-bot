@@ -35,5 +35,5 @@ else
 fi
 
 echo "🚀 [3/3] Launching Node.js Bot Application..."
-# Execute Node.js as the unprivileged node user
-exec su-exec node node dist/index.js
+# Execute Node.js as the unprivileged node user with memory optimization
+exec su-exec node node --optimize-for-size dist/index.js
