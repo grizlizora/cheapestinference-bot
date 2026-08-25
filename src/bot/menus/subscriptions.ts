@@ -244,6 +244,15 @@ export function createSubscriptionsMenu(
                 });
               }
 
+              if (!active) {
+                invertedIndex.updateSubscription(c.user.id, "ALL", "ALL", {
+                  available: false,
+                  soldOut: false,
+                  models: false,
+                  prices: false,
+                });
+              }
+
               const toast = active
                 ? c.t("subscriptions.toast_pool_on", { pool: pool.name })
                 : c.t("subscriptions.toast_pool_off", { pool: pool.name });
@@ -283,6 +292,15 @@ export function createSubscriptionsMenu(
                   models: parentPoolActive,
                   prices: parentPoolActive,
                 });
+
+                if (!active) {
+                  invertedIndex.updateSubscription(c.user.id, "ALL", "ALL", {
+                    available: false,
+                    soldOut: false,
+                    models: false,
+                    prices: false,
+                  });
+                }
 
                 const toast = active
                   ? c.t("subscriptions.toast_slot_on", {

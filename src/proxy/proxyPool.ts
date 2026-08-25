@@ -109,6 +109,7 @@ export class ProxyPool {
     if (statusCode === 429 || statusCode === 403) {
       if (entry.type === "tor" && this.torManager) {
         console.warn("🧅 [ProxyPool] Tor IP throttled/blocked. Renewing Tor circuit in background...");
+        entry.bannedUntil = Date.now() + 2_000; // 2s cooldown while circuit builds
         void this.torManager.renewCircuit().catch(() => {});
         this.httpClient?.invalidateDispatcher(entry.url);
         entry.consecutiveErrors = 0;

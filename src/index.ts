@@ -74,8 +74,8 @@ async function bootstrap() {
   const scraper = new ScraperOrchestrator(
     jsonApiEngine,
     htmlSnapshotEngine,
-    sanityGuard,
     diffEngine,
+    sanityGuard,
     poolStateDao,
     {
       minIntervalSec: config.SCRAPE_MIN_INTERVAL_SEC,

@@ -110,7 +110,8 @@
     "batch_title": "🚨 <b>Оновлення CheapestInference ({count})</b>",
     "batch_price_update": "🏷️ Зміна ціни",
     "btn_claim_slot": "🚀 Оформити слот на сайті",
-    "btn_open_pool": "🔎 Переглянути пул у боті"
+    "btn_open_pool": "🔎 Переглянути пул у боті",
+    "price_drop_badge": "Знижка ціни! 🔥"
   },
   "intelligence": {
     "tag_high_demand": "🔥 Високий попит",

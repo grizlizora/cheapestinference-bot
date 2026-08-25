@@ -8,20 +8,21 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
 
   constructor(private readonly httpClient: RobustHttpClient) {}
 
-  public async fetch(etag?: string, lastModified?: string): Promise<ScrapeResult> {
+  public async fetch(etag?: string, lastModified?: string, timeoutMs: number = 5_000): Promise<ScrapeResult> {
     const res = await this.httpClient.get({
       url: this.htmlUrl,
       etag,
       lastModified,
       isHtmlFallback: true,
+      timeoutMs,
     });
 
     if (res.statusCode === 304) {
       return {
         success: true,
         modified: false,
-        etag,
-        lastModified,
+        etag: res.etag || etag,
+        lastModified: res.lastModified || lastModified,
         source: "cache_not_modified",
         latencyMs: res.latencyMs,
       };

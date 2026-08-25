@@ -59,6 +59,15 @@ export function createPoolDetailMenu(
             });
           }
 
+          if (!active) {
+            invertedIndex.updateSubscription(c.user.id, "ALL", "ALL", {
+              available: false,
+              soldOut: false,
+              models: false,
+              prices: false,
+            });
+          }
+
           const toast = active
             ? c.t("subscriptions.toast_pool_on", { pool: slug.toUpperCase() })
             : c.t("subscriptions.toast_pool_off", { pool: slug.toUpperCase() });

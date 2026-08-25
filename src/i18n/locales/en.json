@@ -110,7 +110,8 @@
     "batch_title": "🚨 <b>CheapestInference Updates ({count})</b>",
     "batch_price_update": "🏷️ Price Update",
     "btn_claim_slot": "🚀 Claim Slot on Site",
-    "btn_open_pool": "🔎 View Pool in Bot"
+    "btn_open_pool": "🔎 View Pool in Bot",
+    "price_drop_badge": "Price Drop! 🔥"
   },
   "intelligence": {
     "tag_high_demand": "🔥 High Demand",

@@ -54,7 +54,7 @@ export function renderAdminText(
     consecutive_failures: scraperTelemetry.consecutiveFailures,
     proxy_status: proxyModeStr,
     memory_mb: memUsageMb,
-    new_users_status: newUsersEnabled ? "УВІМКНЕНО ✅" : "ВИМКНЕНО ❌",
+    new_users_status: newUsersEnabled ? ctx.t("subscriptions.filter_on") : ctx.t("subscriptions.filter_off"),
   });
 }
 

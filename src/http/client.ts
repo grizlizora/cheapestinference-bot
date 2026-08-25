@@ -2,7 +2,13 @@ import { Dispatcher, Agent, ProxyAgent, request } from "undici";
 import { SocksClient } from "socks";
 import zlib from "node:zlib";
 import tls from "node:tls";
+import util from "node:util";
 import { ProxyPool } from "../proxy/proxyPool.js";
+
+const gunzipAsync = util.promisify(zlib.gunzip);
+const brotliDecompressAsync = util.promisify(zlib.brotliDecompress);
+const inflateAsync = util.promisify(zlib.inflate);
+const inflateRawAsync = util.promisify(zlib.inflateRaw);
 
 export interface HttpRequestOptions {
   url: string;
@@ -30,7 +36,13 @@ export class RobustHttpClient {
 
   constructor(private readonly proxyPool: ProxyPool) {
     this.directAgent = new Agent({
-      connect: { timeout: 15_000 },
+      connect: {
+        timeout: 15_000,
+        autoSelectFamily: true,
+        keepAlive: true,
+        keepAliveInitialDelay: 1000,
+        noDelay: true,
+      },
       keepAliveTimeout: 120_000,
       keepAliveMaxTimeout: 180_000,
       keepAliveTimeoutThreshold: 2000,
@@ -50,28 +62,34 @@ export class RobustHttpClient {
 
   private getOrCreateDispatcher(proxyUrl: string | null, timeoutMs: number): Dispatcher {
     if (!proxyUrl) return this.directAgent;
+
     if (this.dispatchers.has(proxyUrl)) {
       return this.dispatchers.get(proxyUrl)!;
     }
 
     let dispatcher: Dispatcher;
 
-    if (proxyUrl.startsWith("socks5")) {
+    if (proxyUrl.startsWith("socks5://") || proxyUrl.startsWith("socks5h://")) {
       const parsed = new URL(proxyUrl);
+      const host = parsed.hostname;
+      const port = parseInt(parsed.port, 10) || 1080;
+      const user = parsed.username || undefined;
+      const pass = parsed.password || undefined;
+
       dispatcher = new Agent({
-        connect: (opts, callback) => {
+        connect: (opts: any, callback: any) => {
           SocksClient.createConnection({
             proxy: {
-              host: parsed.hostname,
-              port: parseInt(parsed.port, 10) || 1080,
+              host,
+              port,
               type: 5,
-              userId: parsed.username ? decodeURIComponent(parsed.username) : undefined,
-              password: parsed.password ? decodeURIComponent(parsed.password) : undefined,
+              userId: user,
+              password: pass,
             },
             command: "connect",
             destination: {
               host: opts.hostname,
-              port: parseInt(opts.port, 10) || (opts.protocol === "https:" ? 443 : 80),
+              port: parseInt(opts.port, 10),
             },
             timeout: timeoutMs + 5_000,
           })
@@ -87,7 +105,8 @@ export class RobustHttpClient {
                 });
                 tlsSocket.setNoDelay(true);
 
-                tlsSocket.setTimeout(10_000, () => {
+                const tlsTimeout = Math.min(timeoutMs, 10_000);
+                tlsSocket.setTimeout(tlsTimeout, () => {
                   info.socket.destroy();
                   tlsSocket.destroy(new Error("TLS Handshake Timeout over SOCKS5"));
                 });
@@ -163,19 +182,26 @@ export class RobustHttpClient {
     return headers;
   }
 
-  private decompressBody(buffer: Buffer, encoding?: string): string {
+  /**
+   * Asynchronous non-blocking body decompression (prevents V8 event loop freezes on 100-300KB payloads)
+   */
+  private async decompressBodyAsync(buffer: Buffer, encoding?: string): Promise<string> {
     if (!encoding || buffer.length === 0) return buffer.toString("utf-8");
     const enc = encoding.toLowerCase().trim();
     try {
       if (enc === "gzip" || enc === "x-gzip") {
-        return zlib.gunzipSync(buffer).toString("utf-8");
+        const decompressed = await gunzipAsync(buffer);
+        return decompressed.toString("utf-8");
       } else if (enc === "br") {
-        return zlib.brotliDecompressSync(buffer).toString("utf-8");
+        const decompressed = await brotliDecompressAsync(buffer);
+        return decompressed.toString("utf-8");
       } else if (enc === "deflate") {
         try {
-          return zlib.inflateSync(buffer).toString("utf-8");
+          const decompressed = await inflateAsync(buffer);
+          return decompressed.toString("utf-8");
         } catch {
-          return zlib.inflateRawSync(buffer).toString("utf-8");
+          const decompressed = await inflateRawAsync(buffer);
+          return decompressed.toString("utf-8");
         }
       }
     } catch {
@@ -195,91 +221,91 @@ export class RobustHttpClient {
     let redirectsCount = 0;
 
     while (redirectsCount <= maxRedirects) {
-      const headers = this.getBrowserHeaders(
-        !!opts.isHtmlFallback,
-        opts.etag,
-        opts.lastModified
-      );
-
       try {
+        const headers = this.getBrowserHeaders(
+          opts.isHtmlFallback ?? false,
+          opts.etag,
+          opts.lastModified
+        );
+
         const res = await request(currentUrl, {
           method: "GET",
           headers,
           dispatcher,
           headersTimeout: timeoutMs,
           bodyTimeout: timeoutMs,
-          maxRedirections: 0,
         });
 
-        // Fast 304 Not Modified exit without body allocations
-        if (res.statusCode === 304) {
+        const statusCode = res.statusCode;
+        const latencyMs = Date.now() - startTime;
+
+        // Handle Redirects
+        if ([301, 302, 303, 307, 308].includes(statusCode)) {
+          const location = res.headers["location"];
           await res.body.dump();
-          const latencyMs = Date.now() - startTime;
+          if (!location || typeof location !== "string") {
+            throw new Error(`Redirect with invalid location header: ${statusCode}`);
+          }
+          currentUrl = new URL(location, currentUrl).toString();
+          redirectsCount++;
+          continue;
+        }
+
+        // Handle 304 Not Modified
+        if (statusCode === 304) {
+          await res.body.dump();
           this.proxyPool.reportSuccess(proxyUrl, latencyMs);
           return {
             statusCode: 304,
-            headers: res.headers as Record<string, string | string[] | undefined>,
+            headers: res.headers as any,
             body: "",
-            etag: typeof res.headers["etag"] === "string" ? res.headers["etag"] : opts.etag,
-            lastModified:
-              typeof res.headers["last-modified"] === "string"
-                ? res.headers["last-modified"]
-                : opts.lastModified,
+            etag: (res.headers["etag"] as string) || opts.etag,
+            lastModified: (res.headers["last-modified"] as string) || opts.lastModified,
             latencyMs,
             usedProxy: proxyUrl,
             finalUrl: currentUrl,
           };
         }
 
-        // Handle Redirects
-        if (
-          (res.statusCode === 301 ||
-            res.statusCode === 302 ||
-            res.statusCode === 307 ||
-            res.statusCode === 308) &&
-          typeof res.headers["location"] === "string"
-        ) {
-          const redirectLocation = res.headers["location"];
-          currentUrl = new URL(redirectLocation, currentUrl).toString();
-          redirectsCount++;
+        // Fast path for errors: 403 Forbidden / 429 Too Many Requests
+        if (statusCode === 403 || statusCode === 429) {
           await res.body.dump();
-          continue;
+          this.proxyPool.reportFailure(proxyUrl, statusCode);
+          throw new Error(`HTTP Error ${statusCode} via proxy ${proxyUrl || "DIRECT"}`);
         }
 
-        const latencyMs = Date.now() - startTime;
+        if (statusCode >= 400) {
+          await res.body.dump();
+          this.proxyPool.reportFailure(proxyUrl, statusCode);
+          throw new Error(`HTTP Error ${statusCode}`);
+        }
+
+        // Decompress body asynchronously without stalling main thread
         const rawBuffer = Buffer.from(await res.body.arrayBuffer());
         const contentEncoding = res.headers["content-encoding"] as string | undefined;
-        const bodyText = this.decompressBody(rawBuffer, contentEncoding);
+        const bodyText = await this.decompressBodyAsync(rawBuffer, contentEncoding);
 
-        const responseEtag =
-          typeof res.headers["etag"] === "string" ? res.headers["etag"] : undefined;
-        const responseLastModified =
-          typeof res.headers["last-modified"] === "string"
-            ? res.headers["last-modified"]
-            : undefined;
-
-        if (res.statusCode >= 200 && res.statusCode < 400) {
-          this.proxyPool.reportSuccess(proxyUrl, latencyMs);
-        } else {
-          await this.proxyPool.reportFailure(proxyUrl, res.statusCode);
-        }
+        this.proxyPool.reportSuccess(proxyUrl, latencyMs);
 
         return {
-          statusCode: res.statusCode,
-          headers: res.headers as Record<string, string | string[] | undefined>,
+          statusCode,
+          headers: res.headers as any,
           body: bodyText,
-          etag: responseEtag,
-          lastModified: responseLastModified,
+          etag: res.headers["etag"] as string | undefined,
+          lastModified: res.headers["last-modified"] as string | undefined,
           latencyMs,
           usedProxy: proxyUrl,
           finalUrl: currentUrl,
         };
       } catch (err: any) {
-        await this.proxyPool.reportFailure(proxyUrl, 500);
+        if (redirectsCount > 0 && err.message.includes("Redirect")) {
+          throw err;
+        }
+        this.proxyPool.reportFailure(proxyUrl, 500);
         throw err;
       }
     }
 
-    throw new Error(`Exceeded maximum redirect limit of ${maxRedirects}`);
+    throw new Error(`Exceeded maximum redirects (${maxRedirects}) for ${opts.url}`);
   }
 }

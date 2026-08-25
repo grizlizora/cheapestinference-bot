@@ -18,6 +18,7 @@ export class SlotDiffEngine {
   private inMemorySlots = new Map<string, TrackedSlot>();
   private inMemoryPools = new Map<string, PoolData>();
   private pendingDisappearances = new Map<string, number>();
+  private pendingPoolDisappearances = new Map<string, number>();
   private isInitialized = false;
 
   constructor(
@@ -363,7 +364,14 @@ export class SlotDiffEngine {
 
     for (const slug of this.inMemoryPools.keys()) {
       if (!incomingPoolSlugs.has(slug)) {
-        this.inMemoryPools.delete(slug);
+        const count = (this.pendingPoolDisappearances.get(slug) || 0) + 1;
+        this.pendingPoolDisappearances.set(slug, count);
+        if (count >= 2) {
+          this.inMemoryPools.delete(slug);
+          this.pendingPoolDisappearances.delete(slug);
+        }
+      } else {
+        this.pendingPoolDisappearances.delete(slug);
       }
     }
 

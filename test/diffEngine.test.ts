@@ -118,4 +118,21 @@ describe("SlotDiffEngine", () => {
     const events2 = engine.processSnapshot(deletedSlotSnapshot);
     expect(events2.some((e) => e.type === "SLOT_DISAPPEARED" && e.block === "europe")).toBe(true);
   });
+
+  it("should require K=2 confirmation before deleting missing pools to prevent false NEW_POOL_EVENT", () => {
+    const engine = new SlotDiffEngine();
+    engine.processSnapshot(sampleSnapshot);
+
+    const emptySnapshot = { success: true, data: [] };
+
+    // Tick 1: Missing pool (K=1) - should NOT immediately purge from inMemoryPools
+    engine.processSnapshot(emptySnapshot);
+    const snapshotAfterK1 = engine.getSnapshot();
+    expect(snapshotAfterK1?.data.length).toBe(1); // Still retained!
+
+    // Tick 2: Second consecutive missing scan (K=2) - Now pruned
+    engine.processSnapshot(emptySnapshot);
+    const snapshotAfterK2 = engine.getSnapshot();
+    expect(snapshotAfterK2?.data.length).toBe(0);
+  });
 });

@@ -76,7 +76,7 @@ export class NotificationDispatcher {
 
   /**
    * Main entrypoint for processing DiffEvents from ScraperOrchestrator
-   * Implements Event Bundling / Coalescing to reduce Telegram message count by 50-75%
+   * Implements Event Bundling / Coalescing with 3,800 character chunking limits
    */
   public async handleDiffEvents(events: DiffEvent[]): Promise<void> {
     if (!events || events.length === 0) return;
@@ -125,16 +125,24 @@ export class NotificationDispatcher {
       }
     }
 
-    // 2. Format and Enqueue messages (Single or Bundled)
+    // 2. Format and Enqueue messages (Single or Chunked Bundles <= 3,800 chars)
     for (const { user, matchedEvents } of userEventsMap.values()) {
       if (matchedEvents.length === 1) {
         const single = matchedEvents[0];
         const msg = this.formatAlertMessage(user, single.event, single.priority);
         this.enqueue(msg);
       } else {
-        // Event Bundling: Bundle multiple updates into a single compact notification
-        const msg = this.formatBundledAlertMessage(user, matchedEvents);
-        this.enqueue(msg);
+        // Chunk bundles so no single Telegram message exceeds the 4096 char limit
+        const MAX_BUNDLE_EVENTS_PER_MSG = 8;
+        for (let i = 0; i < matchedEvents.length; i += MAX_BUNDLE_EVENTS_PER_MSG) {
+          const slice = matchedEvents.slice(i, i + MAX_BUNDLE_EVENTS_PER_MSG);
+          if (slice.length === 1) {
+            this.enqueue(this.formatAlertMessage(user, slice[0].event, slice[0].priority));
+          } else {
+            const msg = this.formatBundledAlertMessage(user, slice);
+            this.enqueue(msg);
+          }
+        }
       }
     }
   }
@@ -181,12 +189,12 @@ export class NotificationDispatcher {
         this.isPaused = false;
       }
 
-      // Refill Token Bucket
+      // Refill Token Bucket with exact integer multiplication to avoid timing drift
       const elapsed = now - this.lastTokenRefill;
       if (elapsed >= this.tokenIntervalMs) {
         const newTokens = Math.floor(elapsed / this.tokenIntervalMs);
         this.tokens = Math.min(this.maxTokens, this.tokens + newTokens);
-        this.lastTokenRefill = now;
+        this.lastTokenRefill += newTokens * this.tokenIntervalMs;
       }
 
       if (this.getTotalPending() === 0) {
@@ -405,7 +413,8 @@ export class NotificationDispatcher {
         const sign = event.slotPrice.priceDelta > 0 ? "+" : "";
         deltaBadge = `${sign}$${event.slotPrice.priceDelta}/mo (${sign}${event.slotPrice.percentageDelta}%)`;
         if (event.slotPrice.isDiscount) {
-          deltaBadge = `🟢 <b>${deltaBadge} (Price Drop!)</b>`;
+          const dropLabel = translate(lang, "alerts.price_drop_badge") || "Price Drop!";
+          deltaBadge = `🟢 <b>${deltaBadge} (${dropLabel})</b>`;
         } else {
           deltaBadge = `🔴 <b>${deltaBadge}</b>`;
         }
@@ -432,7 +441,8 @@ export class NotificationDispatcher {
         const sign = event.basePrice.priceDelta > 0 ? "+" : "";
         deltaBadge = `${sign}$${event.basePrice.priceDelta}/mo (${sign}${event.basePrice.percentageDelta}%)`;
         if (event.basePrice.priceDelta < 0) {
-          deltaBadge = `🟢 <b>${deltaBadge} (Price Drop!)</b>`;
+          const dropLabel = translate(lang, "alerts.price_drop_badge") || "Price Drop!";
+          deltaBadge = `🟢 <b>${deltaBadge} (${dropLabel})</b>`;
         } else {
           deltaBadge = `🔴 <b>${deltaBadge}</b>`;
         }
@@ -545,7 +555,7 @@ export class NotificationDispatcher {
 
         if (buttonCount < 3) {
           keyboard.url(
-            `🚀 ${translate(lang, "alerts.btn_claim_slot")} (${blockName})`,
+            `${translate(lang, "alerts.btn_claim_slot")} (${blockName})`,
             checkoutUrl
           ).row();
           buttonCount++;
@@ -597,15 +607,18 @@ export class NotificationDispatcher {
 
   private flushBlockedUsersToDb(): void {
     if (this.blockedUsersBatch.length === 0) return;
-    const batch = [...this.blockedUsersBatch];
+    const uniqueIds = Array.from(new Set(this.blockedUsersBatch));
     this.blockedUsersBatch = [];
 
+    const deactivateMany = (this.userDao as any).db.transaction((ids: number[]) => {
+      for (const id of ids) {
+        this.userDao.deactivateUser(id);
+      }
+    });
+
     try {
-      const placeholders = batch.map(() => "?").join(",");
-      (this.userDao as any).db
-        .prepare(`UPDATE users SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE telegram_id IN (${placeholders})`)
-        .run(...batch);
-      console.log(`🧹 [NotificationDispatcher] Deactivated ${batch.length} blocked users in database batch.`);
+      deactivateMany(uniqueIds);
+      console.log(`🧹 [NotificationDispatcher] Deactivated ${uniqueIds.length} unique blocked users in DB transaction.`);
     } catch (e: any) {
       console.error("[NotificationDispatcher] Error persisting blocked users to DB:", e.message);
     }

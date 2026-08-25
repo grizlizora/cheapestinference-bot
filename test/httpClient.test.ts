@@ -7,38 +7,38 @@ describe("RobustHttpClient", () => {
   const proxyPool = new ProxyPool(undefined, true);
   const client = new RobustHttpClient(proxyPool);
 
-  it("should correctly decompress gzip payloads", () => {
+  it("should correctly decompress gzip payloads", async () => {
     const rawText = JSON.stringify({ success: true, test: "gzip_payload" });
     const gzipped = zlib.gzipSync(Buffer.from(rawText));
 
-    const decompressed = (client as any).decompressBody(gzipped, "gzip");
+    const decompressed = await (client as any).decompressBodyAsync(gzipped, "gzip");
     expect(decompressed).toBe(rawText);
     expect(JSON.parse(decompressed).test).toBe("gzip_payload");
   });
 
-  it("should correctly decompress brotli payloads", () => {
+  it("should correctly decompress brotli payloads", async () => {
     const rawText = JSON.stringify({ success: true, test: "brotli_payload" });
     const brotlied = zlib.brotliCompressSync(Buffer.from(rawText));
 
-    const decompressed = (client as any).decompressBody(brotlied, "br");
+    const decompressed = await (client as any).decompressBodyAsync(brotlied, "br");
     expect(decompressed).toBe(rawText);
     expect(JSON.parse(decompressed).test).toBe("brotli_payload");
   });
 
-  it("should correctly decompress deflate payloads", () => {
+  it("should correctly decompress deflate payloads", async () => {
     const rawText = JSON.stringify({ success: true, test: "deflate_payload" });
     const deflated = zlib.deflateSync(Buffer.from(rawText));
 
-    const decompressed = (client as any).decompressBody(deflated, "deflate");
+    const decompressed = await (client as any).decompressBodyAsync(deflated, "deflate");
     expect(decompressed).toBe(rawText);
     expect(JSON.parse(decompressed).test).toBe("deflate_payload");
   });
 
-  it("should fallback to raw deflate decompression on raw deflate streams", () => {
+  it("should fallback to raw deflate decompression on raw deflate streams", async () => {
     const rawText = JSON.stringify({ success: true, test: "raw_deflate_payload" });
     const rawDeflated = zlib.deflateRawSync(Buffer.from(rawText));
 
-    const decompressed = (client as any).decompressBody(rawDeflated, "deflate");
+    const decompressed = await (client as any).decompressBodyAsync(rawDeflated, "deflate");
     expect(decompressed).toBe(rawText);
     expect(JSON.parse(decompressed).test).toBe("raw_deflate_payload");
   });

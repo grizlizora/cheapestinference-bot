@@ -32,10 +32,10 @@ export class SubscriptionDAO {
           OR (s.pool_slug = ? AND s.block_id = ?)
         )
         AND (
-          (? = 'available' AND s.notify_on_available = 1)
-          OR (? = 'sold_out' AND s.notify_on_sold_out = 1)
-          OR (? = 'models' AND s.notify_on_models = 1)
-          OR (? = 'prices' AND s.notify_on_prices = 1)
+          (? = 'available' AND s.notify_on_available = 1 AND COALESCE(u.notify_available_global, 1) = 1)
+          OR (? = 'sold_out' AND s.notify_on_sold_out = 1 AND COALESCE(u.notify_sold_out_global, 0) = 1)
+          OR (? = 'models' AND s.notify_on_models = 1 AND COALESCE(u.notify_models_global, 1) = 1)
+          OR (? = 'prices' AND s.notify_on_prices = 1 AND COALESCE(u.notify_prices_global, 1) = 1)
         )
     `);
 
@@ -114,6 +114,7 @@ export class SubscriptionDAO {
   /**
    * Cascading Master Toggle for an entire pool:
    * Toggling "Весь пул" synchronizes the pool ('ALL') and all its regional blocks ('asia', 'europe', 'americas').
+   * Also deactivates 'ALL:ALL' if the pool is turned off.
    */
   togglePoolWithBlocks(userId: number, poolSlug: string, blockIds: string[] = ["asia", "europe", "americas"]): boolean {
     const isCurrentlySubscribed = this.hasSubscription(userId, poolSlug, "ALL");
@@ -124,6 +125,9 @@ export class SubscriptionDAO {
       for (const b of blockIds) {
         this.setSubscription(userId, poolSlug, b, newState);
       }
+      if (!newState) {
+        this.setSubscription(userId, "ALL", "ALL", false);
+      }
     });
     tx();
 
@@ -133,6 +137,7 @@ export class SubscriptionDAO {
   /**
    * Child Block Toggle:
    * Toggles a single regional block, and auto-updates the parent "Весь пул" state if all blocks are now active or not.
+   * Also deactivates 'ALL:ALL' if any block is turned off.
    */
   toggleBlockAndUpdatePool(
     userId: number,
@@ -157,6 +162,9 @@ export class SubscriptionDAO {
       }
 
       this.setSubscription(userId, poolSlug, "ALL", allActive);
+      if (!newBlockState) {
+        this.setSubscription(userId, "ALL", "ALL", false);
+      }
     });
     tx();
 

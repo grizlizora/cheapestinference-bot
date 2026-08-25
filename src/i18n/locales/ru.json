@@ -47,7 +47,7 @@
     "global_enabled": "ВКЛЮЧЕНО ✅",
     "global_disabled": "ВЫКЛЮЧЕНО ❌",
     "sound_enabled": "Звук включен 🔊",
-    "sound_muted": "Без звуку 🔇",
+    "sound_muted": "Без звука 🔇",
     "filter_on": "ВКЛЮЧЕНО ✅",
     "filter_off": "ВЫКЛЮЧЕНО ❌",
     "btn_toggle_avail_on": "⚡ Свободные слоты: ВКЛ ✅",
@@ -110,7 +110,8 @@
     "batch_title": "🚨 <b>Обновления CheapestInference ({count})</b>",
     "batch_price_update": "🏷️ Изменение цены",
     "btn_claim_slot": "🚀 Оформить слот на сайте",
-    "btn_open_pool": "🔎 Посмотреть пул в боте"
+    "btn_open_pool": "🔎 Просмотреть пул в боте",
+    "price_drop_badge": "Снижение цены! 🔥"
   },
   "intelligence": {
     "tag_high_demand": "🔥 Высокий спрос",

@@ -182,6 +182,19 @@ export class SubscriberInvertedIndex {
   /**
    * Fast-path Write-Through update on user subscription change
    */
+  private removeIndexEntry(key: string, userId: number): void {
+    const set = this.index.get(key);
+    if (set) {
+      set.delete(userId);
+      if (set.size === 0) {
+        this.index.delete(key);
+      }
+    }
+  }
+
+  /**
+   * Fast-path Write-Through update on user subscription change
+   */
   public updateSubscription(
     userId: number,
     poolSlug: string,
@@ -200,19 +213,19 @@ export class SubscriberInvertedIndex {
 
     if (flags.available !== undefined) {
       if (flags.available) this.addIndexEntry(availKey, userId);
-      else this.index.get(availKey)?.delete(userId);
+      else this.removeIndexEntry(availKey, userId);
     }
     if (flags.soldOut !== undefined) {
       if (flags.soldOut) this.addIndexEntry(soldKey, userId);
-      else this.index.get(soldKey)?.delete(userId);
+      else this.removeIndexEntry(soldKey, userId);
     }
     if (flags.models !== undefined) {
       if (flags.models) this.addIndexEntry(modelKey, userId);
-      else this.index.get(modelKey)?.delete(userId);
+      else this.removeIndexEntry(modelKey, userId);
     }
     if (flags.prices !== undefined) {
       if (flags.prices) this.addIndexEntry(priceKey, userId);
-      else this.index.get(priceKey)?.delete(userId);
+      else this.removeIndexEntry(priceKey, userId);
     }
   }
 
