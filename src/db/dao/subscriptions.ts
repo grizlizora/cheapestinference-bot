@@ -113,6 +113,19 @@ export class SubscriptionDAO {
     return !!row;
   }
 
+  getSubscriptionStats(): { totalRules: number; subscribedUsers: number } {
+    const row = this.db.prepare(`
+      SELECT 
+        COUNT(*) as total_rules,
+        COUNT(DISTINCT user_id) as subscribed_users
+      FROM subscriptions
+    `).get() as any;
+    return {
+      totalRules: Number(row?.total_rules || 0),
+      subscribedUsers: Number(row?.subscribed_users || 0),
+    };
+  }
+
   toggleSubscription(userId: number, poolSlug: string, blockId: string): boolean {
     const exists = this.hasSubscription(userId, poolSlug, blockId);
     if (exists) {

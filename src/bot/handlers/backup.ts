@@ -72,7 +72,7 @@ export function createBackupHandler(
       const sha256Hash = await computeFileSha256(tmpBackupPath);
 
       const userStats = userDao.getUserStats();
-      const activeSubs = subDao.getTotalActiveSubscriptions();
+      const subStats = subDao.getSubscriptionStats();
 
       const caption = [
         `💾 <b>CheapestInference SQLite Database Snapshot</b>`,
@@ -81,7 +81,7 @@ export function createBackupHandler(
         `📦 <b>File Size:</b> <code>${sizeMb} MB</code> (${fileStats.size.toLocaleString()} bytes)`,
         `⚡ <b>Snapshot Time:</b> <code>${durationMs}ms</code>`,
         `👥 <b>Total Users:</b> <code>${userStats.total}</code> (Active: ${userStats.active})`,
-        `🔔 <b>Active Subscriptions:</b> <code>${activeSubs}</code>`,
+        `🔔 <b>Subscribed Users:</b> <code>${subStats.subscribedUsers}</code> (${subStats.totalRules} rule matrix rows)`,
         `🔒 <b>SHA-256:</b> <code>${sha256Hash.substring(0, 16)}...${sha256Hash.substring(48)}</code>`,
       ].join("\n");
 

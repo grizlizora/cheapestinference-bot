@@ -42,8 +42,8 @@
   "settings": {
     "title": "⚙️ <b>Налаштування та безпека</b>\n\n🆔 <b>Ваш Telegram ID:</b> <code>{telegram_id}</code>\n👤 <b>Користувач:</b> {username}\n🌐 <b>Мова інтерфейсу:</b> {language}\n\nОберіть потрібний розділ:",
     "btn_language": "🌐 Зміна мови",
-    "btn_help": "ℹ️ Довідка та зв'язок з автором",
-    "btn_integrity": "🛡️ Перевірка автентичності коду (GitHub)"
+    "btn_help": "ℹ️ Довідка та підтримка",
+    "btn_integrity": "🛡️ Перевірка коду (GitHub)"
   },
   "integrity": {
     "title": "🛡️ <b>Криптографічний Zero-Trust Верифікатор</b>\n\nВи можете миттєво перевірити, чи код цього запущеного бота відповідає офіційному репозиторію GitHub без жодних сторонніх модифікацій чи заглушок.",
@@ -63,9 +63,9 @@
     "no_data": "⚠️ Дані для <b>{pool}</b> ще завантажуються. Спробуйте оновити за мить.",
     "model_item": "  • <code>{model_name}</code>",
     "block_row": "{block_icon} <b>{block_name}</b> ({hours_utc}):\n   {status_badge} — <b>${price}/міс</b>",
-    "btn_subscribe_pool": "🔔 Підписатися на весь пул {pool_name}",
-    "btn_unsubscribe_pool": "🔕 Відписатися від пулу {pool_name}",
-    "btn_pool_filters": "⚙️ Фільтри тарифу {pool_name}",
+    "btn_subscribe_pool": "🔔 Підписатися на {pool_name}",
+    "btn_unsubscribe_pool": "🔕 Відписатися від {pool_name}",
+    "btn_pool_filters": "⚙️ Фільтри {pool_name}",
     "btn_open_site": "🛒 Замовити на сайті"
   },
   "pool_settings": {
@@ -78,7 +78,7 @@
     "btn_models_off": "🆕 Моделі: ❌",
     "btn_prices_on": "🏷 Ціни: ✅",
     "btn_prices_off": "🏷 Ціни: ❌",
-    "btn_back_to_pool": "⬅️ Назад до тарифу {pool_name}",
+    "btn_back_to_pool": "⬅️ Назад до {pool_name}",
     "toast_filter_updated": "✅ Фільтр оновлено!"
   },
   "subscriptions": {
@@ -171,11 +171,12 @@
     "tip_stable_historical": "⏱ <i>Середній час у наявності: {duration}.</i>"
   },
   "admin": {
-    "stats_title": "📊 <b>Панель адміністратора & Телеметрія</b>\n\n🟢 <b>Статус системи:</b> {status}\n⏱ <b>Аптайм:</b> {uptime}\n\n👥 <b>Користувачі:</b>\n• Всього зареєстровано: <b>{total_users}</b>\n• Активних спостерігачів: <b>{active_users}</b>\n• Заблокували бота: <b>{blocked_users}</b>\n• Активних правил підписок: <b>{active_subscriptions}</b>\n\n🕷 <b>Скрейпер & Anti-Ban:</b>\n• Останнє опитування: <b>{last_scrape_ago}</b> (Затримка: {latency}мс)\n• Джерело даних: <code>{source}</code>\n• Помилок поспіль: <b>{consecutive_failures}</b>\n• Режим Tor / Проксі: <b>{proxy_status}</b>\n\n💾 <b>Пам'ять процесу:</b> <b>{memory_mb} MB</b>\n🔔 <b>Сповіщення про нових користувачів:</b> <b>{new_users_status}</b>",
+    "stats_title": "📊 <b>Панель адміністратора & Телеметрія</b>\n\n🟢 <b>Статус системи:</b> {status}\n⏱ <b>Аптайм:</b> {uptime}\n\n👥 <b>Користувачі та підписки:</b>\n• Всього зареєстровано: <b>{total_users}</b>\n• Активних користувачів: <b>{active_users}</b>\n• Заблокували бота: <b>{blocked_users}</b>\n• Підписаних на алерти: <b>{subscribed_users}</b>\n• Записів у матриці правил: <b>{active_subscriptions}</b> <i>(1 Global + 3 пули × 3 блоки)</i>\n\n🕷 <b>Скрейпер & Anti-Ban:</b>\n• Останнє опитування: <b>{last_scrape_ago}</b> (Затримка: {latency}мс)\n• Джерело даних: <code>{source}</code>\n• Помилок поспіль: <b>{consecutive_failures}</b>\n• Режим Tor / Проксі: <b>{proxy_status}</b>\n\n💾 <b>Пам'ять процесу:</b> <b>{memory_mb} MB</b>\n🔔 <b>Сповіщення про нових користувачів:</b> <b>{new_users_status}</b>",
     "unauthorized": "⛔ <b>Доступ обмежено.</b> Ця команда доступна лише адміністраторам бота.\n\n🆔 <b>Ваш Telegram ID:</b> <code>{telegram_id}</code>\n\nℹ️ <i>Щоб активувати права, додайте ваш Telegram ID у змінну ADMIN_USER_IDS на хостингу або введіть команду <code>/admin &lt;пароль&gt;</code>.</i>",
+    "owner_unauthorized": "⛔ Доступ до атестації хмарного вузла має виключно Головний Автор (@grizlizora).",
     "claim_success": "🎉 <b>Вітаємо!</b> Ви успішно активували права адміністратора бота.",
-    "btn_test_alert": "🧪 Надіслати тест",
-    "btn_cloud_node": "🛡️ Активація Вузла",
+    "btn_test_alert": "🧪 Тест-алерт",
+    "btn_cloud_node": "🛡️ Хмарний вузол",
     "btn_backup": "💾 Завантажити бекап",
     "btn_toggle_new_users_on": "🔔 Нові користувачі: ✅",
     "btn_toggle_new_users_off": "🔔 Нові користувачі: ❌",
@@ -184,7 +185,9 @@
     "toast_test_alert_sent": "🚀 Тестове сповіщення надіслано!",
     "test_alert_sending": "🧪 <i>Надсилаю реалістичне тестове сповіщення про відкриття слота...</i>",
     "backup_in_progress": "⏳ <i>Формування бекапу бази даних SQLite (`VACUUM INTO`)...</i>",
-    "new_user_alert": "👤 <b>Новий користувач у боті!</b>\n━━━━━━━━━━━━━━━━━━━━━━━━\n• <b>Ім'я:</b> <code>{first_name}</code>\n• <b>Username:</b> {username}\n• <b>Telegram ID:</b> <code>{telegram_id}</code>\n• <b>Мова інтерфейсу:</b> {language}\n• <b>Всього користувачів:</b> <code>{total_users}</code>"
+    "cloud_node_title": "🛡️ <b>Авторизація Хмарного Вузла (Cloud Node)</b>\n\n🖥 <b>Node ID:</b> <code>{node_id}</code>\n🌐 <b>Хост:</b> <code>{hostname}</code>\n💻 <b>Платформа:</b> <code>{platform}</code>\n🕒 <b>Час запуску:</b> <code>{boot_time}</code>\n\n📋 <b>Однорядкова команда для активації на вашому Mac:</b>\n<code>cd \"/Users/roman/Downloads/telegram bot cheapestinference\" && npm run activate:cloud -- --node={node_id} --token={token} && git add docs/ && git commit -m \"chore: authorize cloud node {node_id}\" && git push origin main</code>\n\n<i>Після виконання команди на вашому комп'ютері хмарний вузол буде офіційно зафіксовано на GitHub Pages!</i>",
+    "btn_open_gh_pages": "🔍 Відкрити GitHub Pages",
+    "new_user_alert": "👤 <b>Новий користувач у боті!</b>\n━━━━━━━━━━━━━━━━━━━━━━━━\n• <b>Ім'я:</b> <code>{first_name}</code>\n• <b>Username:</b> {username}\\n• <b>Telegram ID:</b> <code>{telegram_id}</code>\n• <b>Мова інтерфейсу:</b> {language}\n• <b>Всього користувачів:</b> <code>{total_users}</code>"
   },
   "help_text": "ℹ️ <b>Як працює цей бот?</b>\n\n1. Бот цілодобово перевіряє сторінку <a href=\"https://cheapestinference.com/pools\">cheapestinference.com/pools</a> через захищений анонімний Tor/проксі канал.\n2. Кожен тариф ділиться на три щоденні 8-годинні часові блоки (Азія, Європа, Америка).\n3. Ви можете переглядати актуальну наявність слотів у реальному часі за допомогою кнопок меню.\n4. Натисніть на потрібний тариф на головному екрані, щоб налаштувати персональні сповіщення.\n5. Щойно слот з'являється — ви миттєво отримуєте повідомлення з прямою кнопкою на замовлення!\n\n🆔 <b>Ваш Telegram ID:</b> <code>{telegram_id}</code>\n\n👨‍💻 <b>Зв'язок з автором / Підтримка:</b>\nTelegram: <a href=\"https://t.me/grizlizora\">@grizlizora</a>"
 }

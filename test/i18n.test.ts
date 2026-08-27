@@ -47,7 +47,7 @@ describe("i18n subsystem", () => {
 
   it("should interpolate template variables correctly", () => {
     const textUk = translate("uk", "pool_detail.btn_subscribe_pool", { pool_name: "FLAGSHIP" });
-    expect(textUk).toBe("🔔 Підписатися на весь пул FLAGSHIP");
+    expect(textUk).toBe("🔔 Підписатися на FLAGSHIP");
 
     const slotUk = translate("uk", "subscriptions.slot_active", { name: "🌏 Азія", hours: "00-08" });
     expect(slotUk).toBe("✅ 🌏 Азія (00-08)");

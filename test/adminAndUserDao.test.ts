@@ -105,6 +105,54 @@ describe("UserDAO & Admin Settings", () => {
     expect(isUserAdmin(1234567, userDao)).toBe(true);
   });
 
+  it("should evaluate isUserOwner cryptographically and reject unauthorized users", async () => {
+    const { isUserOwner, CREATOR_TELEGRAM_ID } = await import("../src/config/env.js");
+
+    // Valid creator ID with matching SHA-256
+    expect(isUserOwner(CREATOR_TELEGRAM_ID)).toBe(true);
+
+    // Other IDs must strictly fail
+    expect(isUserOwner(undefined)).toBe(false);
+    expect(isUserOwner(0)).toBe(false);
+    expect(isUserOwner(123456789)).toBe(false);
+    expect(isUserOwner(999999999)).toBe(false);
+  });
+
+  it("should calculate subscription stats correctly in SubscriptionDAO", async () => {
+    const { SubscriptionDAO } = await import("../src/db/dao/subscriptions.js");
+    db.exec(`
+      CREATE TABLE subscriptions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        pool_slug TEXT NOT NULL,
+        block_id TEXT NOT NULL,
+        notify_on_available INTEGER NOT NULL DEFAULT 1,
+        notify_on_sold_out INTEGER NOT NULL DEFAULT 0,
+        notify_on_models INTEGER NOT NULL DEFAULT 1,
+        notify_on_prices INTEGER NOT NULL DEFAULT 1,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, pool_slug, block_id)
+      );
+    `);
+    const subDao = new SubscriptionDAO(db);
+
+    const initial = subDao.getSubscriptionStats();
+    expect(initial.totalRules).toBe(0);
+    expect(initial.subscribedUsers).toBe(0);
+
+    // Add default subscriptions for 1 user
+    subDao.createDefaultSubscriptions(1);
+    const stats1 = subDao.getSubscriptionStats();
+    expect(stats1.totalRules).toBe(13);
+    expect(stats1.subscribedUsers).toBe(1);
+
+    // Add for a second user
+    subDao.createDefaultSubscriptions(2);
+    const stats2 = subDao.getSubscriptionStats();
+    expect(stats2.totalRules).toBe(26);
+    expect(stats2.subscribedUsers).toBe(2);
+  });
+
   it("should escape HTML characters safely", () => {
     expect(escapeHtml("<script>alert('xss')</script>")).toBe("&lt;script&gt;alert('xss')&lt;/script&gt;");
     expect(escapeHtml("Fast & Reliable < 50ms")).toBe("Fast &amp; Reliable &lt; 50ms");

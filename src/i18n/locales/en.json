@@ -42,8 +42,8 @@
   "settings": {
     "title": "⚙️ <b>Settings & Security</b>\n\n🆔 <b>Your Telegram ID:</b> <code>{telegram_id}</code>\n👤 <b>User:</b> {username}\n🌐 <b>Interface Language:</b> {language}\n\nSelect a section to configure:",
     "btn_language": "🌐 Change Language",
-    "btn_help": "ℹ️ Help & Author Contact",
-    "btn_integrity": "🛡️ Code Integrity Verification (GitHub)"
+    "btn_help": "ℹ️ Help & Support",
+    "btn_integrity": "🛡️ Code Verification (GitHub)"
   },
   "integrity": {
     "title": "🛡️ <b>Cryptographic Zero-Trust Code Verifier</b>\n\nInstantly verify whether the running bot's codebase matches the official GitHub repository without any third-party modifications or fake stubs.",
@@ -65,7 +65,7 @@
     "block_row": "{block_icon} <b>{block_name}</b> ({hours_utc}):\n   {status_badge} — <b>${price}/mo</b>",
     "btn_subscribe_pool": "🔔 Subscribe to {pool_name}",
     "btn_unsubscribe_pool": "🔕 Unsubscribe from {pool_name}",
-    "btn_pool_filters": "⚙️ Alert Settings ({pool_name})",
+    "btn_pool_filters": "⚙️ Filters ({pool_name})",
     "btn_open_site": "🛒 Order on website"
   },
   "pool_settings": {
@@ -171,12 +171,13 @@
     "tip_stable_historical": "⏱ <i>Average availability window: {duration}.</i>"
   },
   "admin": {
-    "stats_title": "📊 <b>Admin Dashboard & System Telemetry</b>\n\n🟢 <b>System Health:</b> {status}\n⏱ <b>Uptime:</b> {uptime}\n\n👥 <b>Subscribers:</b>\n• Total Registered: <b>{total_users}</b>\n• Active Watchers: <b>{active_users}</b>\n• Blocked Bot: <b>{blocked_users}</b>\n• Active Alert Rules: <b>{active_subscriptions}</b>\n\n🕷 <b>Scraper & Anti-Ban:</b>\n• Last Poll: <b>{last_scrape_ago}</b> (Latency: {latency}ms)\n• Ingestion Engine: <code>{source}</code>\n• Consecutive Errors: <b>{consecutive_failures}</b>\n• Proxy Circuit: <b>{proxy_status}</b>\n\n💾 <b>Memory Footprint:</b> <b>{memory_mb} MB</b>\n🔔 <b>New User Push Alerts:</b> <b>{new_users_status}</b>",
+    "stats_title": "📊 <b>Admin Dashboard & Telemetry</b>\n\n🟢 <b>System Health:</b> {status}\n⏱ <b>Uptime:</b> {uptime}\n\n👥 <b>Users & Subscriptions:</b>\n• Total Registered: <b>{total_users}</b>\n• Active Users: <b>{active_users}</b>\n• Blocked Bot: <b>{blocked_users}</b>\n• Subscribed Watchers: <b>{subscribed_users}</b>\n• Subscription Matrix Rules: <b>{active_subscriptions}</b> <i>(1 Global + 3 Pools × 3 Blocks)</i>\n\n🕷 <b>Scraper & Anti-Ban:</b>\n• Last Poll: <b>{last_scrape_ago}</b> (Latency: {latency}ms)\n• Ingestion Engine: <code>{source}</code>\n• Consecutive Errors: <b>{consecutive_failures}</b>\n• Proxy Circuit: <b>{proxy_status}</b>\n\n💾 <b>Memory Footprint:</b> <b>{memory_mb} MB</b>\n🔔 <b>New User Push Alerts:</b> <b>{new_users_status}</b>",
     "unauthorized": "⛔ <b>Access Restricted.</b> This command is reserved for bot administrators.\n\n🆔 <b>Your Telegram ID:</b> <code>{telegram_id}</code>\n\nℹ️ <i>To gain admin privileges, add your Telegram ID to ADMIN_USER_IDS in hosting environment variables or authenticate via <code>/admin &lt;password&gt;</code>.</i>",
+    "owner_unauthorized": "⛔ Cloud node attestation is restricted to the Repository Owner (@grizlizora).",
     "claim_success": "🎉 <b>Success!</b> You have successfully claimed bot administrator privileges.",
-    "btn_test_alert": "🧪 Send Test Alert",
-    "btn_cloud_node": "🛡️ Node Activation",
-    "btn_backup": "💾 Download SQLite Backup",
+    "btn_test_alert": "🧪 Test Alert",
+    "btn_cloud_node": "🛡️ Cloud Node",
+    "btn_backup": "💾 Download Backup",
     "btn_toggle_new_users_on": "🔔 New Users: ✅",
     "btn_toggle_new_users_off": "🔔 New Users: ❌",
     "toast_new_users_on": "🔔 Alerts on new user registrations enabled",
@@ -184,6 +185,8 @@
     "toast_test_alert_sent": "🚀 Test restock alert dispatched!",
     "test_alert_sending": "🧪 <i>Dispatching realistic test restock event to queue...</i>",
     "backup_in_progress": "⏳ <i>Generating hot zero-lock SQLite snapshot (`VACUUM INTO`)...</i>",
+    "cloud_node_title": "🛡️ <b>Cloud Node Attestation</b>\n\n🖥 <b>Node ID:</b> <code>{node_id}</code>\n🌐 <b>Host:</b> <code>{hostname}</code>\n💻 <b>Platform:</b> <code>{platform}</code>\n🕒 <b>Boot Time:</b> <code>{boot_time}</code>\n\n📋 <b>1-Click Command for your Mac/PC Terminal:</b>\n<code>cd \"/Users/roman/Downloads/telegram bot cheapestinference\" && npm run activate:cloud -- --node={node_id} --token={token} && git add docs/ && git commit -m \"chore: authorize cloud node {node_id}\" && git push origin main</code>\n\n<i>After running this command, your cloud node will be cryptographically attested on GitHub Pages!</i>",
+    "btn_open_gh_pages": "🔍 Open GitHub Pages",
     "new_user_alert": "👤 <b>New User Onboarded!</b>\n━━━━━━━━━━━━━━━━━━━━━━━━\n• <b>Name:</b> <code>{first_name}</code>\n• <b>Username:</b> {username}\n• <b>Telegram ID:</b> <code>{telegram_id}</code>\n• <b>Interface Language:</b> {language}\n• <b>Total Users:</b> <code>{total_users}</code>"
   },
   "help_text": "ℹ️ <b>How does this bot work?</b>\n\n1. The bot monitors <a href=\"https://cheapestinference.com/pools\">cheapestinference.com/pools</a> 24/7 through isolated, anonymous Tor proxy streams.\n2. Each compute tier is divided into three daily 8-hour regional blocks (Asia, Europe, Americas).\n3. You can inspect live availability anytime from the interactive dashboard.\n4. Tap any pool card on the main dashboard to configure custom event filters.\n5. The moment compute becomes available, you receive an instant alert with a 1-click checkout button!\n\n🆔 <b>Your Telegram ID:</b> <code>{telegram_id}</code>\n\n👨‍💻 <b>Author Contact / Support:</b>\nTelegram: <a href=\"https://t.me/grizlizora\">@grizlizora</a>"

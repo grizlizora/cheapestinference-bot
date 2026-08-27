@@ -33,6 +33,7 @@ export function createLanguageMenu(
     const pendingDeepLink = (ctx.session as any)?.pendingDeepLink;
     if (pendingDeepLink && typeof pendingDeepLink === "string") {
       delete (ctx.session as any).pendingDeepLink;
+      delete (ctx.session as any).fromOnboarding;
       if (pendingDeepLink.startsWith("pool_")) {
         const slug = pendingDeepLink.replace("pool_", "");
         ctx.session.tempPoolSlug = slug;

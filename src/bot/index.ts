@@ -18,7 +18,7 @@ import { createLanguageHandler } from "./handlers/language.js";
 import { createAdminHandler, renderAdminText, createAdminKeyboard } from "./handlers/admin.js";
 import { createBackupHandler } from "./handlers/backup.js";
 import { NotificationDispatcher } from "./notifier/dispatcher.js";
-import { config, isUserAdmin, CREATOR_TELEGRAM_ID } from "../config/env.js";
+import { config, isUserAdmin, isUserOwner, CREATOR_TELEGRAM_ID } from "../config/env.js";
 import {
   translate,
   resolveDefaultLanguage,
@@ -340,21 +340,24 @@ export function createTelegramBot(
   });
 
   bot.callbackQuery("admin_cloud_node", async (ctx) => {
-    if (!(await requireAdmin(ctx))) return;
+    if (!ctx.from || !isUserOwner(ctx.from.id)) {
+      await ctx.answerCallbackQuery({ text: ctx.t("admin.owner_unauthorized"), show_alert: true }).catch(() => {});
+      return;
+    }
     await ctx.answerCallbackQuery().catch(() => {});
     const attestation = nodeActivationEngine.getAttestation();
-    const text =
-      `🛡️ <b>Авторизація Хмарного Вузла (Cloud Node)</b>\n\n` +
-      `🖥 <b>Node ID:</b> <code>${attestation.nodeId}</code>\n` +
-      `🌐 <b>Хост:</b> <code>${escapeHtml(attestation.hostname)}</code>\n` +
-      `💻 <b>Платформа:</b> <code>${escapeHtml(attestation.platform)}</code>\n` +
-      `🕒 <b>Час запуску:</b> <code>${new Date(attestation.bootTimestamp).toISOString()}</code>\n\n` +
-      `📋 <b>Команда для активації на вашому авторизованому ПК:</b>\n` +
-      `<code>${attestation.activationCliCommand}</code>\n\n` +
-      `<i>Після виконання команди на вашому комп'ютері виконайте <code>git push origin main</code> для оновлення GitHub Pages.</i>`;
+    const bootTimeStr = new Date(attestation.bootTimestamp).toISOString();
+
+    const text = ctx.t("admin.cloud_node_title", {
+      node_id: attestation.nodeId,
+      hostname: escapeHtml(attestation.hostname),
+      platform: escapeHtml(attestation.platform),
+      boot_time: bootTimeStr,
+      token: attestation.activationToken.slice(0, 16),
+    });
 
     const keyboard = new InlineKeyboard()
-      .url("🔍 Відкрити GitHub Pages", "https://grizlizora.github.io/cheapestinference-bot/")
+      .url(ctx.t("admin.btn_open_gh_pages"), "https://grizlizora.github.io/cheapestinference-bot/")
       .row()
       .text(ctx.t("common.back"), "admin_refresh");
 

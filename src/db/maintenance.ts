@@ -110,6 +110,18 @@ export class DatabaseMaintenanceManager {
       this.db.pragma("optimize");
     } catch {}
 
+    // 8. Reclaim unused memory buffers back to OS
+    try {
+      this.db.pragma("shrink_memory");
+    } catch {}
+
+    // 9. Request V8 memory compaction if exposure flag is set
+    try {
+      if (typeof global.gc === "function") {
+        global.gc();
+      }
+    } catch {}
+
     return {
       deletedCount: totalDeleted,
       durationMs: Date.now() - start,

@@ -48,11 +48,11 @@ export class RobustHttpClient {
         noDelay: true,
         lookup: (hostname: string, opts: any, cb: any) => this.dnsCache.lookup(hostname, opts, cb),
       },
-      keepAliveTimeout: 45_000, // Below Cloudflare 60s idle timeout
-      keepAliveMaxTimeout: 55_000,
+      keepAliveTimeout: 30_000, // Below Cloudflare idle timeout
+      keepAliveMaxTimeout: 45_000,
       keepAliveTimeoutThreshold: 1000,
       pipelining: 1,
-      connections: 8, // Optimal memory & socket footprint
+      connections: 4, // Optimized memory & socket footprint for low-RAM containers
       strictContentLength: false,
     });
     this.proxyPool.setHttpClient(this);

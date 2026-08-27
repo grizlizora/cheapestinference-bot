@@ -347,10 +347,13 @@ export class NotificationDispatcher {
     try {
       this.lastUserDispatchTime.set(msg.telegramId, Date.now());
 
+      const liveProfile = this.index.getProfileByTgId(msg.telegramId);
+      const disableNotification = liveProfile ? liveProfile.isMuted : msg.isMuted;
+
       await this.bot.api.sendMessage(msg.telegramId, msg.text, {
         parse_mode: "HTML",
         reply_markup: msg.keyboard,
-        disable_notification: msg.isMuted,
+        disable_notification: disableNotification,
         link_preview_options: { is_disabled: true },
       });
 
@@ -967,8 +970,9 @@ export class NotificationDispatcher {
     }
 
     if (this.blockedUsersBatch.length === 0) return;
-    const uniqueIds = Array.from(new Set(this.blockedUsersBatch));
+    const batch = this.blockedUsersBatch;
     this.blockedUsersBatch = [];
+    const uniqueIds = Array.from(new Set(batch));
 
     try {
       this.userDao.deactivateUsersBatch(uniqueIds);
