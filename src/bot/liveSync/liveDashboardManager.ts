@@ -48,7 +48,7 @@ export class LiveDashboardManager {
     options: LiveDashboardManagerOptions = {}
   ) {
     this.registry = options.registry || new ActiveDashboardRegistry();
-    this.heartbeatSyncThrottleMs = options.heartbeatSyncThrottleMs ?? 45_000;
+    this.heartbeatSyncThrottleMs = options.heartbeatSyncThrottleMs ?? 10_000;
     this.targetRatePerSec = options.maxEditsPerSecond ?? 20;
     this.tokenIntervalMs = 1000 / this.targetRatePerSec;
 
@@ -72,17 +72,15 @@ export class LiveDashboardManager {
   }
 
   /**
-   * Slow Path: Invoked on routine heartbeat polls (every ~15-30s)
+   * Invoked on routine heartbeat polls and scrape cycles
    */
   public handleScraperHeartbeat(isModified: boolean): void {
-    if (isModified) return; // Handled by diff_events
-
     const now = Date.now();
     const activeSessions = this.registry.getActiveSessions();
 
     for (const session of activeSessions) {
-      // Throttle sub-minute timestamp edits to keep Telegram UI smooth
-      if (now - session.lastTelegramEditAt >= this.heartbeatSyncThrottleMs) {
+      // If data modified or throttle time elapsed (>=10s), sync live dashboard message
+      if (isModified || (now - session.lastTelegramEditAt >= this.heartbeatSyncThrottleMs)) {
         this.enqueueUpdate(session);
       }
     }
@@ -200,11 +198,13 @@ export class LiveDashboardManager {
     const errorCode = err?.error_code || err?.response?.error_code;
     const desc = err?.description || err?.message || "";
 
-    // 1. Message not modified
+    // 1. Message not modified (normal Telegram response when text is identical)
     if (desc.includes("message is not modified")) {
       session.lastTelegramEditAt = Date.now();
       return;
     }
+
+    console.warn(`⚠️ [LiveDashboard] Edit error for chat ${session.chatId}: ${desc}`);
 
     // 2. Message deleted or too old (>48h) or not found
     if (

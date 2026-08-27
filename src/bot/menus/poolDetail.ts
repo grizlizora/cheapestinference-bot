@@ -240,7 +240,14 @@ export function createPoolDetailMenu(
           if (scraper) {
             await scraper.forceRefresh(3000);
           }
-          await safeEditMessageText(c, renderPoolDetailText(c, poolStateDao, historyDao, scraper));
+          const rendered = renderPoolDetailText(c, poolStateDao, historyDao, scraper);
+          await safeEditMessageText(c, rendered);
+          if (c.chat) {
+            const msgId = c.callbackQuery?.message?.message_id;
+            if (msgId) {
+              dashboardRegistry?.register(c.chat.id, msgId, c.user.id, c.lang, "pool_detail", slug);
+            }
+          }
           try {
             c.menu.update();
           } catch {}

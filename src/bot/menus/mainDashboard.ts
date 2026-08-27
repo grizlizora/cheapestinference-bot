@@ -121,7 +121,14 @@ export function createMainMenuHierarchy(
         if (scraper) {
           await scraper.forceRefresh(3000);
         }
-        await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao, scraper));
+        const rendered = renderDashboardText(ctx, poolStateDao, historyDao, scraper);
+        await safeEditMessageText(ctx, rendered);
+        if (ctx.chat) {
+          const msgId = ctx.callbackQuery?.message?.message_id;
+          if (msgId) {
+            dashboardRegistry?.register(ctx.chat.id, msgId, ctx.user.id, ctx.lang, "dashboard");
+          }
+        }
         try {
           ctx.menu.update();
         } catch {}
