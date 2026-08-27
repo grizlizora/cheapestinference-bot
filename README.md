@@ -6,14 +6,14 @@
 [![Node.js](https://img.shields.io/badge/Node.js-20.x%20LTS-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![grammY](https://img.shields.io/badge/grammY-Telegram%20Framework-2481CC?style=for-the-badge&logo=telegram&logoColor=white)](https://grammy.dev/)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL%20Mode-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
-[![Vitest](https://img.shields.io/badge/Vitest-66%20Tests%20Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)](https://vitest.dev/)
+[![Vitest](https://img.shields.io/badge/Vitest-105%20Tests%20Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)](https://vitest.dev/)
 [![Tor](https://img.shields.io/badge/Tor%20Network-SOCKS5h-7D4698?style=for-the-badge&logo=torproject&logoColor=white)](https://www.torproject.org/)
 [![Docker](https://img.shields.io/badge/Docker-Alpine%20Multi--Stage-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
 <br />
 
-**⚡ Ultra-low-latency 24/7 Telegram drop monitor & alert bot for [CheapestInference.com](https://cheapestinference.com/pools). Instant slot availability alerts with 1-click claim buttons, real-time price drop tracking, dynamic model updates, Tor stream isolation, in-memory inverted index, and zero-lock SQLite.**
+**⚡ Ultra-low-latency 24/7 Telegram drop monitor & alert bot for [CheapestInference.com](https://cheapestinference.com/pools). Instant slot availability alerts with 1-click claim buttons, real-time price drop tracking, predictive availability ETA, Tukey IQR outlier filtering, dynamic model updates, Tor stream isolation, in-memory inverted index, and zero-lock SQLite.**
 
 [🤖 Live Telegram Bot (@cheapestinference_bot)](https://t.me/cheapestinference_bot) • [🏛 Architecture Overview](#-system-architecture) • [📦 Supported Pools & Regional Blocks](#-supported-pools-tiers--regional-blocks) • [👨‍💻 Author & Contact](#-author--collaboration)
 
@@ -31,7 +31,8 @@
   - [2. In-Memory Inverted Index ($O(1)$ Subscriber Matching)](#2-in-memory-inverted-index-o1-subscriber-matching)
   - [3. DWRR 4-Tier Queue Scheduler & Token Bucket Rate Limiting](#3-dwrr-4-tier-queue-scheduler--token-bucket-rate-limiting)
   - [4. Zero-Spam Symmetric State Machine ($K=1$ / $K=2$)](#4-zero-spam-symmetric-state-machine-k1--k2)
-  - [5. Zero-Lock SQLite Architecture with TRUNCATE Checkpointing](#5-zero-lock-sqlite-architecture-with-truncate-checkpointing)
+  - [5. Compact SQLite Architecture with 64MB WAL Truncation Cap](#5-compact-sqlite-architecture-with-64mb-wal-truncation-cap)
+  - [6. Predictive Analytics, Drop Classifier & Fair-Value Price Engine](#6-predictive-analytics-drop-classifier--fair-value-price-engine)
 - [Live In-Place Telegram Dashboard & Per-Tariff Filters](#-live-in-place-telegram-dashboard--per-tariff-filters)
 - [Full-Stack Features Matrix](#-full-stack-features-matrix)
 - [Local Development & Quick Start](#-local-development--quick-start)
@@ -172,6 +173,13 @@ flowchart TD
 * **Dynamic Incremental Vacuum**: Maintenance job drains `freelist_count` in chunks and executes `wal_checkpoint(TRUNCATE)` to release disk space back to the OS.
 * **Debounced Batch Logging**: Notification logs are debounced and written in atomic chunks (every 2s or 100 logs), eliminating disk write serialization.
 * **Zero-Lock Live Backup**: `/backup` command executes `VACUUM INTO` streaming with SHA-256 integrity verification, sending the database directly to the admin on Telegram without locking user operations.
+
+### 6. Predictive Analytics, Drop Classifier & Fair-Value Price Engine
+* **Tukey IQR Outlier Defense & Recency-Weighted EWMA**: Automatically filters out abnormal platform maintenance spikes ($[Q_1 - 1.5 \cdot IQR, Q_3 + 1.5 \cdot IQR]$) and weights recent drops ($w_i = \frac{1}{1 + 0.1 \cdot i}$) to compute true demand categories (`flash` $<5$m, `hot` $5-30$m, `moderate` $30$m$-2$h, `stable` $>2$h).
+* **Time-to-Availability ETA & 24h Harmonic Cadence**: Automatically detects periodic daily resets (e.g. 08:00 UTC unrenewed lease expiries) and computes expected return windows with Median Absolute Deviation (MAD) confidence scoring (`🟢 High confidence (85%)` / `🟡 Medium (65%)` / `⚪ Low (35%)`).
+* **Strict Sample Gating ($N \ge 3$)**: Suppresses speculative ETA and price rating claims until at least 3 verified historical records exist (`📊 Collecting stats (2/3)`).
+* **Drop Pattern Classifier**: Evaluates boundary proximity to `:00` UTC ($\pm 3$ min), multi-region opening concurrency ($K \ge 2$), and catalog mutations to accurately distinguish `BATCH_CAPACITY_EXPANSION` from `UNRENEWED_EXPIRY`.
+* **Fair-Value & All-Time Low (ATL) Pricing Index**: Continuously benchmarks incoming regional prices against historical records in `slot_price_history`, issuing smart tags (`🔥 All-Time Low (ATL)!`, `🟢 Below Average`, `⚖️ Fair Market Value`, `🔴 Above Average`).
 
 ---
 
@@ -315,12 +323,12 @@ npm test
 ```
 
 ```
- Test Files  13 passed (13)
-      Tests  64 passed (64)
-   Duration  0.98s
+ Test Files  21 passed (21)
+      Tests  105 passed (105)
+   Duration  1.25s
 ```
 
-* **13 Test Suites**: Slot Diffing ($K=1$/$K=2$), Bipartite Model Matching, Tor Circuit Isolation, Inverted Index Resolution, Singleflight Polling, DWRR Scheduler, Live Dashboard Sync, Rate Limiting, Multi-Language i18n, and SQLite Migrations.
+* **21 Test Suites**: Real-World Multi-Day Simulation (8 Stages), Slot Diffing ($K=1$/$K=2$), Predictive Analytics & Outlier-Free IQR, Price Rating (ATL / Fair Value), Bipartite Model Matching, Tor Stream Isolation, In-Memory Inverted Index, Singleflight Polling, DWRR Scheduler, Live Dashboard Sync, Rate Limiting, Multi-Language i18n, Turso Cloud Sync, and SQLite Migrations.
 
 ---
 
