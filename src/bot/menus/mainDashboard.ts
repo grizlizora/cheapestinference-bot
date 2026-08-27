@@ -141,6 +141,29 @@ export function createMainMenuHierarchy(
       }
     })
     .text(
+      (ctx) =>
+        (ctx.user.is_muted ?? 0) === 1
+          ? ctx.t("subscriptions.btn_toggle_sound_off")
+          : ctx.t("subscriptions.btn_toggle_sound_on"),
+      async (ctx) => {
+        const val = userDao.toggleMute(ctx.from!.id);
+        ctx.user.is_muted = val;
+        invertedIndex.updateUserPreferences(ctx.from!.id, {
+          isMuted: val === 1,
+        });
+        const toast =
+          val === 1
+            ? ctx.t("subscriptions.toast_sound_muted")
+            : ctx.t("subscriptions.toast_sound_enabled");
+        await ctx.answerCallbackQuery(toast).catch(() => {});
+        await safeEditMessageText(ctx, renderSettingsText(ctx));
+        try {
+          ctx.menu.update();
+        } catch {}
+      }
+    )
+    .row()
+    .text(
       (ctx) => ctx.t("settings.btn_language"),
       async (ctx) => {
         await ctx.answerCallbackQuery().catch(() => {});
@@ -203,32 +226,19 @@ export function createMainMenuHierarchy(
   const mainDashboardMenu = new Menu<BotContext>("main-dashboard-menu")
     .dynamic((ctx, range) => {
       const summaries = poolStateDao.getPoolSummaries();
-      const pools =
-        summaries.length > 0
-          ? summaries.map((s) => ({
-              slug: s.slug,
-              name: s.name,
-              availableCount: s.available_count,
-              totalBlocks: s.total_blocks || 3,
-            }))
-          : [
-              { slug: "flagship", name: "Flagship", availableCount: 0, totalBlocks: 3 },
-              { slug: "frontier", name: "Frontier", availableCount: 0, totalBlocks: 3 },
-              { slug: "core", name: "Core", availableCount: 0, totalBlocks: 3 },
-            ];
-
-      for (const pool of pools) {
-        let icon = "🔴";
-        if (pool.availableCount >= pool.totalBlocks && pool.totalBlocks > 0) {
-          icon = "🟢";
-        } else if (pool.availableCount > 0) {
-          icon = "🟡";
-        } else {
-          icon = "🔴";
-        }
+      for (const pool of summaries) {
+        const availableCount = pool.available_count;
+        const totalBlocks = pool.total_blocks || 3;
+        const icon =
+          availableCount >= totalBlocks && totalBlocks > 0
+            ? "🟢"
+            : availableCount > 0
+            ? "🟡"
+            : "🔴";
+        const shortStatus = `${availableCount}/${totalBlocks}`;
 
         range
-          .text(`${icon} ${pool.name}`, async (c) => {
+          .text(`${icon} ${pool.name} [${shortStatus}]`, async (c) => {
             await c.answerCallbackQuery().catch(() => {});
             c.session.tempPoolSlug = pool.slug;
             if (c.chat) {
@@ -243,18 +253,6 @@ export function createMainMenuHierarchy(
           .row();
       }
     })
-    .text(
-      (ctx) => ctx.t("menu.btn_subscriptions"),
-      async (ctx) => {
-        await ctx.answerCallbackQuery().catch(() => {});
-        if (ctx.chat) {
-          dashboardRegistry?.updateView(ctx.chat.id, "subscriptions");
-        }
-        await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
-        return ctx.menu.nav("subscriptions-menu");
-      }
-    )
-    .row()
     .text(
       (ctx) => ctx.t("common.refresh"),
       async (ctx) => {

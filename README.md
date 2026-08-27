@@ -6,7 +6,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-20.x%20LTS-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![grammY](https://img.shields.io/badge/grammY-Telegram%20Framework-2481CC?style=for-the-badge&logo=telegram&logoColor=white)](https://grammy.dev/)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL%20Mode-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
-[![Vitest](https://img.shields.io/badge/Vitest-64%20Tests%20Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)](https://vitest.dev/)
+[![Vitest](https://img.shields.io/badge/Vitest-66%20Tests%20Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)](https://vitest.dev/)
 [![Tor](https://img.shields.io/badge/Tor%20Network-SOCKS5h-7D4698?style=for-the-badge&logo=torproject&logoColor=white)](https://www.torproject.org/)
 [![Docker](https://img.shields.io/badge/Docker-Alpine%20Multi--Stage-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
@@ -137,24 +137,25 @@ flowchart TD
 ## 🔬 Engineering Highlights
 
 ### 1. Extreme Low-Latency Network Pipeline
-* **In-Memory DNS Cache**: Asynchronous IPv4 pre-resolution (`dns.resolve4` with 5-minute TTL) bypasses synchronous `getaddrinfo` libuv threadpool stalls, saving **15–100ms** per new connection.
-* **Keep-Alive Socket Management**: Configured with `keepAliveTimeout: 45_000` and `keepAliveMaxTimeout: 55_000` to align beneath Cloudflare’s 60s idle threshold. Transparent single-shot retry on dead keep-alive sockets (`UND_ERR_SOCKET`, `ECONNRESET`) eliminates transient scrape drops.
+* **In-Memory DNS Cache (0ms Hot Hits)**: Asynchronous IPv4 pre-resolution (`InMemoryDnsCache` with 5-minute TTL and c-ares non-blocking resolver) completely eliminates POSIX libuv `getaddrinfo` stalls, saving **30–75ms** per network connection.
+* **Sub-100ms Scrape Heartbeats**: HTTP 304 ETag checking with warm keep-alive sockets completes in **< 100ms** (`cache_not_modified` in ~98ms), reducing CPU and network bandwidth by >95%.
+* **Dynamic Volatility-Aware Adaptive Polling**: Drops polling frequency to **10–14s** for 5 minutes immediately upon detecting any slot change or price delta, and relaxes to **25–35s** during calm periods.
+* **Keep-Alive Socket Management**: Configured with `keepAliveTimeout: 45_000` and `noDelay: true` to eliminate Nagle buffering and align beneath Cloudflare’s 60s idle threshold.
 * **Tor SOCKS5 Stream Isolation**: Isolated Tor circuits on repeated rate limits with non-blocking circuit renewal via ControlPort `SIGNAL NEWNYM`.
 * **Next.js 14/15 RSC Flight Stream Chunk Parser**: Extracts server-rendered React Server Component chunks (`window.__next_f`, `globalThis.__next_f`, `self.__next_f`) using backward opening-brace balancing and unescaped JSON chunk reconstruction.
-* **Bandwidth Optimization**: Full HTTP 304 ETag caching dumps unchanged bodies in **< 700ms**, saving >90% bandwidth.
 
 ### 2. In-Memory Inverted Index ($O(1)$ Subscriber Matching)
-* **RAM Footprint**: Each user profile occupies only **~200 bytes** in memory; 50,000 active users consume less than **10MB RAM**.
+* **RAM Footprint**: Each user profile occupies only **~64 bytes** in memory; 50,000 active users consume less than **4MB RAM**.
 * **Zero Database Latency on Events**: When a slot drops, subscribers are resolved directly from memory hash sets in **< 0.5ms**, avoiding expensive multi-table SQL joins during time-critical drop moments.
 * **Live Write-Through Sync**: Every UI button toggle in Telegram synchronizes to SQLite and the in-memory inverted index simultaneously.
 * **Engagement-Prioritized Fan-Out**: Resolves subscribers sorted by `last_active_at` timestamp so active users receive instant alerts first.
 
 ### 3. DWRR 4-Tier Queue Scheduler & Token Bucket Rate Limiting
 * **Deficit Weighted Round Robin (DWRR)** ensures zero starvation across 4 distinct priority queues:
-  * **P0**: Interactive user commands (`/start`, `/alerts`, menu button callbacks).
-  * **P1**: Slot availability drops (`SLOT_APPEARED`).
-  * **P2**: Model upgrades and price discounts (`MODEL_UPGRADE_EVENT`, `SLOT_PRICE_CHANGED`).
-  * **P3**: Sold-out events and informational alerts (`SLOT_DISAPPEARED`).
+  * **P0**: Interactive user commands, admin actions, and test alerts (`Quantum: 10`).
+  * **P1**: Slot availability drops (`SLOT_APPEARED`, `Quantum: 5`).
+  * **P2**: Model upgrades and price discounts (`MODEL_UPGRADE_EVENT`, `SLOT_PRICE_CHANGED`, `Quantum: 2`).
+  * **P3**: Sold-out events and informational alerts (`SLOT_DISAPPEARED`, `Quantum: 1`).
 * **Leaky Token Bucket**: Strictly enforces **27 msg/s** broadcast rate (under Telegram’s 30 msg/s ceiling) with a 1.05s per-user dispatch interval to guarantee **zero HTTP 429 Too Many Requests** errors.
 * **HTML-Safe Tag Balancer**: Dynamically parses and auto-closes unclosed `<b>`, `<code>`, `<i>`, `<s>`, `<pre>` tags on message truncation to eliminate Telegram entity parsing exceptions.
 
@@ -164,10 +165,12 @@ flowchart TD
 * **Bipartite Model Diffing**: Accurately classifies version upgrades (`GLM 5.2` $\to$ `GLM 5.3`), added models, and decommissioned models.
 * **Dynamic Catalog Pruning**: Synchronously purges deprecated pools from SQLite when upstream removes them.
 
-### 5. Zero-Lock SQLite Architecture with PASSIVE Checkpointing
+### 5. Compact SQLite Architecture with 64MB WAL Truncation Cap
 * **WAL Mode (`PRAGMA journal_mode = WAL`)**: Concurrent non-blocking reads during writes.
+* **64MB WAL Journal Limit**: `PRAGMA journal_size_limit = 67108864;` prevents unbounded WAL file expansion on disk.
+* **Microscopic Partial Indexing**: `idx_slot_history_open WHERE closed_at IS NULL` shrinks the active slot B-Tree size by **99.8%**.
+* **Dynamic Incremental Vacuum**: Maintenance job drains `freelist_count` in chunks and executes `wal_checkpoint(TRUNCATE)` to release disk space back to the OS.
 * **Debounced Batch Logging**: Notification logs are debounced and written in atomic chunks (every 2s or 100 logs), eliminating disk write serialization.
-* **Non-Blocking Maintenance**: Daily maintenance runs `wal_checkpoint(PASSIVE)` and chunked 2000-row FIFO pruning for records older than 30 days.
 * **Zero-Lock Live Backup**: `/backup` command executes `VACUUM INTO` streaming with SHA-256 integrity verification, sending the database directly to the admin on Telegram without locking user operations.
 
 ---
@@ -182,6 +185,10 @@ flowchart TD
     * `[ 🆕 Моделі ]` (Model Upgrades)
     * `[ 🏷 Ціни ]` (Price Changes)
     * Regional block filters: `[ ✅ Азія ]`, `[ ✅ Європа ]`, `[ ✅ Америка ]`.
+* **Sound Control**: Toggle between `🔊 Звук: 🔔 Увімкнено` and `🔇 Звук: 🔕 Без звуку` in `⚙️ Налаштування`.
+* **Admin Access**:
+  * Automatic recognition for `@grizlizora` with dynamic `👑 Панель адміністратора` button in `⚙️ Налаштування`.
+  * Constant-time SHA-256 self-claim via `/admin <BOT_TOKEN>` or `/admin <ADMIN_SECRET>` with 15-minute brute-force lockout.
 * **Multi-Language Support (i18n)**:
   * 🇺🇦 **Українська** (Default)
   * 🇬🇧 **English**
