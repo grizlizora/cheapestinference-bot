@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import { TierUpdatedPayload, PoolBasePricePayload } from "../../types/domain.js";
 import { ModelCatalogDiff } from "../../engine/modelSemanticMatcher.js";
+import { tursoCloudSync } from "../tursoSync.js";
 
 export class CatalogHistoryDAO {
   private stmtInsertModelUpgrade: Database.Statement;
@@ -55,6 +56,20 @@ export class CatalogHistoryDAO {
       removed: JSON.stringify(diff.removed),
       all_models: JSON.stringify(diff.currentModels),
     });
+    tursoCloudSync.pushMutation(
+      `INSERT INTO catalog_history (
+        pool_slug, pool_name, event_type, added_models_json, 
+        upgraded_models_json, removed_models_json, all_models_json, detected_at
+      ) VALUES (?, ?, 'MODEL_UPGRADE', ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+      [
+        diff.poolSlug,
+        diff.poolName,
+        JSON.stringify(diff.added),
+        JSON.stringify(diff.upgraded),
+        JSON.stringify(diff.removed),
+        JSON.stringify(diff.currentModels),
+      ]
+    );
   }
 
   public recordTierUpdate(
@@ -69,6 +84,12 @@ export class CatalogHistoryDAO {
       all_models: JSON.stringify(models),
       metadata: JSON.stringify(payload),
     });
+    tursoCloudSync.pushMutation(
+      `INSERT INTO catalog_history (
+        pool_slug, pool_name, event_type, all_models_json, metadata_json, detected_at
+      ) VALUES (?, ?, 'TIER_UPDATE', ?, ?, CURRENT_TIMESTAMP)`,
+      [poolSlug, poolName, JSON.stringify(models), JSON.stringify(payload)]
+    );
   }
 
   public recordBasePriceUpdate(
@@ -85,6 +106,20 @@ export class CatalogHistoryDAO {
       new_price: payload.newMinPrice,
       metadata: JSON.stringify(payload),
     });
+    tursoCloudSync.pushMutation(
+      `INSERT INTO catalog_history (
+        pool_slug, pool_name, event_type, all_models_json,
+        previous_min_price, new_min_price, metadata_json, detected_at
+      ) VALUES (?, ?, 'BASE_PRICE', ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+      [
+        poolSlug,
+        poolName,
+        JSON.stringify(models),
+        payload.previousMinPrice,
+        payload.newMinPrice,
+        JSON.stringify(payload),
+      ]
+    );
   }
 
   public recordSlotPriceChange(
@@ -103,5 +138,11 @@ export class CatalogHistoryDAO {
       price_delta: priceDelta,
       percent_delta: percentDelta,
     });
+    tursoCloudSync.pushMutation(
+      `INSERT INTO slot_price_history (
+        pool_slug, block_id, old_price, new_price, price_delta, percent_delta, changed_at
+      ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+      [poolSlug, blockId, oldPrice, newPrice, priceDelta, percentDelta]
+    );
   }
 }

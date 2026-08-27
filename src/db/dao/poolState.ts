@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import { PoolStateRecord } from "../../types/db.js";
 import { PoolData, PoolsSnapshot } from "../../types/domain.js";
+import { tursoCloudSync } from "../tursoSync.js";
 
 export class PoolStateDAO {
   private stmtGetBySlugAndBlock: Database.Statement;
@@ -84,6 +85,40 @@ export class PoolStateDAO {
             infra_spec: pool.infraSpec || "",
             manual_provisioning: pool.manualProvisioning ? 1 : 0,
           });
+
+          tursoCloudSync.pushMutation(
+            `INSERT INTO pool_state (
+              pool_slug, pool_name, models_json, block_id, status, 
+              hours_utc, price_month, min_price_day, annual_discount, description,
+              infra_spec, manual_provisioning, last_changed_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ON CONFLICT(pool_slug, block_id) DO UPDATE SET
+              pool_name = excluded.pool_name,
+              models_json = excluded.models_json,
+              status = excluded.status,
+              hours_utc = excluded.hours_utc,
+              price_month = excluded.price_month,
+              min_price_day = excluded.min_price_day,
+              annual_discount = excluded.annual_discount,
+              description = excluded.description,
+              infra_spec = excluded.infra_spec,
+              manual_provisioning = excluded.manual_provisioning,
+              updated_at = CURRENT_TIMESTAMP`,
+            [
+              pool.slug,
+              pool.modelName,
+              JSON.stringify(pool.models || []),
+              block.block,
+              block.status,
+              block.hoursUtc,
+              block.pricePerMonth,
+              pool.minPricePerDay || "0.00",
+              typeof pool.annualDiscount === "number" ? pool.annualDiscount : 0.15,
+              pool.description || "",
+              pool.infraSpec || "",
+              pool.manualProvisioning ? 1 : 0,
+            ]
+          );
         }
       }
     });

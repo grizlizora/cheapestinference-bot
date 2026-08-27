@@ -1,4 +1,5 @@
 import Database from "better-sqlite3";
+import { tursoCloudSync } from "../tursoSync.js";
 
 export interface SlotLifecycleRecord {
   id: number;
@@ -71,10 +72,29 @@ export class SlotHistoryDAO {
     priceMonth: string
   ): void {
     this.txRecordOpened(poolSlug, blockId, initialStatus, priceMonth);
+    tursoCloudSync.pushMutation(
+      `UPDATE slot_lifecycle_history 
+       SET closed_at = CURRENT_TIMESTAMP,
+           duration_seconds = CAST((strftime('%s', 'now') - strftime('%s', opened_at)) AS INTEGER)
+       WHERE pool_slug = ? AND block_id = ? AND closed_at IS NULL`,
+      [poolSlug, blockId]
+    );
+    tursoCloudSync.pushMutation(
+      `INSERT INTO slot_lifecycle_history (pool_slug, block_id, initial_status, price_month, opened_at)
+       VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+      [poolSlug, blockId, initialStatus, priceMonth]
+    );
   }
 
   public recordSlotClosed(poolSlug: string, blockId: string): void {
     this.stmtCloseActiveSlot.run(poolSlug, blockId);
+    tursoCloudSync.pushMutation(
+      `UPDATE slot_lifecycle_history 
+       SET closed_at = CURRENT_TIMESTAMP,
+           duration_seconds = CAST((strftime('%s', 'now') - strftime('%s', opened_at)) AS INTEGER)
+       WHERE pool_slug = ? AND block_id = ? AND closed_at IS NULL`,
+      [poolSlug, blockId]
+    );
   }
 
   public getActiveSlot(poolSlug: string, blockId: string): SlotLifecycleRecord | undefined {
