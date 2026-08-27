@@ -10,6 +10,8 @@ import { renderSubscriptionsText } from "../menus/subscriptions.js";
 import { LiveDashboardManager } from "../liveSync/liveDashboardManager.js";
 import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
 
+import { isUserAdmin } from "../../config/env.js";
+
 export function createStartHandler(
   userDao: UserDAO,
   poolStateDao: PoolStateDAO,
@@ -24,6 +26,9 @@ export function createStartHandler(
 ) {
   return async (ctx: BotContext) => {
     if (!ctx.from || !ctx.chat) return;
+
+    // Automatic admin recognition by username (e.g. @grizlizora)
+    isUserAdmin(ctx.from.id, userDao, ctx.from.username);
 
     const match = (ctx as any).match;
     if (ctx.isNewUser) {

@@ -67,7 +67,7 @@ export function createMainMenuHierarchy(
           : ctx.t("admin.btn_toggle_new_users_off");
       },
       async (ctx) => {
-        if (!isUserAdmin(ctx.from?.id, userDao)) return;
+        if (!isUserAdmin(ctx.from?.id, userDao, ctx.from?.username)) return;
         const newVal = userDao.toggleAdminNewUsers(ctx.from!.id);
         await ctx.answerCallbackQuery(
           newVal === 1 ? ctx.t("admin.toast_new_users_on") : ctx.t("admin.toast_new_users_off")
@@ -82,7 +82,7 @@ export function createMainMenuHierarchy(
     .text(
       (ctx) => ctx.t("admin.btn_test_alert"),
       async (ctx) => {
-        if (!isUserAdmin(ctx.from?.id, userDao) || !dispatcher) return;
+        if (!isUserAdmin(ctx.from?.id, userDao, ctx.from?.username) || !dispatcher) return;
         await ctx.answerCallbackQuery({ text: ctx.t("admin.toast_test_alert_sent"), show_alert: false }).catch(() => {});
         await dispatcher.sendTestAlert(ctx.from!.id, ctx.lang, "slot");
       }
@@ -90,7 +90,7 @@ export function createMainMenuHierarchy(
     .text(
       (ctx) => ctx.t("admin.btn_backup"),
       async (ctx) => {
-        if (!isUserAdmin(ctx.from?.id, userDao)) return;
+        if (!isUserAdmin(ctx.from?.id, userDao, ctx.from?.username)) return;
         await ctx.answerCallbackQuery().catch(() => {});
         await createBackupHandler(userDao.db, userDao, subDao)(ctx);
       }
@@ -99,7 +99,7 @@ export function createMainMenuHierarchy(
     .text(
       (ctx) => ctx.t("common.refresh"),
       async (ctx) => {
-        if (!isUserAdmin(ctx.from?.id, userDao)) return;
+        if (!isUserAdmin(ctx.from?.id, userDao, ctx.from?.username)) return;
         await ctx.answerCallbackQuery({ text: ctx.t("common.refreshed_toast"), show_alert: false }).catch(() => {});
         if (scraper && proxyPool) {
           await safeEditMessageText(ctx, renderAdminText(ctx, userDao, subDao, scraper, proxyPool));
@@ -122,7 +122,7 @@ export function createMainMenuHierarchy(
 
   const settingsMenu = new Menu<BotContext>("settings-menu")
     .dynamic((ctx, range) => {
-      if (isUserAdmin(ctx.from?.id, userDao)) {
+      if (isUserAdmin(ctx.from?.id, userDao, ctx.from?.username)) {
         range
           .text(
             (c) => c.t("settings.btn_admin"),
@@ -286,9 +286,6 @@ export function createMainMenuHierarchy(
   mainDashboardMenu.register(poolDetailMenu);
   mainDashboardMenu.register(subscriptionsMenu);
   mainDashboardMenu.register(settingsMenu);
-  mainDashboardMenu.register(languageMenu);
-  mainDashboardMenu.register(helpMenu);
-  mainDashboardMenu.register(adminMenu);
 
   return { mainDashboardMenu, languageMenu, poolDetailMenu, poolSettingsMenu, subscriptionsMenu, helpMenu, settingsMenu, adminMenu };
 }

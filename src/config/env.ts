@@ -61,6 +61,17 @@ const envSchema = z.object({
     .string()
     .default("35")
     .transform((val) => parseInt(val, 10)),
+  ADMIN_USERNAMES: z
+    .string()
+    .default("grizlizora")
+    .transform((val) =>
+      val
+        ? val
+            .split(",")
+            .map((u) => u.trim().replace(/^@/, "").toLowerCase())
+            .filter((u) => u.length > 0)
+        : ["grizlizora"]
+    ),
   ADMIN_SECRET: z.string().optional(),
   SCRAPE_MAX_BACKOFF_SEC: z
     .string()
@@ -82,13 +93,28 @@ function parseEnv(): EnvConfig {
 
 export const config = parseEnv();
 
-export function isUserAdmin(userId?: number, userDao?: { isAdmin: (id: number) => boolean }): boolean {
+export function isUserAdmin(
+  userId?: number,
+  userDao?: { isAdmin: (id: number) => boolean; setAdmin?: (id: number, admin: boolean) => void },
+  username?: string
+): boolean {
   if (!userId) return false;
   if (config.ADMIN_USER_IDS.length > 0 && config.ADMIN_USER_IDS.includes(userId)) {
     return true;
   }
   if (userDao && userDao.isAdmin(userId)) {
     return true;
+  }
+  if (username) {
+    const clean = username.replace(/^@/, "").toLowerCase();
+    if (config.ADMIN_USERNAMES.includes(clean)) {
+      if (userDao && typeof userDao.setAdmin === "function") {
+        try {
+          userDao.setAdmin(userId, true);
+        } catch {}
+      }
+      return true;
+    }
   }
   return false;
 }
