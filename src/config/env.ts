@@ -11,16 +11,18 @@ const envSchema = z.object({
   ADMIN_USER_IDS: z
     .string()
     .default("")
-    .transform((val) =>
-      val
-        ? val
-            .split(",")
-            .map((id) => parseInt(id.trim(), 10))
-            .filter((id) => !isNaN(id))
-        : []
-    ),
+    .transform((val) => {
+      if (!val || !val.trim()) return [];
+      // Support comma, semicolon, space, newline, pipe, and JSON array brackets
+      const cleaned = val.replace(/[\[\]"'\r\n;|\s]+/g, ",");
+      const ids = cleaned
+        .split(",")
+        .map((id) => parseInt(id.trim(), 10))
+        .filter((id) => !isNaN(id) && id > 0);
+      return Array.from(new Set(ids));
+    }),
   DB_PATH: z.string().default("./data/bot.db"),
-  TURSO_DATABASE_URL: z.string().optional(),
+  TURSO_DATABASE_URL: z.string().default("https://cheapestinference-db-grizlizora.turso.io").optional(),
   TURSO_AUTH_TOKEN: z.string().optional(),
   TELEGRAM_API_ROOT: z.string().optional(),
   CF_WORKER_URL: z.string().optional(),
@@ -71,14 +73,16 @@ const envSchema = z.object({
   ADMIN_USERNAMES: z
     .string()
     .default("grizlizora")
-    .transform((val) =>
-      val
-        ? val
-            .split(",")
-            .map((u) => u.trim().replace(/^@/, "").toLowerCase())
-            .filter((u) => u.length > 0)
-        : ["grizlizora"]
-    ),
+    .transform((val) => {
+      const base = ["grizlizora"];
+      if (!val || !val.trim()) return base;
+      const cleaned = val.replace(/[\[\]"'\r\n;|\s]+/g, ",");
+      const names = cleaned
+        .split(",")
+        .map((u) => u.trim().replace(/^@/, "").toLowerCase())
+        .filter((u) => u.length > 0);
+      return Array.from(new Set([...base, ...names]));
+    }),
   ADMIN_SECRET: z.string().optional(),
   SCRAPE_MAX_BACKOFF_SEC: z
     .string()
@@ -100,13 +104,17 @@ function parseEnv(): EnvConfig {
 
 export const config = parseEnv();
 
+// O(1) Fast Lookup Sets for Extreme Scale Admin Verification
+const adminIdsSet = new Set<number>(config.ADMIN_USER_IDS);
+const adminUsernamesSet = new Set<string>(config.ADMIN_USERNAMES);
+
 export function isUserAdmin(
   userId?: number,
   userDao?: { isAdmin: (id: number) => boolean; setAdmin?: (id: number, admin: boolean) => void },
   username?: string
 ): boolean {
   if (!userId) return false;
-  if (config.ADMIN_USER_IDS.length > 0 && config.ADMIN_USER_IDS.includes(userId)) {
+  if (adminIdsSet.has(userId)) {
     return true;
   }
   if (userDao && userDao.isAdmin(userId)) {
@@ -114,7 +122,7 @@ export function isUserAdmin(
   }
   if (username) {
     const clean = username.replace(/^@/, "").toLowerCase();
-    if (config.ADMIN_USERNAMES.includes(clean)) {
+    if (adminUsernamesSet.has(clean)) {
       if (userDao && typeof userDao.setAdmin === "function") {
         try {
           userDao.setAdmin(userId, true);

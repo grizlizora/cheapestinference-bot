@@ -90,7 +90,7 @@ describe("UserDAO & Admin Settings", () => {
     expect(admins).toContain(11111);
   });
 
-  it("should evaluate isUserAdmin strictly", async () => {
+  it("should evaluate isUserAdmin strictly and auto-promote @grizlizora", async () => {
     const { isUserAdmin } = await import("../src/config/env.js");
 
     expect(isUserAdmin(undefined, userDao)).toBe(false);
@@ -103,6 +103,11 @@ describe("UserDAO & Admin Settings", () => {
     userDao.upsertUser({ telegram_id: 1234567, first_name: "VIP" });
     userDao.setAdmin(1234567, true);
     expect(isUserAdmin(1234567, userDao)).toBe(true);
+
+    // Username matching @grizlizora auto-promotes in DB and returns true
+    userDao.upsertUser({ telegram_id: 999111, first_name: "Grizli", username: "grizlizora" });
+    expect(isUserAdmin(999111, userDao, "@grizlizora")).toBe(true);
+    expect(userDao.isAdmin(999111)).toBe(true);
   });
 
   it("should escape HTML characters safely", () => {
