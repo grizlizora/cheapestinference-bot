@@ -102,6 +102,50 @@ export function createPoolDetailMenu(
           }
         )
         .row();
+
+      for (const blockId of blockIds) {
+        const isBlockActive = subDao.hasSubscription(ctx.user.id, slug, blockId);
+        const blockName = translate(ctx.lang, `common.block_${blockId}`) || blockId;
+        const blockRow = blocks.find((b) => b.block_id === blockId);
+        const blockHours = blockRow?.hours_utc || "";
+
+        range
+          .text(
+            isBlockActive
+              ? `✅ ${blockName} (${blockHours})`
+              : `❌ ${blockName} (${blockHours})`,
+            async (c) => {
+              const active = subDao.toggleBlockAndUpdatePool(c.user.id, slug, blockId, blockIds);
+              const parentPoolActive = subDao.hasSubscription(c.user.id, slug, "ALL");
+              const currentFlags = subDao.getPoolFlags(c.user.id, slug);
+              const fullFlags = toFlags(currentFlags);
+
+              const blockFlags = {
+                available: active ? fullFlags.available : false,
+                soldOut: active ? fullFlags.soldOut : false,
+                models: active ? fullFlags.models : false,
+                prices: active ? fullFlags.prices : false,
+              };
+              const poolFlags = {
+                available: parentPoolActive ? fullFlags.available : false,
+                soldOut: parentPoolActive ? fullFlags.soldOut : false,
+                models: parentPoolActive ? fullFlags.models : false,
+                prices: parentPoolActive ? fullFlags.prices : false,
+              };
+
+              invertedIndex.updateSubscription(c.user.id, slug, blockId, blockFlags);
+              invertedIndex.updateSubscription(c.user.id, slug, "ALL", poolFlags);
+
+              const toast = active
+                ? c.t("subscriptions.toast_slot_on", { pool: slug.toUpperCase(), block: blockName })
+                : c.t("subscriptions.toast_slot_off", { pool: slug.toUpperCase(), block: blockName });
+              await c.answerCallbackQuery(toast).catch(() => {});
+              await safeEditMessageText(c, renderPoolSettingsText(c, poolStateDao, subDao));
+              try { c.menu.update(); } catch {}
+            }
+          )
+          .row();
+      }
     })
     .text(
       (ctx) => ctx.t("pool_settings.btn_back_to_pool", { pool_name: (ctx.session.tempPoolSlug || "flagship").toUpperCase() }),

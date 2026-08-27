@@ -112,18 +112,6 @@ export function createMainMenuHierarchy(
       }
     })
     .text(
-      (ctx) => ctx.t("menu.btn_subscriptions"),
-      async (ctx) => {
-        await ctx.answerCallbackQuery().catch(() => {});
-        if (ctx.chat) {
-          dashboardRegistry?.updateView(ctx.chat.id, "subscriptions");
-        }
-        await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
-        return ctx.menu.nav("subscriptions-menu");
-      }
-    )
-    .row()
-    .text(
       (ctx) => ctx.t("common.refresh"),
       async (ctx) => {
         await ctx.answerCallbackQuery({
