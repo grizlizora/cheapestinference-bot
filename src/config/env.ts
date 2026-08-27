@@ -61,6 +61,7 @@ const envSchema = z.object({
     .string()
     .default("35")
     .transform((val) => parseInt(val, 10)),
+  ADMIN_SECRET: z.string().optional(),
   SCRAPE_MAX_BACKOFF_SEC: z
     .string()
     .default("300")
@@ -81,10 +82,16 @@ function parseEnv(): EnvConfig {
 
 export const config = parseEnv();
 
-export function isUserAdmin(userId?: number): boolean {
+export function isUserAdmin(userId?: number, userDao?: { isAdmin: (id: number) => boolean }): boolean {
   if (!userId) return false;
-  return (
-    (config.ADMIN_USER_IDS.length > 0 && config.ADMIN_USER_IDS.includes(userId)) ||
-    (config.NODE_ENV !== "production" && config.ADMIN_USER_IDS.length === 0)
-  );
+  if (config.ADMIN_USER_IDS.length > 0 && config.ADMIN_USER_IDS.includes(userId)) {
+    return true;
+  }
+  if (userDao && userDao.isAdmin(userId)) {
+    return true;
+  }
+  if (config.NODE_ENV !== "production" && config.ADMIN_USER_IDS.length === 0) {
+    return true;
+  }
+  return false;
 }

@@ -34,6 +34,7 @@ describe("NotificationDispatcher Modern Alert & Bundling Test Suite", () => {
         notify_models_global INTEGER NOT NULL DEFAULT 1,
         notify_prices_global INTEGER NOT NULL DEFAULT 1,
         notify_admin_new_users INTEGER NOT NULL DEFAULT 1,
+        is_admin INTEGER NOT NULL DEFAULT 0,
         last_active_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP

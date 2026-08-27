@@ -7,6 +7,7 @@ import { renderDashboardText } from "../menus/mainDashboard.js";
 import { renderPoolDetailText } from "../menus/poolDetail.js";
 import { renderSubscriptionsText } from "../menus/subscriptions.js";
 
+import { LiveDashboardManager } from "../liveSync/liveDashboardManager.js";
 import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
 
 export function createStartHandler(
@@ -18,10 +19,11 @@ export function createStartHandler(
   subDao?: SubscriptionDAO,
   subscriptionsMenu?: any,
   poolDetailMenu?: any,
-  scraper?: ScraperOrchestrator
+  scraper?: ScraperOrchestrator,
+  liveDashboardManager?: LiveDashboardManager
 ) {
   return async (ctx: BotContext) => {
-    if (!ctx.from) return;
+    if (!ctx.from || !ctx.chat) return;
 
     const match = (ctx as any).match;
     if (ctx.isNewUser) {
@@ -39,27 +41,30 @@ export function createStartHandler(
       if (match.startsWith("pool_") && poolDetailMenu) {
         const slug = match.replace("pool_", "");
         ctx.session.tempPoolSlug = slug;
-        await ctx.reply(renderPoolDetailText(ctx, poolStateDao, historyDao, scraper), {
+        const msg = await ctx.reply(renderPoolDetailText(ctx, poolStateDao, historyDao, scraper), {
           reply_markup: poolDetailMenu,
           parse_mode: "HTML",
           link_preview_options: { is_disabled: true },
         });
+        liveDashboardManager?.getRegistry().register(ctx.chat.id, msg.message_id, ctx.user.id, ctx.lang, "pool_detail", slug);
         return;
       }
       if ((match === "alerts" || match === "subscriptions") && subDao && subscriptionsMenu) {
-        await ctx.reply(renderSubscriptionsText(ctx, subDao), {
+        const msg = await ctx.reply(renderSubscriptionsText(ctx, subDao), {
           reply_markup: subscriptionsMenu,
           parse_mode: "HTML",
           link_preview_options: { is_disabled: true },
         });
+        liveDashboardManager?.getRegistry().register(ctx.chat.id, msg.message_id, ctx.user.id, ctx.lang, "subscriptions");
         return;
       }
     }
 
-    await ctx.reply(renderDashboardText(ctx, poolStateDao, historyDao, scraper), {
+    const msg = await ctx.reply(renderDashboardText(ctx, poolStateDao, historyDao, scraper), {
       reply_markup: mainDashboardMenu,
       parse_mode: "HTML",
       link_preview_options: { is_disabled: true },
     });
+    liveDashboardManager?.getRegistry().register(ctx.chat.id, msg.message_id, ctx.user.id, ctx.lang, "dashboard");
   };
 }

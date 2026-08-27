@@ -27,6 +27,8 @@ import {
   SupportedLanguage,
 } from "../i18n/index.js";
 
+import { LiveDashboardManager } from "./liveSync/liveDashboardManager.js";
+
 export function createTelegramBot(
   token: string,
   userDao: UserDAO,
@@ -36,7 +38,7 @@ export function createTelegramBot(
   scraper: ScraperOrchestrator,
   proxyPool: ProxyPool,
   historyDao?: SlotHistoryDAO
-): { bot: Bot<BotContext>; dispatcher: NotificationDispatcher } {
+): { bot: Bot<BotContext>; dispatcher: NotificationDispatcher; liveDashboardManager: LiveDashboardManager } {
   const bot = new Bot<BotContext>(token, {
     client: config.TELEGRAM_API_ROOT
       ? {
@@ -86,9 +88,9 @@ export function createTelegramBot(
 
   // Helper function: Admin verification guard
   const requireAdmin = async (ctx: BotContext): Promise<boolean> => {
-    if (!isUserAdmin(ctx.from?.id)) {
+    if (!isUserAdmin(ctx.from?.id, userDao)) {
       await ctx.answerCallbackQuery({
-        text: ctx.t("admin.unauthorized"),
+        text: ctx.t("admin.unauthorized", { telegram_id: String(ctx.from?.id || "N/A") }),
         show_alert: true,
       }).catch(() => {});
       return false;
@@ -198,7 +200,18 @@ export function createTelegramBot(
 
   bot.use(mainDashboardMenu);
 
-  // 9. Command Handlers
+  // 9. Live Auto-Updating Dashboard Manager
+  const liveDashboardManager = new LiveDashboardManager(
+    bot,
+    poolStateDao,
+    subDao,
+    scraper,
+    mainDashboardMenu,
+    poolDetailMenu,
+    resolvedHistoryDao
+  );
+
+  // 10. Command Handlers
   bot.command(
     "start",
     createStartHandler(
@@ -210,26 +223,45 @@ export function createTelegramBot(
       subDao,
       subscriptionsMenu,
       poolDetailMenu,
-      scraper
+      scraper,
+      liveDashboardManager
     )
   );
 
   bot.command("menu", async (ctx) => {
     const text = renderDashboardText(ctx, poolStateDao, resolvedHistoryDao, scraper);
-    await ctx.reply(text, {
+    const msg = await ctx.reply(text, {
       parse_mode: "HTML",
       reply_markup: mainDashboardMenu,
       link_preview_options: { is_disabled: true },
     });
+    if (ctx.chat && ctx.from) {
+      liveDashboardManager.getRegistry().register(
+        ctx.chat.id,
+        msg.message_id,
+        ctx.user.id,
+        ctx.lang,
+        "dashboard"
+      );
+    }
   });
 
   bot.command(["alerts", "subscriptions"], async (ctx) => {
     const text = renderSubscriptionsText(ctx, subDao);
-    await ctx.reply(text, {
+    const msg = await ctx.reply(text, {
       parse_mode: "HTML",
       reply_markup: subscriptionsMenu,
       link_preview_options: { is_disabled: true },
     });
+    if (ctx.chat && ctx.from) {
+      liveDashboardManager.getRegistry().register(
+        ctx.chat.id,
+        msg.message_id,
+        ctx.user.id,
+        ctx.lang,
+        "subscriptions"
+      );
+    }
   });
 
   bot.command("language", createLanguageHandler(languageMenu));
@@ -238,7 +270,7 @@ export function createTelegramBot(
   bot.command("stats", createAdminHandler(userDao, subDao, scraper, proxyPool));
   bot.command("backup", createBackupHandler(userDao.db, userDao, subDao));
 
-  // 10. Admin Interactive Callback Handlers (Protected by requireAdmin)
+  // 11. Admin Interactive Callback Handlers (Protected by requireAdmin)
   bot.callbackQuery("admin_toggle_new_users", async (ctx) => {
     if (!(await requireAdmin(ctx))) return;
     const newVal = userDao.toggleAdminNewUsers(ctx.from!.id);
@@ -277,18 +309,24 @@ export function createTelegramBot(
       ctx.t("common.btn_contact_author"),
       "https://t.me/grizlizora"
     );
-    await ctx.reply(ctx.t("help_text"), {
-      parse_mode: "HTML",
-      reply_markup: keyboard,
-      link_preview_options: { is_disabled: true },
-    });
+    await ctx.reply(
+      ctx.t("help_text", { telegram_id: String(ctx.from?.id || "N/A") }),
+      {
+        parse_mode: "HTML",
+        reply_markup: keyboard,
+        link_preview_options: { is_disabled: true },
+      }
+    );
   });
 
   // Test notification command (Admin Only)
   bot.command("testalert", async (ctx) => {
     if (!ctx.from) return;
-    if (!isUserAdmin(ctx.from.id)) {
-      await ctx.reply(ctx.t("admin.unauthorized"));
+    if (!isUserAdmin(ctx.from.id, userDao)) {
+      await ctx.reply(
+        ctx.t("admin.unauthorized", { telegram_id: String(ctx.from.id) }),
+        { parse_mode: "HTML" }
+      );
       return;
     }
 
@@ -308,6 +346,7 @@ export function createTelegramBot(
         { command: "alerts", description: "Керування підписками та фільтрами" },
         { command: "language", description: "Змінити мову інтерфейсу" },
         { command: "help", description: "Інструкція та контакт автора" },
+        { command: "admin", description: "Панель адміністратора & керування" },
         { command: "stats", description: "Телеметрія системи (Admin)" },
         { command: "backup", description: "Завантажити бекап бази (Admin)" },
       ],
@@ -323,6 +362,7 @@ export function createTelegramBot(
         { command: "alerts", description: "Управление подписками и фильтрами" },
         { command: "language", description: "Сменить язык интерфейса" },
         { command: "help", description: "Инструкция и контакт автора" },
+        { command: "admin", description: "Панель администратора & управление" },
         { command: "stats", description: "Телеметрия системы (Admin)" },
         { command: "backup", description: "Скачать бэкап базы (Admin)" },
       ],
@@ -337,6 +377,7 @@ export function createTelegramBot(
       { command: "alerts", description: "Manage subscriptions & alert filters" },
       { command: "language", description: "Change language / Змінити мову" },
       { command: "help", description: "How the bot works & author contact" },
+      { command: "admin", description: "Administrator control panel" },
       { command: "stats", description: "System telemetry (Admin)" },
       { command: "backup", description: "Download SQLite database backup (Admin)" },
     ])
@@ -351,5 +392,5 @@ export function createTelegramBot(
     }
   });
 
-  return { bot, dispatcher };
+  return { bot, dispatcher, liveDashboardManager };
 }

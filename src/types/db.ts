@@ -13,6 +13,7 @@ export interface UserRecord {
   notify_models_global: number; // 1 = Enabled, 0 = Disabled
   notify_prices_global: number; // 1 = Enabled, 0 = Disabled
   notify_admin_new_users: number; // 1 = Admin wants new user alerts, 0 = Disabled
+  is_admin?: number; // 1 = Admin, 0 = Regular User
   last_active_at: string;
   created_at: string;
   updated_at: string;

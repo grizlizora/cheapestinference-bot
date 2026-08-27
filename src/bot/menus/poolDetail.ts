@@ -19,7 +19,87 @@ export function createPoolDetailMenu(
   historyDao?: SlotHistoryDAO,
   scraper?: ScraperOrchestrator
 ) {
-  return new Menu<BotContext>("pool-detail-menu")
+  const poolSettingsMenu = new Menu<BotContext>("pool-settings-menu")
+    .dynamic((ctx, range) => {
+      const slug = ctx.session.tempPoolSlug || "flagship";
+      const blocks = poolStateDao.getPoolBlocks(slug);
+      const blockIds = blocks.length > 0 ? blocks.map((b) => b.block_id) : DEFAULT_BLOCK_IDS;
+      const flags = subDao.getPoolFlags(ctx.user.id, slug);
+
+      range
+        .text(
+          flags.available
+            ? ctx.t("pool_settings.btn_avail_on")
+            : ctx.t("pool_settings.btn_avail_off"),
+          async (c) => {
+            const res = subDao.togglePoolEventCategory(c.user.id, slug, "available", blockIds);
+            invertedIndex.updateSubscription(c.user.id, slug, "ALL", { available: res.newState });
+            for (const bId of blockIds) {
+              invertedIndex.updateSubscription(c.user.id, slug, bId, { available: res.newState });
+            }
+            await c.answerCallbackQuery(c.t("pool_settings.toast_filter_updated")).catch(() => {});
+            await safeEditMessageText(c, renderPoolSettingsText(c, poolStateDao, subDao));
+            try { c.menu.update(); } catch {}
+          }
+        )
+        .text(
+          flags.soldOut
+            ? ctx.t("pool_settings.btn_sold_on")
+            : ctx.t("pool_settings.btn_sold_off"),
+          async (c) => {
+            const res = subDao.togglePoolEventCategory(c.user.id, slug, "sold_out", blockIds);
+            invertedIndex.updateSubscription(c.user.id, slug, "ALL", { soldOut: res.newState });
+            for (const bId of blockIds) {
+              invertedIndex.updateSubscription(c.user.id, slug, bId, { soldOut: res.newState });
+            }
+            await c.answerCallbackQuery(c.t("pool_settings.toast_filter_updated")).catch(() => {});
+            await safeEditMessageText(c, renderPoolSettingsText(c, poolStateDao, subDao));
+            try { c.menu.update(); } catch {}
+          }
+        )
+        .row()
+        .text(
+          flags.models
+            ? ctx.t("pool_settings.btn_models_on")
+            : ctx.t("pool_settings.btn_models_off"),
+          async (c) => {
+            const res = subDao.togglePoolEventCategory(c.user.id, slug, "models", blockIds);
+            invertedIndex.updateSubscription(c.user.id, slug, "ALL", { models: res.newState });
+            for (const bId of blockIds) {
+              invertedIndex.updateSubscription(c.user.id, slug, bId, { models: res.newState });
+            }
+            await c.answerCallbackQuery(c.t("pool_settings.toast_filter_updated")).catch(() => {});
+            await safeEditMessageText(c, renderPoolSettingsText(c, poolStateDao, subDao));
+            try { c.menu.update(); } catch {}
+          }
+        )
+        .text(
+          flags.prices
+            ? ctx.t("pool_settings.btn_prices_on")
+            : ctx.t("pool_settings.btn_prices_off"),
+          async (c) => {
+            const res = subDao.togglePoolEventCategory(c.user.id, slug, "prices", blockIds);
+            invertedIndex.updateSubscription(c.user.id, slug, "ALL", { prices: res.newState });
+            for (const bId of blockIds) {
+              invertedIndex.updateSubscription(c.user.id, slug, bId, { prices: res.newState });
+            }
+            await c.answerCallbackQuery(c.t("pool_settings.toast_filter_updated")).catch(() => {});
+            await safeEditMessageText(c, renderPoolSettingsText(c, poolStateDao, subDao));
+            try { c.menu.update(); } catch {}
+          }
+        )
+        .row();
+    })
+    .text(
+      (ctx) => ctx.t("pool_settings.btn_back_to_pool", { pool_name: (ctx.session.tempPoolSlug || "flagship").toUpperCase() }),
+      async (ctx) => {
+        await ctx.answerCallbackQuery().catch(() => {});
+        await safeEditMessageText(ctx, renderPoolDetailText(ctx, poolStateDao, historyDao, scraper));
+        return ctx.menu.nav("pool-detail-menu");
+      }
+    );
+
+  const poolDetailMenu = new Menu<BotContext>("pool-detail-menu")
     .dynamic((ctx, range) => {
       const slug = ctx.session.tempPoolSlug || "flagship";
       const blocks = poolStateDao.getPoolBlocks(slug);
@@ -90,6 +170,16 @@ export function createPoolDetailMenu(
         }
       ).row();
 
+      // Per-Pool Settings button
+      range.text(
+        ctx.t("pool_detail.btn_pool_filters", { pool_name: slug.toUpperCase() }),
+        async (c) => {
+          await c.answerCallbackQuery().catch(() => {});
+          await safeEditMessageText(c, renderPoolSettingsText(c, poolStateDao, subDao));
+          return c.menu.nav("pool-settings-menu");
+        }
+      ).row();
+
       // Refresh button
       range.text(
         (c) => c.t("common.refresh"),
@@ -116,6 +206,34 @@ export function createPoolDetailMenu(
         return ctx.menu.nav("main-dashboard-menu");
       }
     );
+
+  poolDetailMenu.register(poolSettingsMenu);
+  return { poolDetailMenu, poolSettingsMenu };
+}
+
+export function renderPoolSettingsText(
+  ctx: BotContext,
+  poolStateDao: PoolStateDAO,
+  subDao: SubscriptionDAO
+): string {
+  const slug = ctx.session.tempPoolSlug || "flagship";
+  const flags = subDao.getPoolFlags(ctx.user.id, slug);
+  const blocks = poolStateDao.getPoolBlocks(slug);
+  const poolName = blocks[0]?.pool_name || slug.toUpperCase();
+
+  const onText = ctx.t("subscriptions.filter_on");
+  const offText = ctx.t("subscriptions.filter_off");
+
+  return ctx.t("pool_settings.title", {
+    pool_name: escapeHtml(poolName),
+    avail_status: flags.available ? onText : offText,
+    sold_status: flags.soldOut ? onText : offText,
+    model_status: flags.models ? onText : offText,
+    price_status: flags.prices ? onText : offText,
+    pool_status: flags.isSubscribed
+      ? ctx.t("subscriptions.global_enabled")
+      : ctx.t("subscriptions.global_disabled"),
+  });
 }
 
 export function renderPoolDetailText(
@@ -154,12 +272,9 @@ export function renderPoolDetailText(
         ? intelligenceEngine.getSmartStatus(slug, b.block_id, b.status, ctx.lang)
         : null;
 
-      const statusBadge = smart
-        ? smart.badge
-        : b.status === "available"
+      const isAvailable = b.status === "available" || b.status === "limited";
+      const statusBadge = isAvailable
         ? ctx.t("common.status_available")
-        : b.status === "limited"
-        ? ctx.t("common.status_limited")
         : ctx.t("common.status_sold_out");
 
       const icon = b.block_id === "asia" ? "🌏" : b.block_id === "europe" ? "🌍" : "🌎";
@@ -172,7 +287,7 @@ export function renderPoolDetailText(
         price: b.price_month,
       });
 
-      if (smart?.predictionTip && b.status !== "sold-out") {
+      if (smart?.predictionTip && isAvailable) {
         row += `\n   ${smart.predictionTip}`;
       }
 

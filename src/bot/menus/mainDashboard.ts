@@ -44,7 +44,7 @@ export function createMainMenuHierarchy(
   scraper?: ScraperOrchestrator
 ) {
   const languageMenu = createLanguageMenu(userDao, poolStateDao, invertedIndex, historyDao, scraper, subDao);
-  const poolDetailMenu = createPoolDetailMenu(poolStateDao, subDao, invertedIndex, historyDao, scraper);
+  const { poolDetailMenu, poolSettingsMenu } = createPoolDetailMenu(poolStateDao, subDao, invertedIndex, historyDao, scraper);
   const subscriptionsMenu = createSubscriptionsMenu(subDao, userDao, poolStateDao, invertedIndex, historyDao, scraper);
 
   const helpMenu = new Menu<BotContext>("help-menu")
@@ -70,17 +70,25 @@ export function createMainMenuHierarchy(
           ? summaries.map((s) => ({
               slug: s.slug,
               name: s.name,
-              available: s.available_count > 0,
-              isLimited: s.blocks.some((b) => b.status === "limited"),
+              availableCount: s.available_count,
+              totalBlocks: s.total_blocks || 3,
             }))
           : [
-              { slug: "flagship", name: "Flagship", available: false, isLimited: false },
-              { slug: "frontier", name: "Frontier", available: false, isLimited: false },
-              { slug: "core", name: "Core", available: false, isLimited: false },
+              { slug: "flagship", name: "Flagship", availableCount: 0, totalBlocks: 3 },
+              { slug: "frontier", name: "Frontier", availableCount: 0, totalBlocks: 3 },
+              { slug: "core", name: "Core", availableCount: 0, totalBlocks: 3 },
             ];
 
       for (const pool of pools) {
-        const icon = pool.available ? (pool.isLimited ? "🟡" : "🟢") : "🔴";
+        let icon = "🔴";
+        if (pool.availableCount >= pool.totalBlocks && pool.totalBlocks > 0) {
+          icon = "🟢";
+        } else if (pool.availableCount > 0) {
+          icon = "🟡";
+        } else {
+          icon = "🔴";
+        }
+
         range
           .text(`${icon} ${pool.name}`, async (c) => {
             await c.answerCallbackQuery().catch(() => {});
@@ -143,7 +151,7 @@ export function createMainMenuHierarchy(
   mainDashboardMenu.register(languageMenu);
   mainDashboardMenu.register(helpMenu);
 
-  return { mainDashboardMenu, languageMenu, poolDetailMenu, subscriptionsMenu, helpMenu };
+  return { mainDashboardMenu, languageMenu, poolDetailMenu, poolSettingsMenu, subscriptionsMenu, helpMenu };
 }
 
 export function renderDashboardText(
@@ -187,21 +195,14 @@ export function renderDashboardText(
 
   const poolSummariesText = summaries
     .map((p) => {
-      let statusBadge =
-        p.available_count > 0
-          ? ctx.t("common.status_available")
-          : ctx.t("common.status_sold_out");
-
-      if (intelligenceEngine && p.available_count > 0) {
-        for (const b of p.blocks) {
-          if (b.status === "limited" || b.status === "available") {
-            const smart = intelligenceEngine.getSmartStatus(p.slug, b.block, b.status, ctx.lang);
-            if (smart.isHot) {
-              statusBadge = smart.badge;
-              break;
-            }
-          }
-        }
+      const total = p.total_blocks || 3;
+      let statusBadge: string;
+      if (p.available_count >= total && total > 0) {
+        statusBadge = ctx.t("common.status_available");
+      } else if (p.available_count > 0) {
+        statusBadge = ctx.t("common.status_partially_available");
+      } else {
+        statusBadge = ctx.t("common.status_sold_out");
       }
 
       return ctx.t("menu.pool_summary_card", {

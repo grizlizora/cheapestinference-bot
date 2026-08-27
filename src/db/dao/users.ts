@@ -16,11 +16,23 @@ export class UserDAO {
   private stmtDeactivate: Database.Statement;
   private stmtReactivate: Database.Statement;
   private stmtGetStats: Database.Statement;
+  private stmtSetAdmin: Database.Statement;
+  private stmtIsAdmin: Database.Statement;
+  private stmtGetAllAdmins: Database.Statement;
   private txDeactivateBatch: (ids: number[]) => void;
 
   constructor(public readonly db: Database.Database) {
     this.stmtGetByTgId = db.prepare("SELECT * FROM users WHERE telegram_id = ?");
     this.stmtGetById = db.prepare("SELECT * FROM users WHERE id = ?");
+    this.stmtSetAdmin = db.prepare(`
+      UPDATE users SET is_admin = ?, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?
+    `);
+    this.stmtIsAdmin = db.prepare(`
+      SELECT is_admin FROM users WHERE telegram_id = ?
+    `);
+    this.stmtGetAllAdmins = db.prepare(`
+      SELECT telegram_id FROM users WHERE is_admin = 1 AND is_active = 1
+    `);
     this.stmtUpsert = db.prepare(`
       INSERT INTO users (telegram_id, username, first_name, language)
       VALUES (@telegram_id, @username, @first_name, @language)
@@ -171,5 +183,23 @@ export class UserDAO {
       active: Number(row?.active || 0),
       blocked: Number(row?.blocked || 0),
     };
+  }
+
+  setAdmin(tgId: number, isAdmin: boolean): void {
+    this.stmtSetAdmin.run(isAdmin ? 1 : 0, tgId);
+  }
+
+  isAdmin(tgId: number): boolean {
+    const row = this.stmtIsAdmin.get(tgId) as { is_admin: number } | undefined;
+    return Boolean(row && row.is_admin === 1);
+  }
+
+  getAllAdminTelegramIds(envAdminIds: number[] = []): number[] {
+    const dbRows = this.stmtGetAllAdmins.all() as Array<{ telegram_id: number }>;
+    const allIds = new Set<number>(envAdminIds);
+    for (const r of dbRows) {
+      if (r.telegram_id) allIds.add(r.telegram_id);
+    }
+    return Array.from(allIds);
   }
 }

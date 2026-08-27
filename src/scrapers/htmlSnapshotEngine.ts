@@ -208,7 +208,7 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
                   block: String(b.block),
                   hoursUtc: String(b.hoursUtc || ""),
                   pricePerMonth: String(b.pricePerMonth || "0"),
-                  status: String(b.status || "limited"),
+                  status: String(b.status || "available"),
                 })),
                 infraSpec: parsed.infraSpec ? String(parsed.infraSpec) : undefined,
                 manualProvisioning: Boolean(parsed.manualProvisioning),

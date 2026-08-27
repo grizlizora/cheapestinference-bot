@@ -95,8 +95,20 @@ export function createAdminHandler(
   return async (ctx: BotContext) => {
     if (!ctx.from) return;
 
-    if (!isUserAdmin(ctx.from.id)) {
-      await ctx.reply(ctx.t("admin.unauthorized"));
+    // Check if user is attempting to claim admin via secret (/admin <SECRET>)
+    const match = (ctx as any).match;
+    if (typeof match === "string" && match.trim().length > 0) {
+      const secretAttempt = match.trim();
+      if (config.ADMIN_SECRET && secretAttempt === config.ADMIN_SECRET) {
+        userDao.setAdmin(ctx.from.id, true);
+        await ctx.reply(ctx.t("admin.claim_success"), { parse_mode: "HTML" });
+      }
+    }
+
+    if (!isUserAdmin(ctx.from.id, userDao)) {
+      await ctx.reply(ctx.t("admin.unauthorized", { telegram_id: String(ctx.from.id) }), {
+        parse_mode: "HTML",
+      });
       return;
     }
 

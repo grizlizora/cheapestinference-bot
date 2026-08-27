@@ -117,7 +117,7 @@ async function bootstrap() {
   scraper.start();
 
   // 7. Initialize and Start Telegram Bot via grammY runner
-  const { bot, dispatcher } = createTelegramBot(
+  const { bot, dispatcher, liveDashboardManager } = createTelegramBot(
     config.BOT_TOKEN,
     userDao,
     subDao,

@@ -23,6 +23,7 @@ describe("UserDAO & Admin Settings", () => {
         notify_models_global INTEGER NOT NULL DEFAULT 1,
         notify_prices_global INTEGER NOT NULL DEFAULT 1,
         notify_admin_new_users INTEGER NOT NULL DEFAULT 1,
+        is_admin INTEGER NOT NULL DEFAULT 0,
         last_active_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -71,6 +72,22 @@ describe("UserDAO & Admin Settings", () => {
     // Toggle again -> 1 (ON)
     const on = userDao.toggleAdminNewUsers(99999);
     expect(on).toBe(1);
+  });
+
+  it("should support setAdmin, isAdmin, and getAllAdminTelegramIds", () => {
+    userDao.upsertUser({
+      telegram_id: 88888,
+      username: "promotedadmin",
+      first_name: "Admin",
+    });
+
+    expect(userDao.isAdmin(88888)).toBe(false);
+    userDao.setAdmin(88888, true);
+    expect(userDao.isAdmin(88888)).toBe(true);
+
+    const admins = userDao.getAllAdminTelegramIds([11111]);
+    expect(admins).toContain(88888);
+    expect(admins).toContain(11111);
   });
 
   it("should escape HTML characters safely", () => {

@@ -172,16 +172,11 @@ export class SubscriberInvertedIndex {
       }
     }
 
-    // Filter only active users respecting their global user filters
+    // Filter only active users
     const results: PackedUserProfile[] = [];
     for (const userId of matchedUserIds) {
       const profile = this.profiles.get(userId);
       if (profile && profile.isActive) {
-        if (eventType === "available" && !profile.notifyAvailableGlobal) continue;
-        if (eventType === "sold_out" && !profile.notifySoldOutGlobal) continue;
-        if (eventType === "models" && !profile.notifyModelsGlobal) continue;
-        if (eventType === "prices" && !profile.notifyPricesGlobal) continue;
-
         results.push(profile);
       }
     }
