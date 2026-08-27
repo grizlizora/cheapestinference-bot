@@ -36,7 +36,11 @@ async function bootstrap() {
   // 1. Initialize SQLite Database, DAOs & Maintenance
   const db = getDatabase();
   if (tursoCloudSync.isEnabled()) {
+    console.log(`☁️ [TursoSync] Cloud Sync is active: ${tursoCloudSync.getUrl()}`);
+    await tursoCloudSync.initRemoteSchema();
     await tursoCloudSync.pullStateFromTurso(db);
+  } else {
+    console.log(`ℹ️ [TursoSync] Turso Cloud Sync is inactive (TURSO_AUTH_TOKEN is not configured). Operating on local SQLite SSD.`);
   }
   const userDao = new UserDAO(db);
   const subDao = new SubscriptionDAO(db);

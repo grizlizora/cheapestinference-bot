@@ -33,6 +33,10 @@ export class TursoCloudSync {
     return Boolean(this.url && this.token);
   }
 
+  public getUrl(): string {
+    return this.url || "";
+  }
+
   /**
    * Executes remote Turso pipeline requests over HTTPS
    */
