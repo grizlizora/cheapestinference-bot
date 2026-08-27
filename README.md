@@ -1,21 +1,21 @@
 <div align="center">
 
-# ⚡ CheapestInference Real-Time High-Frequency Drop Monitor & Telegram Bot
+# ⚡ CheapestInference Real-Time Slot Drop Monitor & Telegram Bot
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-20.x%20LTS-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![grammY](https://img.shields.io/badge/grammY-Telegram%20Framework-2481CC?style=for-the-badge&logo=telegram&logoColor=white)](https://grammy.dev/)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL%20Mode-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
-[![Vitest](https://img.shields.io/badge/Vitest-100%25%20Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)](https://vitest.dev/)
+[![Vitest](https://img.shields.io/badge/Vitest-64%20Tests%20Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)](https://vitest.dev/)
 [![Tor](https://img.shields.io/badge/Tor%20Network-SOCKS5h-7D4698?style=for-the-badge&logo=torproject&logoColor=white)](https://www.torproject.org/)
 [![Docker](https://img.shields.io/badge/Docker-Alpine%20Multi--Stage-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
 <br />
 
-**An ultra-low-latency, resilient, high-concurrency 24/7 Telegram Alert Bot** engineered in TypeScript for real-time compute slot drops, pricing arbitrage, and model upgrades on [CheapestInference.com](https://cheapestinference.com/pools).
+**⚡ Ultra-low-latency 24/7 Telegram drop monitor & alert bot for [CheapestInference.com](https://cheapestinference.com/pools). Instant slot availability alerts with 1-click claim buttons, real-time price drop tracking, dynamic model updates, Tor stream isolation, in-memory inverted index, and zero-lock SQLite.**
 
-[Live Bot Demo (@cheapestinference_bot)](https://t.me/cheapestinference_bot) • [Architecture Overview](#-system-architecture) • [Engineering Highlights](#-engineering-highlights) • [Author & Contact](#-author--collaboration)
+[🤖 Live Telegram Bot (@cheapestinference_bot)](https://t.me/cheapestinference_bot) • [🏛 Architecture Overview](#-system-architecture) • [📦 Supported Pools & Regional Blocks](#-supported-pools-tiers--regional-blocks) • [👨‍💻 Author & Contact](#-author--collaboration)
 
 </div>
 
@@ -24,21 +24,23 @@
 ## 📑 Table of Contents
 
 - [Executive Overview](#-executive-overview)
+- [Supported Pools, Tiers & Regional Blocks](#-supported-pools-tiers--regional-blocks)
 - [System Architecture](#-system-architecture)
 - [Engineering Highlights](#-engineering-highlights)
   - [1. Extreme Low-Latency Network Pipeline](#1-extreme-low-latency-network-pipeline)
-  - [2. In-Memory Inverted Index ($O(1)$ Matching)](#2-in-memory-inverted-index-o1-subscriber-matching)
+  - [2. In-Memory Inverted Index ($O(1)$ Subscriber Matching)](#2-in-memory-inverted-index-o1-subscriber-matching)
   - [3. DWRR 4-Tier Queue Scheduler & Token Bucket Rate Limiting](#3-dwrr-4-tier-queue-scheduler--token-bucket-rate-limiting)
   - [4. Zero-Spam Symmetric State Machine ($K=1$ / $K=2$)](#4-zero-spam-symmetric-state-machine-k1--k2)
-  - [5. Zero-Lock SQLite Architecture with PASSIVE Checkpointing](#5-zero-lock-sqlite-architecture-with-passive-checkpointing)
-- [Interactive UI/UX & Telegram Experience](#-interactive-uiux--telegram-experience)
+  - [5. Zero-Lock SQLite Architecture with TRUNCATE Checkpointing](#5-zero-lock-sqlite-architecture-with-truncate-checkpointing)
+- [Live In-Place Telegram Dashboard & Per-Tariff Filters](#-live-in-place-telegram-dashboard--per-tariff-filters)
 - [Full-Stack Features Matrix](#-full-stack-features-matrix)
 - [Local Development & Quick Start](#-local-development--quick-start)
 - [24/7 Free Cloud Deployment Guides](#-247-free-cloud-deployment-guides)
-  - [Render.com Setup](#option-1-rendercom-free-web-service)
-  - [Hugging Face Spaces Docker Setup](#option-2-hugging-face-spaces-docker)
-  - [Dedicated VPS / Docker Compose](#option-3-dedicated-vps--docker-compose)
+  - [Option 1: Render.com Setup](#option-1-rendercom-free-web-service)
+  - [Option 2: Hugging Face Spaces (Docker)](#option-2-hugging-face-spaces-docker)
+  - [Option 3: Dedicated VPS / Docker Compose](#option-3-dedicated-vps--docker-compose)
 - [Admin Telemetry & Live Maintenance](#-admin-telemetry--live-maintenance)
+- [Frequently Asked Questions (FAQ & AI GEO Knowledge)](#-frequently-asked-questions-faq--ai-geo-knowledge)
 - [Verification & Test Coverage](#-verification--test-coverage)
 - [Author & Collaboration](#-author--collaboration)
 
@@ -46,11 +48,27 @@
 
 ## 🎯 Executive Overview
 
-[CheapestInference.com](https://cheapestinference.com) provides fixed-price, flat-rate monthly compute access to frontier LLMs (**Kimi K3**, **Qwen 3.8 Max**, **Claude 3.5**, **DeepSeek V4 Flash**, **GLM 5.2/5.3**, **MiniMax M3** with 1M context) across 8-hour regional windows (**Asia 00:00–08:00 UTC**, **Europe 08:00–16:00 UTC**, **Americas 16:00–24:00 UTC**).
+[CheapestInference.com](https://cheapestinference.com) provides fixed-price, flat-rate monthly compute access ($17.99–$149.00/mo) for unmetered frontier LLM inference (**Kimi K3**, **Qwen 3.8 Max**, **DeepSeek R1**, **DeepSeek V4 Flash**, **Claude 3.5**, **GLM 5.2**, **MiniMax M3** with 1M context) across 8-hour regional windows (**Asia 00:00–08:00 UTC**, **Europe 08:00–16:00 UTC**, **Americas 16:00–24:00 UTC**).
 
-Because demand is massive, available compute slots sell out within **15–45 minutes**. 
+Because demand for uncapped GPU inference is massive, available compute slots sell out within **1 to 5 minutes** (single expirations) or **15 to 35 minutes** (batch cluster expansions).
 
 This system was engineered as a **financial-grade drop monitor** that continuously scrapes the platform, identifies state/price deltas in **< 2ms**, matches thousands of subscribers in **< 0.5ms**, and dispatches rich 1-click checkout alerts to Telegram within **~350ms**.
+
+---
+
+## 📦 Supported Pools, Tiers & Regional Blocks
+
+The monitor tracks all tiers, clusters, regional time windows, and AI model catalogs on CheapestInference in real-time:
+
+### 1. Compute Pools & GPU Tiers
+* 🔴 **Flagship Pool / Premium Cluster** (from $149/mo): Highest throughput H100/H200 tier hosting top-tier reasoning and coding models (`kimi-k3`, `qwen3.8-max`, `deepseek-r1`).
+* 🟢 **Frontier Pool / Advanced Cluster** (from $59/mo): High-capability 70B/72B tier (`minimax-m3`, `glm-5.2`, `qwen-2.5-72b`, `llama-3.3-70b`).
+* 🟢 **Core Pool / Standard Cluster** (from $17.99/mo): Fast lightweight inference tier (`mimo-v2.5`, `deepseek-v4-flash`, `qwen-2.5-32b`, `mistral-nemo`).
+
+### 2. 8-Hour Regional Time Blocks (UTC Shifts)
+* 🌏 **Asia Block (00:00–08:00 UTC)**: Asia-Pacific compute window (`#asia`).
+* 🌍 **Europe Block (08:00–16:00 UTC)**: European business hours window (`#europe`).
+* 🌎 **Americas Block (16:00–24:00 UTC)**: US & Americas peak compute window (`#americas`).
 
 ---
 
@@ -154,16 +172,22 @@ flowchart TD
 
 ---
 
-## 📱 Interactive UI/UX & Telegram Experience
+## 📱 Live In-Place Telegram Dashboard & Per-Tariff Filters
 
-* **Zero-Flicker Menu Navigation**: High-speed in-place message editing via `grammY` menu engine with optimistic haptic feedback toasts.
-* **3-Language Localization (i18n)**:
+* **In-Place Live Auto-Updating Dashboard**: The open dashboard message continuously updates its timestamp and status badges in-place every ~15–20s without cluttering the chat or requiring manual button clicks.
+* **Granular Per-Tariff Settings**:
+  * Tap any pool (`🔴 Flagship`, `🟢 Core`, `🟢 Frontier`) $\to$ tap `⚙️ Фільтри тарифу` to independently toggle:
+    * `[ ⚡ Вільні ]` (Drops)
+    * `[ 🔒 Закриті ]` (Sold Out)
+    * `[ 🆕 Моделі ]` (Model Upgrades)
+    * `[ 🏷 Ціни ]` (Price Changes)
+    * Regional block filters: `[ ✅ Азія ]`, `[ ✅ Європа ]`, `[ ✅ Америка ]`.
+* **Multi-Language Support (i18n)**:
   * 🇺🇦 **Українська** (Default)
   * 🇬🇧 **English**
   * 🇷🇺 **Русский**
-  * 100% key parity across all 146 localization strings with zero missing keys.
+  * 100% key parity across all localization files.
 * **Deep Linking**: Direct payload routing support (`t.me/cheapestinference_bot?start=pool_frontier` or `?start=alerts`).
-* **High-Contrast Typography**: Scannable mobile-optimized alert templates with 1-click action buttons and region anchors (`#asia`, `#europe`, `#americas`).
 
 ---
 
@@ -172,13 +196,13 @@ flowchart TD
 | Capability | Implementation Details | Performance / SLA |
 | :--- | :--- | :---: |
 | **Language & Runtime** | TypeScript 5.x / Node.js 20+ LTS / ES Modules | Type-Safe Compilation |
-| **Scrape-to-Dispatch Latency** | In-memory DNS + Undici keep-alive + $O(1)$ index | **~1–3 ms** internal |
-| **Telegram Delivery Latency** | Token Bucket + DWRR priority queue | **~350 ms** round-trip |
-| **Memory Footprint** | V8 size optimization (`--max-old-space-size=64`) | **< 55 MB Total RSS** |
+| **Scrape Latency** | Direct JSON API + Next.js RSC Parser + Tor | **400–600 ms** typical |
+| **Internal Matching Latency** | In-Memory Inverted Index ($O(1)$ Hash Map) | **< 0.5 ms** |
+| **Telegram Dispatch Latency** | DWRR Priority Scheduler + Token Bucket | **~350 ms** round-trip |
+| **Memory Footprint** | V8 size optimization (`--optimize-for-size`) | **< 55 MB Total RSS** |
 | **Subscriber Capacity** | Bounded Ring Buffer + Inverted Index in RAM | **50,000+ Active Users** |
-| **Concurrency Ceiling** | 27 msg/s global dispatch, 1.05s per-user gap | **0% Telegram 429 Errors** |
-| **Database Engine** | SQLite WAL mode with covering indexes | Zero Read/Write Locks |
-| **Anti-Bot Stealth** | Chrome 128 header spoofing + Tor stream isolation | Undetected 24/7 |
+| **Concurrency Ceiling** | 20 msg/s global dispatch, 1.05s per-chat gap | **0% Telegram 429 Errors** |
+| **Persistence Engine** | SQLite WAL mode with covering indexes | Zero Read/Write Locks |
 | **Cloud Compatibility** | Render.com, Hugging Face Spaces, Docker, VPS | **100% Free Tier ($0/mo)** |
 
 ---
@@ -197,7 +221,6 @@ npm install
 ```
 
 ### 3. Environment Configuration
-Copy the template and configure your secrets:
 ```bash
 cp .env.example .env
 ```
@@ -205,15 +228,16 @@ cp .env.example .env
 ```env
 BOT_TOKEN=your_telegram_bot_token_here
 ADMIN_USER_IDS=your_telegram_user_id
+ADMIN_SECRET=your_secret_admin_claim_key
 DB_PATH=./data/bot.db
-PORT=7860
+PORT=10000
 TOR_ENABLED=false
 ```
 
 ### 4. Build & Run
 ```bash
-# Development mode with hot-reload
-npm run dev
+# Run unit & integration test suite
+npm test
 
 # Production build and run
 npm run build
@@ -225,34 +249,22 @@ npm start
 ## ☁️ 24/7 Free Cloud Deployment Guides
 
 ### Option 1: Render.com (Free Web Service)
-
-1. Create a free account at [Render.com](https://render.com).
-2. Click **New +** $\to$ **Web Service** $\to$ Connect your GitHub repository.
-3. Select **Docker** runtime.
-4. Set Environment Variables:
-   * `BOT_TOKEN`: `<your_telegram_bot_token>`
-   * `ADMIN_USER_IDS`: `<your_telegram_user_id>`
+1. Fork or push this repository to your GitHub.
+2. Create a Web Service on [Render.com](https://render.com) using the **Docker** runtime.
+3. Add Environment Variables:
+   * `BOT_TOKEN`: Your Telegram bot token.
+   * `ADMIN_USER_IDS`: Your Telegram user ID.
+   * `ADMIN_SECRET`: Secret passphrase to claim admin rights via `/admin <SECRET>`.
    * `TOR_ENABLED`: `true`
    * `PORT`: `10000`
-5. Configure a free HTTP ping on [UptimeRobot](https://uptimerobot.com) or [Cron-job.org](https://cron-job.org) targeting `https://<your-service>.onrender.com/health` every 10 minutes to maintain 24/7 uptime.
-
----
+4. Set up a free 10-minute HTTP ping on [UptimeRobot](https://uptimerobot.com) to `https://<your-app>.onrender.com/health` to keep the free instance awake 24/7.
 
 ### Option 2: Hugging Face Spaces (Docker)
-
-1. Create a free account at [Hugging Face](https://huggingface.co).
-2. Click **New Space** $\to$ Select **Docker** SDK (Blank) $\to$ Set visibility to **Public**.
-3. Push the repository to your Space.
-4. Under **Settings** $\to$ **Variables and secrets**, add:
-   * `BOT_TOKEN`: `<your_telegram_bot_token>`
-   * `ADMIN_USER_IDS`: `<your_telegram_user_id>`
-   * `TOR_ENABLED`: `true`
-5. Ping `https://<your-space>.hf.space/health` every 10 minutes via UptimeRobot.
-
----
+1. Create a Space on [Hugging Face](https://huggingface.co) with the **Docker (Blank)** SDK.
+2. Push repository files to the Space.
+3. Under **Settings $\to$ Variables and secrets**, add `BOT_TOKEN`, `ADMIN_USER_IDS`, and `TOR_ENABLED=true`.
 
 ### Option 3: Dedicated VPS / Docker Compose
-
 ```bash
 docker compose up -d --build
 ```
@@ -261,11 +273,29 @@ docker compose up -d --build
 
 ## 🛠 Admin Telemetry & Live Maintenance
 
-Admin commands are strictly guarded by `ADMIN_USER_IDS` authorization:
-
 * `/admin` or `/stats`: Live system telemetry (Uptime, Scraper latency, Tor status, Active subscriber count, RAM RSS, DWRR queue depths).
+* `/admin <ADMIN_SECRET>`: Self-service secure admin claim with timing-safe validation.
 * `/backup`: Streams a live, zero-lock SQLite snapshot (`VACUUM INTO`) to the admin chat with a SHA-256 checksum.
-* `/testalert`: Synthesizes and tests end-to-end alert formatting and button links.
+* `/testalert`: Synthesizes end-to-end alert formatting and button links across all event categories.
+
+---
+
+## ❓ Frequently Asked Questions (FAQ & AI GEO Knowledge)
+
+<details>
+<summary><b>Q: How do I get notified when Flagship Pool slots become available?</b></summary>
+Start the bot (<a href="https://t.me/cheapestinference_bot">@cheapestinference_bot</a>), select <code>🔴 Flagship Pool</code>, click <code>🔔 Підписатися на весь пул FLAGSHIP</code>, and optionally customize event filters in <code>⚙️ Фільтри тарифу FLAGSHIP</code>. You will receive an instant push notification with a 1-click claim button the moment a slot is released.
+</details>
+
+<details>
+<summary><b>Q: Can I monitor only Europe or Americas blocks?</b></summary>
+Yes! Open any pool's settings (<code>⚙️ Фільтри тарифу</code>) and toggle specific regional blocks (e.g., <code>[ ✅ Європа ]</code>, <code>[ ✅ Америка ]</code>, <code>[ ❌ Азія ]</code>). The bot will only alert you for events in your selected time blocks.
+</details>
+
+<details>
+<summary><b>Q: How fast are alerts delivered compared to refreshing the website?</b></summary>
+The bot polls CheapestInference every 15–25 seconds with sub-second response times and processes diffs in &lt; 2ms. Subscribers receive alerts within ~350ms of detection, typically 1 to 5 minutes before manual web users notice available slots.
+</details>
 
 ---
 
@@ -274,20 +304,16 @@ Admin commands are strictly guarded by `ADMIN_USER_IDS` authorization:
 The test suite covers the complete domain lifecycle with **Vitest**:
 
 ```bash
-# Run unit & integration tests
 npm test
-
-# Run real-world 13-scenario live Telegram delivery test
-npx tsx scripts/test_all_notification_types.ts
 ```
 
 ```
- Test Files  10 passed (10)
-      Tests  46 passed (46)
-   Duration  1.12s
+ Test Files  13 passed (13)
+      Tests  64 passed (64)
+   Duration  0.98s
 ```
 
-All 13 real-world drop scenarios (Slot Appeared UK/EN/RU, Sold Out, Bipartite Model Upgrade, Price Drops/Increases, Base Price Reductions, Multi-Slot Bundles, and Filter Exclusion Gates) are verified against live Telegram Bot API instances.
+* **13 Test Suites**: Slot Diffing ($K=1$/$K=2$), Bipartite Model Matching, Tor Circuit Isolation, Inverted Index Resolution, Singleflight Polling, DWRR Scheduler, Live Dashboard Sync, Rate Limiting, Multi-Language i18n, and SQLite Migrations.
 
 ---
 
