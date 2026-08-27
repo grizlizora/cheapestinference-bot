@@ -4,19 +4,26 @@ import { PoolStateDAO } from "../../db/dao/poolState.js";
 import { SubscriptionDAO } from "../../db/dao/subscriptions.js";
 import { SlotHistoryDAO } from "../../db/dao/slotHistory.js";
 import { SubscriberInvertedIndex } from "../notifier/subscriberIndex.js";
-import { AvailabilityIntelligenceEngine } from "../../engine/intelligenceEngine.js";
-import { translate, escapeHtml, formatRelativeTime } from "../../i18n/index.js";
-import { renderDashboardText, safeEditMessageText } from "./mainDashboard.js";
-
+import { translate } from "../../i18n/index.js";
 import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
 import { ActiveDashboardRegistry } from "../liveSync/dashboardRegistry.js";
 
-const DEFAULT_BLOCK_IDS = ["asia", "europe", "americas"];
-const DEFAULT_BLOCK_HOURS: Record<string, string> = {
-  asia: "00:00 – 08:00 UTC",
-  europe: "08:00 – 16:00 UTC",
-  americas: "16:00 – 24:00 UTC",
-};
+// Re-export presentation functions from view layer for 100% backward compatibility
+export {
+  renderPoolDetailText,
+  renderPoolSettingsText,
+  getBlockIcon,
+  DEFAULT_BLOCK_IDS,
+  DEFAULT_BLOCK_HOURS,
+} from "../views/poolDetailView.js";
+import {
+  renderPoolDetailText,
+  renderPoolSettingsText,
+  DEFAULT_BLOCK_IDS,
+  DEFAULT_BLOCK_HOURS,
+} from "../views/poolDetailView.js";
+import { renderDashboardText } from "../views/dashboardView.js";
+import { safeEditMessageText } from "../views/common.js";
 
 export function createPoolDetailMenu(
   poolStateDao: PoolStateDAO,
@@ -28,7 +35,7 @@ export function createPoolDetailMenu(
 ) {
   const poolSettingsMenu = new Menu<BotContext>("pool-settings-menu")
     .dynamic((ctx, range) => {
-      const slug = ctx.session.tempPoolSlug || "flagship";
+      const slug = ctx.session?.tempPoolSlug || "flagship";
       const blocks = poolStateDao.getPoolBlocks(slug);
       const blockIds = blocks.length > 0 ? blocks.map((b) => b.block_id) : DEFAULT_BLOCK_IDS;
       const flags = subDao.getPoolFlags(ctx.user.id, slug);
@@ -155,11 +162,11 @@ export function createPoolDetailMenu(
       }
     })
     .text(
-      (ctx) => ctx.t("pool_settings.btn_back_to_pool", { pool_name: (ctx.session.tempPoolSlug || "flagship").toUpperCase() }),
+      (ctx) => ctx.t("pool_settings.btn_back_to_pool", { pool_name: (ctx.session?.tempPoolSlug || "flagship").toUpperCase() }),
       async (ctx) => {
         await ctx.answerCallbackQuery().catch(() => {});
         if (ctx.chat) {
-          dashboardRegistry?.updateView(ctx.chat.id, "pool_detail", ctx.session.tempPoolSlug);
+          dashboardRegistry?.updateView(ctx.chat.id, "pool_detail", ctx.session?.tempPoolSlug);
         }
         await safeEditMessageText(ctx, renderPoolDetailText(ctx, poolStateDao, historyDao, scraper));
         return ctx.menu.nav("pool-detail-menu");
@@ -168,7 +175,7 @@ export function createPoolDetailMenu(
 
   const poolDetailMenu = new Menu<BotContext>("pool-detail-menu")
     .dynamic((ctx, range) => {
-      const slug = ctx.session.tempPoolSlug || "flagship";
+      const slug = ctx.session?.tempPoolSlug || "flagship";
       const blocks = poolStateDao.getPoolBlocks(slug);
       const blockIds = blocks.length > 0 ? blocks.map((b) => b.block_id) : DEFAULT_BLOCK_IDS;
       const isSubscribedToPool = subDao.isPoolSubscribed(ctx.user.id, slug, blockIds);
@@ -192,7 +199,7 @@ export function createPoolDetailMenu(
         ).row();
       }
 
-      // Toggle subscription for this pool (Cascading to all its regional blocks)
+      // Toggle subscription for this pool
       range.text(
         isSubscribedToPool
           ? ctx.t("pool_detail.btn_unsubscribe_pool", { pool_name: slug.toUpperCase() })
@@ -272,9 +279,7 @@ export function createPoolDetailMenu(
               dashboardRegistry?.register(c.chat.id, msgId, c.user.id, c.lang, "pool_detail", slug);
             }
           }
-          try {
-            c.menu.update();
-          } catch {}
+          try { ctx.menu.update(); } catch {}
         }
       );
     })
@@ -292,125 +297,4 @@ export function createPoolDetailMenu(
 
   poolDetailMenu.register(poolSettingsMenu);
   return { poolDetailMenu, poolSettingsMenu };
-}
-
-export function renderPoolSettingsText(
-  ctx: BotContext,
-  poolStateDao: PoolStateDAO,
-  subDao: SubscriptionDAO
-): string {
-  const slug = ctx.session.tempPoolSlug || "flagship";
-  const flags = subDao.getPoolFlags(ctx.user.id, slug);
-  const blocks = poolStateDao.getPoolBlocks(slug);
-  const poolName = blocks[0]?.pool_name || slug.toUpperCase();
-
-  const onText = ctx.t("subscriptions.filter_on");
-  const offText = ctx.t("subscriptions.filter_off");
-
-  return ctx.t("pool_settings.title", {
-    pool_name: escapeHtml(poolName),
-    avail_status: flags.available ? onText : offText,
-    sold_status: flags.soldOut ? onText : offText,
-    model_status: flags.models ? onText : offText,
-    price_status: flags.prices ? onText : offText,
-    pool_status: flags.isSubscribed
-      ? ctx.t("subscriptions.global_enabled")
-      : ctx.t("subscriptions.global_disabled"),
-  });
-}
-
-export function renderPoolDetailText(
-  ctx: BotContext,
-  poolStateDao: PoolStateDAO,
-  historyDao?: SlotHistoryDAO,
-  scraper?: ScraperOrchestrator
-): string {
-  const slug = ctx.session.tempPoolSlug || "flagship";
-  const blocks = poolStateDao.getPoolBlocks(slug);
-
-  if (blocks.length === 0) {
-    return ctx.t("pool_detail.no_data", { pool: slug.toUpperCase() });
-  }
-
-  const first = blocks[0];
-  let models: string[] = [];
-  try {
-    models = JSON.parse(first.models_json);
-  } catch {
-    models = [];
-  }
-
-  const modelsList = models
-    .map((m) => ctx.t("pool_detail.model_item", { model_name: escapeHtml(m) }))
-    .join("\n");
-
-  const intelligenceEngine = historyDao
-    ? new AvailabilityIntelligenceEngine(historyDao)
-    : null;
-
-  const blocksList = blocks
-    .map((b) => {
-      const blockName = ctx.t(`common.block_${b.block_id}`) || b.block_id;
-      const smart = intelligenceEngine
-        ? intelligenceEngine.getSmartStatus(slug, b.block_id, b.status, ctx.lang)
-        : null;
-
-      const isAvailable = b.status === "available" || b.status === "limited";
-      const statusBadge = isAvailable
-        ? ctx.t("common.status_available")
-        : ctx.t("common.status_sold_out");
-
-      const icon = b.block_id === "asia" ? "🌏" : b.block_id === "europe" ? "🌍" : "🌎";
-
-      let row = ctx.t("pool_detail.block_row", {
-        block_icon: icon,
-        block_name: blockName,
-        hours_utc: b.hours_utc,
-        status_badge: statusBadge,
-        price: b.price_month,
-      });
-
-      if (isAvailable && smart?.predictionTip) {
-        row += `\n   ${smart.predictionTip}`;
-      } else if (!isAvailable) {
-        if (smart?.etaTip) {
-          row += `\n   ${smart.etaTip}`;
-        } else if (smart?.collectingStatsTip) {
-          row += `\n   ${smart.collectingStatsTip}`;
-        }
-      }
-
-      return row;
-    })
-    .join("\n");
-
-  const parseNum = (v: string) => parseFloat(String(v).replace(/[^0-9.-]/g, "")) || 0;
-  const prices = blocks.map((b) => parseNum(b.price_month)).filter((p) => p > 0);
-  const minPriceNum = prices.length > 0 ? Math.min(...prices) : parseNum(first.min_price_day);
-  const minPrice = minPriceNum > 0 ? minPriceNum.toFixed(2) : "0.00";
-  const minPriceDay = minPriceNum > 0 ? (minPriceNum / 30).toFixed(2) : "0.00";
-
-  const telemetry = scraper?.getTelemetry();
-  const lastVerified = poolStateDao.getLastVerified();
-  const lastVerifiedTs = telemetry?.lastScrapeTimestamp || lastVerified?.timestamp;
-
-  let timeFooter = "";
-  if (lastVerifiedTs && lastVerifiedTs > 0) {
-    const utcDateStr = new Date(lastVerifiedTs).toISOString().replace("T", " ").substring(0, 19) + " UTC";
-    const elapsedText = formatRelativeTime(lastVerifiedTs, ctx.lang);
-    timeFooter = `\n\n🕒 <i>${ctx.lang === "uk" ? "Оновлено" : ctx.lang === "ru" ? "Обновлено" : "Updated"}: ${utcDateStr} (${elapsedText})</i>`;
-  }
-
-  const baseTitle = ctx.t("pool_detail.title", {
-    pool_name: escapeHtml(first.pool_name),
-    description: escapeHtml(first.description || "Unlimited AI inference pool"),
-    models_list: modelsList || "  • Custom open-weights models",
-    min_price: minPrice,
-    min_price_day: minPriceDay,
-    annual_discount: Math.round((first.annual_discount || 0.15) * 100),
-    blocks_list: blocksList,
-    url: `https://cheapestinference.com/pools/${slug}`,
-  });
-
-  return `${baseTitle}${timeFooter}`;
 }

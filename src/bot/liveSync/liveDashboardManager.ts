@@ -6,8 +6,8 @@ import { SlotHistoryDAO } from "../../db/dao/slotHistory.js";
 import { SubscriptionDAO } from "../../db/dao/subscriptions.js";
 import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
 import { ActiveDashboardRegistry, ActiveDashboardEntry, fnv1a32 } from "./dashboardRegistry.js";
-import { renderDashboardText } from "../menus/mainDashboard.js";
-import { renderPoolDetailText } from "../menus/poolDetail.js";
+import { renderDashboardText } from "../views/dashboardView.js";
+import { renderPoolDetailText } from "../views/poolDetailView.js";
 import { translate } from "../../i18n/index.js";
 
 export interface LiveDashboardManagerOptions {

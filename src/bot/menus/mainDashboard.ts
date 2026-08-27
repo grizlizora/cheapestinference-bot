@@ -5,47 +5,23 @@ import { UserDAO } from "../../db/dao/users.js";
 import { SubscriptionDAO } from "../../db/dao/subscriptions.js";
 import { SlotHistoryDAO } from "../../db/dao/slotHistory.js";
 import { SubscriberInvertedIndex } from "../notifier/subscriberIndex.js";
-import { AvailabilityIntelligenceEngine } from "../../engine/intelligenceEngine.js";
 import { createLanguageMenu } from "./language.js";
-import { createPoolDetailMenu, renderPoolDetailText } from "./poolDetail.js";
+import { createPoolDetailMenu } from "./poolDetail.js";
 import { createSubscriptionsMenu, renderSubscriptionsText } from "./subscriptions.js";
-import { escapeHtml, formatRelativeTime } from "../../i18n/index.js";
-
 import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
-
-/**
- * Safely edit message text ignoring Telegram 400 "message is not modified"
- */
-export async function safeEditMessageText(
-  ctx: BotContext,
-  text: string,
-  extra: any = { parse_mode: "HTML", link_preview_options: { is_disabled: true } }
-) {
-  try {
-    if ((ctx as any).menu && typeof (ctx as any).menu.update === "function") {
-      try {
-        (ctx as any).menu.update();
-      } catch {}
-    }
-    const finalExtra = { ...extra };
-    await ctx.editMessageText(text, finalExtra);
-  } catch (err: any) {
-    if (
-      err?.description?.includes("message is not modified") ||
-      err?.message?.includes("message is not modified")
-    ) {
-      return;
-    }
-    console.warn("⚠️ [Menu] Safe editMessageText warning:", err?.message || err);
-  }
-}
-
 import { ProxyPool } from "../../proxy/proxyPool.js";
 import { NotificationDispatcher } from "../notifier/dispatcher.js";
 import { isUserAdmin } from "../../config/env.js";
 import { renderAdminText } from "../handlers/admin.js";
 import { createBackupHandler, createUsersExportHandler, createHistoryExportHandler } from "../handlers/backup.js";
 import { ActiveDashboardRegistry } from "../liveSync/dashboardRegistry.js";
+
+// Re-export presentation functions from view layer for 100% backward compatibility
+export { renderDashboardText, renderSettingsText, computePoolBadgeInfo } from "../views/dashboardView.js";
+export { safeEditMessageText } from "../views/common.js";
+import { renderDashboardText, renderSettingsText, computePoolBadgeInfo } from "../views/dashboardView.js";
+import { renderPoolDetailText } from "../views/poolDetailView.js";
+import { safeEditMessageText } from "../views/common.js";
 
 export function createMainMenuHierarchy(
   poolStateDao: PoolStateDAO,
@@ -248,18 +224,9 @@ export function createMainMenuHierarchy(
     .dynamic((ctx, range) => {
       const summaries = poolStateDao.getPoolSummaries();
       for (const pool of summaries) {
-        const availableCount = pool.available_count;
-        const totalBlocks = pool.total_blocks || 3;
-        const icon =
-          availableCount >= totalBlocks && totalBlocks > 0
-            ? "🟢"
-            : availableCount > 0
-            ? "🟡"
-            : "🔴";
-        const shortStatus = `${availableCount}/${totalBlocks}`;
-
+        const badge = computePoolBadgeInfo(pool.available_count, pool.total_blocks);
         range
-          .text(`${icon} ${pool.name} [${shortStatus}]`, async (c) => {
+          .text(`${badge.icon} ${pool.name} [${badge.shortStatus}]`, async (c) => {
             await c.answerCallbackQuery().catch(() => {});
             c.session.tempPoolSlug = pool.slug;
             if (c.chat) {
@@ -303,9 +270,7 @@ export function createMainMenuHierarchy(
             dashboardRegistry?.register(ctx.chat.id, msgId, ctx.user.id, ctx.lang, "dashboard");
           }
         }
-        try {
-          ctx.menu.update();
-        } catch {}
+        try { ctx.menu.update(); } catch {}
       }
     )
     .row()
@@ -341,85 +306,4 @@ export function createMainMenuHierarchy(
   mainDashboardMenu.register(settingsMenu);
 
   return { mainDashboardMenu, languageMenu, poolDetailMenu, poolSettingsMenu, subscriptionsMenu, helpMenu, settingsMenu, adminMenu };
-}
-
-export function renderSettingsText(ctx: BotContext): string {
-  const langNames: Record<string, string> = {
-    uk: "Українська 🇺🇦",
-    en: "English 🇬🇧",
-    ru: "Русский 🇷🇺",
-  };
-  const currentLang = langNames[ctx.lang] || ctx.lang;
-
-  return ctx.t("settings.title", {
-    current_lang: currentLang,
-    telegram_id: String(ctx.from?.id || "N/A"),
-  });
-}
-
-export function renderDashboardText(
-  ctx: BotContext,
-  poolStateDao: PoolStateDAO,
-  historyDao?: SlotHistoryDAO,
-  scraper?: ScraperOrchestrator
-): string {
-  const summaries = poolStateDao.getPoolSummaries();
-
-  const telemetry = scraper?.getTelemetry();
-  const lastVerified = poolStateDao.getLastVerified();
-  const lastVerifiedTs = telemetry?.lastScrapeTimestamp || lastVerified?.timestamp;
-
-  let updatedAtStr = "";
-  if (lastVerifiedTs && lastVerifiedTs > 0) {
-    const utcDateStr = new Date(lastVerifiedTs).toISOString().replace("T", " ").substring(0, 19) + " UTC";
-    const elapsedText = formatRelativeTime(lastVerifiedTs, ctx.lang);
-    updatedAtStr = `${utcDateStr} (${elapsedText})`;
-  } else {
-    updatedAtStr = new Date().toISOString().replace("T", " ").substring(0, 19) + " UTC";
-  }
-
-  if (telemetry && telemetry.consecutiveFailures > 0) {
-    updatedAtStr +=
-      ctx.lang === "uk"
-        ? ` ⚠️ [затримка мережі, спроба ${telemetry.consecutiveFailures}]`
-        : ctx.lang === "ru"
-        ? ` ⚠️ [задержка сети, попытка ${telemetry.consecutiveFailures}]`
-        : ` ⚠️ [network delay, retry ${telemetry.consecutiveFailures}]`;
-  }
-
-  if (summaries.length === 0) {
-    return ctx.t("menu.dashboard_title", {
-      pool_summaries: ctx.t("menu.loading_data"),
-      updated_at: updatedAtStr,
-    });
-  }
-
-  const poolSummariesText = summaries
-    .map((p) => {
-      const total = p.total_blocks || 3;
-      let statusBadge: string;
-      if (p.available_count >= total && total > 0) {
-        statusBadge = ctx.t("common.status_available");
-      } else if (p.available_count > 0) {
-        statusBadge = ctx.t("common.status_partially_available");
-      } else {
-        statusBadge = ctx.t("common.status_sold_out");
-      }
-
-      return ctx.t("menu.pool_summary_card", {
-        pool_name: escapeHtml(p.name),
-        status_badge: statusBadge,
-        models: escapeHtml(p.models.join(", ")) || ctx.t("common.custom_models"),
-        min_price: p.min_price,
-        available_count: p.available_count,
-        total_blocks: p.total_blocks || 3,
-        url: `https://cheapestinference.com/pools/${p.slug}`,
-      });
-    })
-    .join("\n\n");
-
-  return ctx.t("menu.dashboard_title", {
-    pool_summaries: poolSummariesText,
-    updated_at: updatedAtStr,
-  });
 }
