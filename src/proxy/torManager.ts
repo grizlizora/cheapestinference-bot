@@ -31,7 +31,7 @@ export class TorManager {
   private sessionNonce = Date.now().toString(36);
 
   public rotateStreamIsolation(): string {
-    this.sessionNonce = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    this.sessionNonce = process.hrtime.bigint().toString(36);
     return this.getSocksUrl();
   }
 

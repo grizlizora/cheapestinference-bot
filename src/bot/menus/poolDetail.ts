@@ -162,7 +162,7 @@ export function createPoolDetailMenu(
       const slug = ctx.session.tempPoolSlug || "flagship";
       const blocks = poolStateDao.getPoolBlocks(slug);
       const blockIds = blocks.length > 0 ? blocks.map((b) => b.block_id) : DEFAULT_BLOCK_IDS;
-      const isSubscribedToPool = subDao.isPoolSubscribed(ctx.user.id, slug, blockIds) || subDao.getPoolFlags(ctx.user.id, slug).isSubscribed;
+      const isSubscribedToPool = subDao.isPoolSubscribed(ctx.user.id, slug, blockIds);
 
       const availableBlocks = blocks.filter(
         (b) => b.status === "available" || b.status === "limited"

@@ -49,7 +49,7 @@ export class RobustHttpClient {
         timeout: 8_000,
         lookup: defaultDnsCache.lookup as any,
         autoSelectFamily: true,
-        autoSelectFamilyAttemptTimeout: 50, // 50ms instead of 250ms default on dual-stack
+        autoSelectFamilyAttemptTimeout: 50,
         keepAlive: true,
         keepAliveInitialDelay: 1000,
         noDelay: true,

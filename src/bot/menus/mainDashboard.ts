@@ -44,7 +44,7 @@ import { ProxyPool } from "../../proxy/proxyPool.js";
 import { NotificationDispatcher } from "../notifier/dispatcher.js";
 import { isUserAdmin } from "../../config/env.js";
 import { renderAdminText } from "../handlers/admin.js";
-import { createBackupHandler } from "../handlers/backup.js";
+import { createBackupHandler, createUsersExportHandler, createHistoryExportHandler } from "../handlers/backup.js";
 import { ActiveDashboardRegistry } from "../liveSync/dashboardRegistry.js";
 
 export function createMainMenuHierarchy(
@@ -92,6 +92,25 @@ export function createMainMenuHierarchy(
         await dispatcher.sendTestAlert(ctx.from!.id, ctx.lang, "slot");
       }
     )
+    .row()
+    .text(
+      (ctx) => ctx.t("admin.btn_export_users"),
+      async (ctx) => {
+        if (!isUserAdmin(ctx.from?.id, userDao, ctx.from?.username)) return;
+        await ctx.answerCallbackQuery().catch(() => {});
+        await createUsersExportHandler(userDao.db, userDao, subDao)(ctx);
+      }
+    )
+    .row()
+    .text(
+      (ctx) => ctx.t("admin.btn_export_history"),
+      async (ctx) => {
+        if (!isUserAdmin(ctx.from?.id, userDao, ctx.from?.username)) return;
+        await ctx.answerCallbackQuery().catch(() => {});
+        await createHistoryExportHandler(userDao.db, userDao)(ctx);
+      }
+    )
+    .row()
     .text(
       (ctx) => ctx.t("admin.btn_backup"),
       async (ctx) => {
@@ -287,6 +306,18 @@ export function createMainMenuHierarchy(
         try {
           ctx.menu.update();
         } catch {}
+      }
+    )
+    .row()
+    .text(
+      (ctx) => ctx.t("menu.btn_subscriptions"),
+      async (ctx) => {
+        await ctx.answerCallbackQuery().catch(() => {});
+        if (ctx.chat) {
+          dashboardRegistry?.updateView(ctx.chat.id, "subscriptions");
+        }
+        await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
+        return ctx.menu.nav("subscriptions-menu");
       }
     )
     .row()

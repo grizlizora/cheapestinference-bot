@@ -442,6 +442,11 @@ export class TursoCloudSync {
     } catch (err: any) {
       console.warn(`⚠️ [TursoSync] Background batch push warning (${batch.length} mutations):`, err?.message || err);
       this.pendingMutations = [...batch, ...this.pendingMutations];
+      if (!this.flushTimer) {
+        this.flushTimer = setTimeout(() => {
+          this.flush().catch(() => {});
+        }, 5000);
+      }
     } finally {
       this.isFlushing = false;
     }
@@ -454,6 +459,9 @@ export class TursoCloudSync {
     if (this.flushTimer) {
       clearTimeout(this.flushTimer);
       this.flushTimer = null;
+    }
+    while (this.isFlushing) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
     }
     await this.flush().catch(() => {});
   }

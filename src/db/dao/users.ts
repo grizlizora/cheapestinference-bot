@@ -246,6 +246,10 @@ export class UserDAO {
 
   setAdmin(tgId: number, isAdmin: boolean): void {
     this.stmtSetAdmin.run(isAdmin ? 1 : 0, tgId);
+    tursoCloudSync.pushMutation(
+      `UPDATE users SET is_admin = ?, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?`,
+      [isAdmin ? 1 : 0, tgId]
+    );
   }
 
   isAdmin(tgId: number): boolean {
