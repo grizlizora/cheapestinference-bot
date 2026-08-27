@@ -28,6 +28,7 @@ export class JsonApiEngine implements IFetcherEngine {
         lastModified: res.lastModified || lastModified,
         source: "cache_not_modified",
         latencyMs: res.latencyMs,
+        usedProxy: res.usedProxy,
       };
     }
 
@@ -83,6 +84,7 @@ export class JsonApiEngine implements IFetcherEngine {
       lastModified: res.lastModified,
       source: "api",
       latencyMs: res.latencyMs,
+      usedProxy: res.usedProxy,
     };
   }
 }

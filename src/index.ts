@@ -96,8 +96,14 @@ async function bootstrap() {
     }
   );
 
-  scraper.on("heartbeat", (hb) => {
-    console.log(`💓 [Heartbeat] Scraped from '${hb.source}' in ${hb.latencyMs}ms (modified: ${hb.modified})`);
+  scraper.on("heartbeat", (hb: any) => {
+    const proxyTag = hb.usedProxy
+      ? hb.usedProxy.includes("9050")
+        ? "🧅 Tor SOCKS5"
+        : `🌐 Proxy (${hb.usedProxy})`
+      : "⚡ Direct (DNS Cache)";
+    const modTag = hb.modified ? "🔥 MODIFIED" : "static";
+    console.log(`💓 [Heartbeat] Scraped from '${hb.source}' via ${proxyTag} in ${hb.latencyMs}ms (${modTag})`);
   });
 
   scraper.on("warn", (msg) => {

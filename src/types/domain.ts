@@ -111,4 +111,5 @@ export interface ScrapeResult {
   lastModified?: string;
   source: string;
   latencyMs: number;
+  usedProxy?: string | null;
 }

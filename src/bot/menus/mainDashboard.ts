@@ -256,6 +256,7 @@ export function createMainMenuHierarchy(
     .text(
       (ctx) => ctx.t("common.refresh"),
       async (ctx) => {
+        const startTime = Date.now();
         await ctx.answerCallbackQuery({
           text: ctx.t("common.refreshed_toast"),
           show_alert: false,
@@ -263,6 +264,13 @@ export function createMainMenuHierarchy(
         if (scraper) {
           await scraper.forceRefresh(3000);
         }
+        const telemetry = scraper?.getTelemetry();
+        const elapsed = Date.now() - startTime;
+        const username = ctx.from?.username ? `@${ctx.from.username}` : `ID:${ctx.from?.id}`;
+        const proxyTag = telemetry?.lastUsedProxy
+          ? (telemetry.lastUsedProxy.includes("9050") ? "🧅 Tor SOCKS5" : "🌐 Proxy")
+          : "⚡ Direct";
+        console.log(`🔄 [Manual Refresh] User ${username} on Dashboard -> ${telemetry?.lastScrapeLatencyMs || elapsed}ms via ${proxyTag} (source: ${telemetry?.lastSource || "cache"}, total UI: ${elapsed}ms)`);
         const rendered = renderDashboardText(ctx, poolStateDao, historyDao, scraper);
         await safeEditMessageText(ctx, rendered);
         if (ctx.chat) {
@@ -322,17 +330,23 @@ export function renderDashboardText(
 ): string {
   const summaries = poolStateDao.getPoolSummaries();
 
-  const lastVerifiedTs = scraper?.getTelemetry().lastScrapeTimestamp || poolStateDao.getLastVerified()?.timestamp;
+  const telemetry = scraper?.getTelemetry();
+  const lastVerified = poolStateDao.getLastVerified();
+  const lastVerifiedTs = telemetry?.lastScrapeTimestamp || lastVerified?.timestamp;
+  const lastLatency = telemetry?.lastScrapeLatencyMs || lastVerified?.latencyMs || 0;
+  const lastProxy = telemetry?.lastUsedProxy;
+  const proxyBadge = lastProxy ? (lastProxy.includes("9050") ? " 🧅" : " 🌐") : " ⚡";
+
   let updatedAtStr = "";
   if (lastVerifiedTs && lastVerifiedTs > 0) {
     const utcDateStr = new Date(lastVerifiedTs).toISOString().replace("T", " ").substring(0, 19) + " UTC";
     const elapsedText = formatRelativeTime(lastVerifiedTs, ctx.lang);
-    updatedAtStr = `${utcDateStr} (${elapsedText})`;
+    const latencyTag = lastLatency > 0 ? ` [${lastLatency}ms${proxyBadge}]` : "";
+    updatedAtStr = `${utcDateStr} (${elapsedText}${latencyTag})`;
   } else {
     updatedAtStr = new Date().toISOString().replace("T", " ").substring(0, 19) + " UTC";
   }
 
-  const telemetry = scraper?.getTelemetry();
   if (telemetry && telemetry.consecutiveFailures > 0) {
     updatedAtStr +=
       ctx.lang === "uk"

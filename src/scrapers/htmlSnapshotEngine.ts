@@ -25,6 +25,7 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
         lastModified: res.lastModified || lastModified,
         source: "cache_not_modified",
         latencyMs: res.latencyMs,
+        usedProxy: res.usedProxy,
       };
     }
 
@@ -43,6 +44,7 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
         lastModified: res.lastModified,
         source: "html_rsc_stream",
         latencyMs: res.latencyMs,
+        usedProxy: res.usedProxy,
       };
     }
 
@@ -63,6 +65,7 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
             lastModified: res.lastModified,
             source: "html_snapshot",
             latencyMs: res.latencyMs,
+            usedProxy: res.usedProxy,
           };
         }
       } catch {}
@@ -88,6 +91,7 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
             lastModified: res.lastModified,
             source: "html_snapshot",
             latencyMs: res.latencyMs,
+            usedProxy: res.usedProxy,
           };
         }
       } catch {}
@@ -119,6 +123,7 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
       lastModified: res.lastModified,
       source: "html_dom",
       latencyMs: res.latencyMs,
+      usedProxy: res.usedProxy,
     };
   }
 

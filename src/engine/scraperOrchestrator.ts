@@ -21,6 +21,7 @@ export class ScraperOrchestrator extends EventEmitter {
   private lastScrapeTimestamp = 0;
   private lastScrapeLatencyMs = 0;
   private lastSource = "none";
+  private lastUsedProxy?: string | null;
 
   // Cache headers
   private apiEtag?: string;
@@ -158,6 +159,7 @@ export class ScraperOrchestrator extends EventEmitter {
         this.lastScrapeTimestamp = Date.now();
         this.lastScrapeLatencyMs = result.latencyMs;
         this.lastSource = result.source;
+        this.lastUsedProxy = result.usedProxy;
 
         // Touch verified in SQLite so UI knows verified timestamp
         this.poolStateDao.touchVerified(result.source, result.latencyMs);
@@ -165,6 +167,7 @@ export class ScraperOrchestrator extends EventEmitter {
         this.emit("heartbeat", {
           source: result.source,
           latencyMs: result.latencyMs,
+          usedProxy: result.usedProxy,
           modified: false,
         });
         return [];
@@ -177,6 +180,7 @@ export class ScraperOrchestrator extends EventEmitter {
       this.lastScrapeTimestamp = Date.now();
       this.lastScrapeLatencyMs = result.latencyMs;
       this.lastSource = result.source;
+      this.lastUsedProxy = result.usedProxy;
 
       // 1. Synchronously persist state to SQLite first
       try {
@@ -191,6 +195,7 @@ export class ScraperOrchestrator extends EventEmitter {
       this.emit("heartbeat", {
         source: result.source,
         latencyMs: result.latencyMs,
+        usedProxy: result.usedProxy,
         modified: true,
         eventsCount: events.length,
       });
@@ -308,6 +313,7 @@ export class ScraperOrchestrator extends EventEmitter {
       lastScrapeTimestamp: this.lastScrapeTimestamp,
       lastScrapeLatencyMs: this.lastScrapeLatencyMs,
       lastSource: this.lastSource,
+      lastUsedProxy: this.lastUsedProxy,
       apiCircuitOpen: Date.now() < this.apiCircuitOpenUntil,
     };
   }

@@ -232,6 +232,7 @@ export function createPoolDetailMenu(
       range.text(
         (c) => c.t("common.refresh"),
         async (c) => {
+          const startTime = Date.now();
           await c.answerCallbackQuery({
             text: c.lang === "uk" ? "🔄 Оновлюю дані з сайту..." : c.lang === "ru" ? "🔄 Обновляю данные с сайта..." : "🔄 Refreshing data from site...",
             show_alert: false,
@@ -239,6 +240,13 @@ export function createPoolDetailMenu(
           if (scraper) {
             await scraper.forceRefresh(3000);
           }
+          const telemetry = scraper?.getTelemetry();
+          const elapsed = Date.now() - startTime;
+          const username = c.from?.username ? `@${c.from.username}` : `ID:${c.from?.id}`;
+          const proxyTag = telemetry?.lastUsedProxy
+            ? (telemetry.lastUsedProxy.includes("9050") ? "🧅 Tor SOCKS5" : "🌐 Proxy")
+            : "⚡ Direct";
+          console.log(`🔄 [Manual Refresh] User ${username} in pool '${slug}' -> ${telemetry?.lastScrapeLatencyMs || elapsed}ms via ${proxyTag} (source: ${telemetry?.lastSource || "cache"}, total UI: ${elapsed}ms)`);
           const rendered = renderPoolDetailText(c, poolStateDao, historyDao, scraper);
           await safeEditMessageText(c, rendered);
           if (c.chat) {
@@ -359,12 +367,19 @@ export function renderPoolDetailText(
   const minPrice = minPriceNum > 0 ? minPriceNum.toFixed(2) : "0.00";
   const minPriceDay = minPriceNum > 0 ? (minPriceNum / 30).toFixed(2) : "0.00";
 
-  const lastVerifiedTs = scraper?.getTelemetry().lastScrapeTimestamp || poolStateDao.getLastVerified()?.timestamp;
+  const telemetry = scraper?.getTelemetry();
+  const lastVerified = poolStateDao.getLastVerified();
+  const lastVerifiedTs = telemetry?.lastScrapeTimestamp || lastVerified?.timestamp;
+  const lastLatency = telemetry?.lastScrapeLatencyMs || lastVerified?.latencyMs || 0;
+  const lastProxy = telemetry?.lastUsedProxy;
+  const proxyBadge = lastProxy ? (lastProxy.includes("9050") ? " 🧅" : " 🌐") : " ⚡";
+
   let timeFooter = "";
   if (lastVerifiedTs && lastVerifiedTs > 0) {
     const utcDateStr = new Date(lastVerifiedTs).toISOString().replace("T", " ").substring(0, 19) + " UTC";
     const elapsedText = formatRelativeTime(lastVerifiedTs, ctx.lang);
-    timeFooter = `\n\n🕒 <i>${ctx.lang === "uk" ? "Оновлено" : ctx.lang === "ru" ? "Обновлено" : "Updated"}: ${utcDateStr} (${elapsedText})</i>`;
+    const latencyTag = lastLatency > 0 ? ` [${lastLatency}ms${proxyBadge}]` : "";
+    timeFooter = `\n\n🕒 <i>${ctx.lang === "uk" ? "Оновлено" : ctx.lang === "ru" ? "Обновлено" : "Updated"}: ${utcDateStr} (${elapsedText}${latencyTag})</i>`;
   }
 
   const baseTitle = ctx.t("pool_detail.title", {
