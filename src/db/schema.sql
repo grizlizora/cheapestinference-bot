@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS slot_lifecycle_history (
 CREATE INDEX IF NOT EXISTS idx_slot_history_open ON slot_lifecycle_history(pool_slug, block_id) WHERE closed_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_slot_history_closed_at ON slot_lifecycle_history(closed_at) WHERE closed_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_slot_history_analytics_covering ON slot_lifecycle_history(pool_slug, block_id, duration_seconds, opened_at) WHERE duration_seconds IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_slot_history_downtime_perf ON slot_lifecycle_history(pool_slug, block_id, opened_at ASC);
 
 -- 5. Catalog & Model Upgrade History
 CREATE TABLE IF NOT EXISTS catalog_history (
@@ -98,12 +99,14 @@ CREATE TABLE IF NOT EXISTS slot_price_history (
   block_id TEXT NOT NULL,
   old_price TEXT NOT NULL,
   new_price TEXT NOT NULL,
+  new_price_num REAL NOT NULL DEFAULT 0.0,
   price_delta REAL NOT NULL,
   percent_delta REAL NOT NULL,
   changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_slot_price_hist_retention ON slot_price_history(changed_at);
+CREATE INDEX IF NOT EXISTS idx_slot_price_hist_lookup ON slot_price_history(pool_slug, block_id);
 
 -- 7. Notification Logs Table
 CREATE TABLE IF NOT EXISTS notification_logs (

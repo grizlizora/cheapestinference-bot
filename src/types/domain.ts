@@ -94,6 +94,7 @@ export interface EtaPrediction {
   expectedOpenTimestampMin: number | null; // Epoch ms
   expectedOpenTimestampMax: number | null; // Epoch ms
   formattedEtaWindow: string; // e.g. "~18-24 год"
+  isOverdue?: boolean;
   message?: string;
 }
 

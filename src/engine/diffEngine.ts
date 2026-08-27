@@ -16,8 +16,9 @@ import { PredictiveAnalyticsEngine } from "./predictiveEngine.js";
 
 function parseCleanPrice(val: string | undefined | null): number {
   if (!val) return 0;
-  const cleaned = String(val).replace(/[^0-9.-]/g, "");
-  const num = parseFloat(cleaned);
+  const match = String(val).match(/[-+]?\d+(?:\.\d+)?/);
+  if (!match) return 0;
+  const num = parseFloat(match[0]);
   if (isNaN(num)) return 0;
   return Math.round(num * 100) / 100;
 }

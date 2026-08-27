@@ -40,9 +40,9 @@ export class CatalogHistoryDAO {
 
     this.stmtInsertSlotPriceHistory = db.prepare(`
       INSERT INTO slot_price_history (
-        pool_slug, block_id, old_price, new_price, price_delta, percent_delta, changed_at
+        pool_slug, block_id, old_price, new_price, new_price_num, price_delta, percent_delta, changed_at
       ) VALUES (
-        @pool_slug, @block_id, @old_price, @new_price, @price_delta, @percent_delta, CURRENT_TIMESTAMP
+        @pool_slug, @block_id, @old_price, @new_price, @new_price_num, @price_delta, @percent_delta, CURRENT_TIMESTAMP
       )
     `);
   }
@@ -130,19 +130,23 @@ export class CatalogHistoryDAO {
     priceDelta: number,
     percentDelta: number
   ): void {
+    const match = String(newPrice).match(/[-+]?\d+(?:\.\d+)?/);
+    const newPriceNum = match ? parseFloat(match[0]) : 0;
+
     this.stmtInsertSlotPriceHistory.run({
       pool_slug: poolSlug,
       block_id: blockId,
       old_price: oldPrice,
       new_price: newPrice,
+      new_price_num: newPriceNum,
       price_delta: priceDelta,
       percent_delta: percentDelta,
     });
     tursoCloudSync.pushMutation(
       `INSERT INTO slot_price_history (
-        pool_slug, block_id, old_price, new_price, price_delta, percent_delta, changed_at
-      ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-      [poolSlug, blockId, oldPrice, newPrice, priceDelta, percentDelta]
+        pool_slug, block_id, old_price, new_price, new_price_num, price_delta, percent_delta, changed_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+      [poolSlug, blockId, oldPrice, newPrice, newPriceNum, priceDelta, percentDelta]
     );
   }
 
@@ -157,11 +161,11 @@ export class CatalogHistoryDAO {
         .prepare(`
           SELECT 
             COUNT(*) as count,
-            MIN(CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL)) as min_p,
-            MAX(CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL)) as max_p,
-            AVG(CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL)) as avg_p
+            MIN(CASE WHEN new_price_num > 0 THEN new_price_num ELSE CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL) END) as min_p,
+            MAX(CASE WHEN new_price_num > 0 THEN new_price_num ELSE CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL) END) as max_p,
+            AVG(CASE WHEN new_price_num > 0 THEN new_price_num ELSE CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL) END) as avg_p
           FROM slot_price_history
-          WHERE pool_slug = ? AND block_id = ?
+          WHERE pool_slug = ? AND block_id = ? AND (new_price_num > 0 OR new_price != '')
         `)
         .get(poolSlug, blockId);
     } else {
@@ -169,11 +173,11 @@ export class CatalogHistoryDAO {
         .prepare(`
           SELECT 
             COUNT(*) as count,
-            MIN(CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL)) as min_p,
-            MAX(CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL)) as max_p,
-            AVG(CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL)) as avg_p
+            MIN(CASE WHEN new_price_num > 0 THEN new_price_num ELSE CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL) END) as min_p,
+            MAX(CASE WHEN new_price_num > 0 THEN new_price_num ELSE CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL) END) as max_p,
+            AVG(CASE WHEN new_price_num > 0 THEN new_price_num ELSE CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL) END) as avg_p
           FROM slot_price_history
-          WHERE pool_slug = ?
+          WHERE pool_slug = ? AND (new_price_num > 0 OR new_price != '')
         `)
         .get(poolSlug);
     }

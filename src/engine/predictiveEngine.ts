@@ -153,10 +153,22 @@ export class PredictiveAnalyticsEngine {
     const cleanDurations = rawDurations.filter((d) => d >= lowerFence && d <= upperFence);
     const effectiveClean = cleanDurations.length > 0 ? cleanDurations : rawDurations;
 
-    // Trimmed Mean of in-fence durations
-    const trimmedMean = Math.round(
-      effectiveClean.reduce((sum, v) => sum + v, 0) / effectiveClean.length
-    );
+    // Trimmed & Recency-Weighted Mean of in-fence durations
+    let trimmedMean: number;
+    if (effectiveClean.length >= 6) {
+      let weightSum = 0;
+      let valSum = 0;
+      effectiveClean.forEach((v, idx) => {
+        const w = 1 / (1 + 0.1 * idx); // Newer observations carry higher mathematical weight
+        valSum += v * w;
+        weightSum += w;
+      });
+      trimmedMean = Math.round(valSum / weightSum);
+    } else {
+      trimmedMean = Math.round(
+        effectiveClean.reduce((sum, v) => sum + v, 0) / effectiveClean.length
+      );
+    }
 
     const effectiveDuration =
       cleanDurations.length >= 3 ? Math.round(0.6 * median + 0.4 * trimmedMean) : median;
@@ -271,6 +283,7 @@ export class PredictiveAnalyticsEngine {
 
     const expectedOpenTimestampMin = (lastClosedEpoch + lowSec) * 1000;
     const expectedOpenTimestampMax = (lastClosedEpoch + highSec) * 1000;
+    const isOverdue = Date.now() > expectedOpenTimestampMax;
 
     const formatInterval = (s: number) => {
       if (s < 3600) return `${Math.round(s / 60)}хв`;
@@ -293,6 +306,7 @@ export class PredictiveAnalyticsEngine {
       expectedOpenTimestampMin,
       expectedOpenTimestampMax,
       formattedEtaWindow,
+      isOverdue,
     };
   }
 
