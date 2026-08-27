@@ -228,12 +228,11 @@ export class NotificationDispatcher {
         return;
       }
 
-      if (this.tokens >= 1) {
+      while (this.tokens >= 1 && this.getTotalPending() > 0) {
         const item = this.selectNextItemDWRR();
-        if (item) {
-          this.tokens -= 1;
-          this.dispatchSingleMessage(item).catch(() => {});
-        }
+        if (!item) break;
+        this.tokens -= 1;
+        this.dispatchSingleMessage(item).catch(() => {});
       }
 
       // Jittered next tick: 37ms ± 3ms to avoid thundering harmonic edge spikes

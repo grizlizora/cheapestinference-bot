@@ -1,6 +1,8 @@
 {
   "common": {
     "back": "⬅️ Назад",
+    "back_to_settings": "⬅️ Назад до налаштувань",
+    "back_to_dashboard": "⬅️ Назад до дашборду",
     "refresh": "🔄 Оновити",
     "refreshed_toast": "⚡ Дані щойно оновлено з сайту!",
     "status_available": "🟢 Доступно",
@@ -32,9 +34,29 @@
     "btn_frontier": "⚡ Frontier Пул",
     "btn_core": "🧠 Core Пул",
     "btn_subscriptions": "🔔 Мої сповіщення",
+    "btn_settings": "⚙️ Налаштування",
     "btn_language": "🌐 Змінити мову",
     "btn_refresh": "🔄 Оновити дані",
     "btn_help": "ℹ️ Інструкція"
+  },
+  "settings": {
+    "title": "⚙️ <b>Налаштування та безпека</b>\n\n🆔 <b>Ваш Telegram ID:</b> <code>{telegram_id}</code>\n👤 <b>Користувач:</b> {username}\n🌐 <b>Мова інтерфейсу:</b> {language}\n\nОберіть потрібний розділ:",
+    "btn_language": "🌐 Зміна мови",
+    "btn_help": "ℹ️ Довідка та зв'язок з автором",
+    "btn_integrity": "🛡️ Перевірка автентичності коду (GitHub)"
+  },
+  "integrity": {
+    "title": "🛡️ <b>Криптографічний Zero-Trust Верифікатор</b>\n\nВи можете миттєво перевірити, чи код цього запущеного бота відповідає офіційному репозиторію GitHub без жодних сторонніх модифікацій чи заглушок.",
+    "success_text": "🛡️ <b>Криптографічна автентичність коду: ПІДТВЕРДЖЕНО ✅</b>\n\nКод запущеного бота на 100% автентичний і повністю відповідає офіційному репозиторію GitHub!\n\n📦 <b>Специфікація коміту:</b>\n• <b>Commit:</b> <code>{commit_sha}</code> (<a href=\"https://github.com/grizlizora/cheapestinference-bot/tree/{commit_sha}\">GitHub Tree</a>)\n• <b>Автор:</b> {commit_author}\n• <b>Повідомлення:</b> <i>{commit_msg}</i>\n• <b>Перевірено файлів:</b> <b>{total_files} / {total_files} ✅</b>\n\n🎲 <b>Динамічний челендж:</b> <code>{challenge_code}</code>\n🔐 <b>Proof-Хеш:</b>\n<code>{proof_hash}</code>\n\n🖥 <b>Хмарний вузол:</b> <code>{node_id}</code> <i>(Час: {time_ms}мс)</i>\n\n👇 <i>Натисніть кнопку нижче, щоб незалежний верифікатор на GitHub Pages звірив цей хеш з офіційним вихідним кодом:</i>",
+    "mismatch_text": "⚠️ <b>УВАГА: Виявлено розбіжності з офіційним кодом GitHub!</b>\n\nПоточний код запущеного бота має локальні модифікації порівняно з офіційним репозиторієм.\n\n📦 <b>Порівняно з комітом:</b> <code>{commit_sha}</code>\n📊 <b>Ідентичних файлів:</b> {identical_count} / {total_files}\n{diffs_summary}\n\n🎲 <b>Челендж:</b> <code>{challenge_code}</code>\n🔐 <b>Локальний хеш:</b> <code>{proof_hash}</code>\n🖥 <b>Вузол:</b> <code>{node_id}</code>",
+    "btn_open_verifier": "🔍 Перевірити на GitHub Pages",
+    "btn_open_github": "🐙 Відкрити GitHub репозиторій",
+    "btn_reverify": "🔄 Повторити перевірку",
+    "toast_scanning": "⏳ Сканую файли та перевіряю GitHub API...",
+    "toast_running_audit": "⏳ Запуск криптографічного аудиту...",
+    "diff_modified": "\n❌ <b>Модифіковано ({count}):</b>",
+    "diff_added": "\n➕ <b>Додано сторонні файли ({count}):</b>",
+    "diff_deleted": "\n➖ <b>Видалено файли ({count}):</b>"
   },
   "pool_detail": {
     "title": "🏷 <b>{pool_name}</b>\n\n📝 <b>Опис:</b>\n<i>{description}</i>\n\n🤖 <b>Включені моделі (безліміт):</b>\n{models_list}\n\n💰 <b>Вартість:</b>\n• Базовий тариф: від <b>${min_price}/міс</b> (~${min_price_day}/день)\n• Знижка при оплаті за рік: <b>{annual_discount}%</b>\n\n🕒 <b>Регіональні 8-годинні блоки (UTC):</b>\n{blocks_list}\n\n🔗 <b>Офіційне посилання:</b> <a href=\"{url}\">{url}</a>",
@@ -96,27 +118,23 @@
     "toast_slot_on": "✅ Сповіщення {pool} ({block}) увімкнено",
     "toast_slot_off": "❌ Сповіщення {pool} ({block}) вимкнено",
     "pool_section_header": "\n📦 <b>Тариф {pool_name}:</b>",
+    "pool_active": "📦 Тариф {name}: ✅ Увімкнено",
+    "pool_inactive": "📦 Тариф {name}: ❌ Вимкнено",
     "slot_active": "✅ {name} ({hours})",
-    "slot_inactive": "❌ {name} ({hours})",
-    "pool_active": "✅ Весь пул {name}",
-    "pool_inactive": "❌ Весь пул {name}",
-    "btn_pool_on": "🔕 Відписатися від пулу {pool}",
-    "btn_pool_off": "🔔 Підписатися на весь пул {pool}"
+    "slot_inactive": "❌ {name} ({hours})"
   },
   "alerts": {
     "slot_appeared_header": "{status_icon} <b>ВІЛЬНИЙ СЛОТ • {pool_name}</b>",
-    "slot_appeared_body": "🌍 <b>Регіон:</b> {block_name} <code>({hours_utc})</code>\n📊 <b>Статус:</b> {status_badge}\n🤖 <b>Моделі:</b> {models}\n💰 <b>Вартість:</b> <code>${price}/{currency_month}</code>\n⏱ <b>Час:</b> <code>{timestamp} UTC</code>\n\n⚡ <i>Слоти розбирають за хвилини! Забронюйте за кнопкою нижче:</i>",
-    "slot_disappeared_header": "🔒 <b>СЛОТ РОЗПРОДАНО • {pool_name}</b>",
-    "slot_disappeared_body": "🌍 <b>Регіон:</b> {block_name}\n⏱ <b>Час закриття:</b> <code>{timestamp} UTC</code>\n\n🔔 <i>Бот миттєво сповістить вас, щойно слот знову стане доступним!</i>",
-    "price_changed_header": "{trend_icon} <b>ЗМІНА ЦІНИ ТАРИФУ • {pool_name}</b>",
-    "price_changed_body": "🌍 <b>Регіон:</b> {block_name}\n💰 <b>Тариф:</b> <s>${old_price}</s> ➔ <b>${new_price}/{currency_month}</b>\n{delta_badge}\n\n💡 <i>Зафіксувати ціну можна за посиланням нижче:</i>",
+    "slot_appeared_body": "📦 <b>{pool_name}</b> ({block_name} • <code>({hours_utc})</code>)\n\n🟢 <b>Статус:</b> {status_badge}\n💰 <b>Ціна:</b> <code>${price}/{currency_month}</code>\n🤖 <b>Моделі:</b> {models}\n\n🕒 <b>Час:</b> <code>{timestamp} UTC</code>",
+    "slot_disappeared_header": "🔴 <b>СЛОТ РОЗПРОДАНО • {pool_name}</b>",
+    "slot_disappeared_body": "📦 <b>{pool_name}</b> ({block_name})\n\n🕒 <b>Час:</b> <code>{timestamp} UTC</code>\n⚡ <i>Ми сповістимо вас, щойно слот знову стане доступним!</i>",
     "slot_price_changed_header": "{trend_icon} <b>ЗМІНА ЦІНИ СЛОТА • {pool_name}</b>",
-    "slot_price_changed_body": "🌍 <b>Регіон:</b> {block_name} <code>({hours_utc})</code>\n💰 <b>Ціна слота:</b> <s>${old_price}</s> ➔ <b>${new_price}/{currency_month}</b>\n{delta_badge}\n\n💡 <i>Зафіксувати ціну можна за посиланням нижче:</i>",
-    "pool_base_price_header": "{trend_icon} <b>ЗМІНА БАЗОВОГО ТАРИФУ • {pool_name}</b>",
-    "pool_base_price_body": "💰 <b>Базовий тариф пулу:</b> <s>${old_price}</s> ➔ <b>${new_price}/{currency_month}</b>\n{delta_badge}\n🤖 <b>Моделі:</b> {models}\n\n⚡ <i>Ціна поширюється на всі нові підписки цього тарифу!</i>",
+    "slot_price_changed_body": "📦 <b>{pool_name}</b> ({block_name} • <code>{hours_utc}</code>)\n\n💰 <b>Ціна:</b> <s>${old_price}</s> ➔ <b>${new_price}/{currency_month}</b>\n{delta_badge}",
     "price_discount_badge": "🟢 <b>Знижка: -${delta}/{currency_month} (-{percentage}%) 🔥</b>",
-    "price_increase_badge": "🔴 <b>Підвищення: +${delta}/{currency_month} (+{percentage}%)</b>",
-    "model_upgrade_header": "🚀 <b>ОНОВЛЕННЯ МОДЕЛЕЙ • {pool_name}</b>",
+    "price_increase_badge": "🔴 <b>Подорожчання: +${delta}/{currency_month} (+{percentage}%)</b>",
+    "pool_base_price_header": "{trend_icon} <b>ЗМІНА БАЗОВОГО ТАРИФУ • {pool_name}</b>",
+    "pool_base_price_body": "У тарифі <b>{pool_name}</b> змінилася базова ціна:\n\n💰 <s>${old_price}</s> ➔ <b>${new_price}/{currency_month}</b>\n{delta_badge}\n\n🤖 <b>Моделі:</b> {models}",
+    "model_upgrade_header": "🆕 <b>ОНОВЛЕННЯ НЕЙРОМЕРЕЖ • {pool_name}</b>",
     "model_upgrade_body": "У пулі оновлено конфігурацію нейромереж:\n\n{model_diff_block}\n\n🤖 <b>Усі активні моделі ({model_count}):</b>\n{all_models}\n\n⚡ <i>Оновлені моделі доступні за поточною підпискою без доплат!</i>",
     "model_item_upgraded": "  ⚡ <code>{old_model}</code> ➔ <code>{new_model}</code>",
     "model_item_added": "  ➕ <code>{model_name}</code> <i>(Нова)</i>",
@@ -138,7 +156,7 @@
     "bundle_title_tier": "Оновлення тарифу",
     "bundle_title_new_pool": "Новий пул запущено",
     "batch_price_update": "🏷️ Зміна ціни",
-    "btn_claim_slot": "🚀 Оформити слот на сайті",
+    "btn_claim_slot": "⚡ Замовити слот",
     "btn_claim_slot_block": "⚡ Забрати ({block_name}) • ${price}/{currency_month}",
     "btn_open_pool": "🔎 Переглянути пул у боті",
     "price_drop_badge": "Знижка ціни! 🔥"
@@ -167,5 +185,5 @@
     "backup_in_progress": "⏳ <i>Формування бекапу бази даних SQLite (`VACUUM INTO`)...</i>",
     "new_user_alert": "👤 <b>Новий користувач у боті!</b>\n━━━━━━━━━━━━━━━━━━━━━━━━\n• <b>Ім'я:</b> <code>{first_name}</code>\n• <b>Username:</b> {username}\n• <b>Telegram ID:</b> <code>{telegram_id}</code>\n• <b>Мова інтерфейсу:</b> {language}\n• <b>Всього користувачів:</b> <code>{total_users}</code>"
   },
-  "help_text": "ℹ️ <b>Як працює цей бот?</b>\n\n1. Бот цілодобово перевіряє сторінку <a href=\"https://cheapestinference.com/pools\">cheapestinference.com/pools</a> через захищений анонімний Tor/проксі канал.\n2. Кожен тариф ділиться на три щоденні 8-годинні часові блоки (Азія, Європа, Америка).\n3. Ви можете переглядати актуальну наявність слотів у реальному часі за допомогою кнопок меню.\n4. У розділі <b>🔔 Мої сповіщення</b> налаштуйте персональні сповіщення на потрібні вам тарифи або окремі регіони.\n5. Щойно слот з'являється — ви миттєво отримуєте повідомлення з прямим посиланням на покупку!\n\n🆔 <b>Ваш Telegram ID:</b> <code>{telegram_id}</code>\n\n👨‍💻 <b>Зв'язок з автором / Підтримка:</b>\nTelegram: <a href=\"https://t.me/grizlizora\">@grizlizora</a>"
+  "help_text": "ℹ️ <b>Як працює цей бот?</b>\n\n1. Бот цілодобово перевіряє сторінку <a href=\"https://cheapestinference.com/pools\">cheapestinference.com/pools</a> через захищений анонімний Tor/проксі канал.\n2. Кожен тариф ділиться на три щоденні 8-годинні часові блоки (Азія, Європа, Америка).\n3. Ви можете переглядати актуальну наявність слотів у реальному часі за допомогою кнопок меню.\n4. Натисніть на потрібний тариф на головному екрані, щоб налаштувати персональні сповіщення.\n5. Щойно слот з'являється — ви миттєво отримуєте повідомлення з прямою кнопкою на замовлення!\n\n🆔 <b>Ваш Telegram ID:</b> <code>{telegram_id}</code>\n\n👨‍💻 <b>Зв'язок з автором / Підтримка:</b>\nTelegram: <a href=\"https://t.me/grizlizora\">@grizlizora</a>"
 }

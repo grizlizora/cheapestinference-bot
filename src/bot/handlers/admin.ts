@@ -80,7 +80,17 @@ export function renderAdminText(
   });
 }
 
+function pruneFailedClaimAttempts(): void {
+  const now = Date.now();
+  for (const [userId, attempt] of failedClaimAttempts.entries()) {
+    if (attempt.lockedUntil < now && now - attempt.lockedUntil > 3600 * 1000) {
+      failedClaimAttempts.delete(userId);
+    }
+  }
+}
+
 export function createAdminKeyboard(ctx: BotContext, userDao: UserDAO): InlineKeyboard {
+  pruneFailedClaimAttempts();
   const adminUser = ctx.from ? userDao.getByTelegramId(ctx.from.id) : undefined;
   const newUsersEnabled = (adminUser?.notify_admin_new_users ?? 1) === 1;
 
@@ -96,7 +106,8 @@ export function createAdminKeyboard(ctx: BotContext, userDao: UserDAO): InlineKe
     .row()
     .text(ctx.t("admin.btn_test_alert"), "admin_test_alert")
     .row()
-    .text(ctx.t("common.refresh"), "admin_refresh");
+    .text(ctx.t("common.refresh"), "admin_refresh")
+    .text(ctx.t("common.back_to_dashboard"), "back_to_dashboard_from_admin");
 }
 
 export function createAdminHandler(

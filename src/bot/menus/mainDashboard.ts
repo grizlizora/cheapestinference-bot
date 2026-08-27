@@ -37,6 +37,10 @@ export async function safeEditMessageText(
 
 import { ActiveDashboardRegistry } from "../liveSync/dashboardRegistry.js";
 
+import { createSettingsMenu, renderSettingsText } from "./settings.js";
+import { CodeIntegrityEngine } from "../../engine/codeIntegrityEngine.js";
+import { NodeActivationEngine } from "../../engine/nodeActivationEngine.js";
+
 export function createMainMenuHierarchy(
   poolStateDao: PoolStateDAO,
   userDao: UserDAO,
@@ -44,29 +48,23 @@ export function createMainMenuHierarchy(
   invertedIndex: SubscriberInvertedIndex,
   historyDao?: SlotHistoryDAO,
   scraper?: ScraperOrchestrator,
-  dashboardRegistry?: ActiveDashboardRegistry
+  dashboardRegistry?: ActiveDashboardRegistry,
+  integrityEngine?: CodeIntegrityEngine,
+  nodeActivationEngine?: NodeActivationEngine
 ) {
   const languageMenu = createLanguageMenu(userDao, poolStateDao, invertedIndex, historyDao, scraper, subDao, dashboardRegistry);
   const { poolDetailMenu, poolSettingsMenu } = createPoolDetailMenu(poolStateDao, subDao, invertedIndex, historyDao, scraper, dashboardRegistry);
   const subscriptionsMenu = createSubscriptionsMenu(subDao, userDao, poolStateDao, invertedIndex, historyDao, scraper, dashboardRegistry);
-
-  const helpMenu = new Menu<BotContext>("help-menu")
-    .url(
-      (ctx) => ctx.t("common.btn_contact_author"),
-      "https://t.me/grizlizora"
-    )
-    .row()
-    .text(
-      (ctx) => ctx.t("common.back"),
-      async (ctx) => {
-        await ctx.answerCallbackQuery().catch(() => {});
-        if (ctx.chat) {
-          dashboardRegistry?.updateView(ctx.chat.id, "dashboard");
-        }
-        await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao, scraper));
-        return ctx.menu.nav("main-dashboard-menu");
-      }
-    );
+  const { settingsMenu, helpMenu, integrityMenu } = createSettingsMenu(
+    userDao,
+    subDao,
+    poolStateDao,
+    historyDao,
+    scraper,
+    dashboardRegistry,
+    integrityEngine,
+    nodeActivationEngine
+  );
 
   const mainDashboardMenu = new Menu<BotContext>("main-dashboard-menu")
     .dynamic((ctx, range) => {
@@ -135,36 +133,26 @@ export function createMainMenuHierarchy(
       }
     )
     .text(
-      (ctx) => ctx.t("common.help"),
+      (ctx) => ctx.t("menu.btn_settings"),
       async (ctx) => {
         await ctx.answerCallbackQuery().catch(() => {});
         if (ctx.chat) {
           dashboardRegistry?.updateView(ctx.chat.id, "other");
         }
-        await safeEditMessageText(ctx, ctx.t("help_text", { telegram_id: String(ctx.from?.id || "N/A") }));
-        return ctx.menu.nav("help-menu");
-      }
-    )
-    .row()
-    .text(
-      (ctx) => ctx.t("menu.btn_language"),
-      async (ctx) => {
-        await ctx.answerCallbackQuery().catch(() => {});
-        if (ctx.chat) {
-          dashboardRegistry?.updateView(ctx.chat.id, "other");
-        }
-        await safeEditMessageText(ctx, ctx.t("onboarding.welcome_title"));
-        return ctx.menu.nav("language-menu");
+        await safeEditMessageText(ctx, renderSettingsText(ctx));
+        return ctx.menu.nav("settings-menu");
       }
     );
 
   // Register submenus into hierarchy
   mainDashboardMenu.register(poolDetailMenu);
   mainDashboardMenu.register(subscriptionsMenu);
-  mainDashboardMenu.register(languageMenu);
-  mainDashboardMenu.register(helpMenu);
+  mainDashboardMenu.register(settingsMenu);
+  settingsMenu.register(languageMenu);
+  settingsMenu.register(helpMenu);
+  settingsMenu.register(integrityMenu);
 
-  return { mainDashboardMenu, languageMenu, poolDetailMenu, poolSettingsMenu, subscriptionsMenu, helpMenu };
+  return { mainDashboardMenu, languageMenu, poolDetailMenu, poolSettingsMenu, subscriptionsMenu, settingsMenu, helpMenu, integrityMenu };
 }
 
 export function renderDashboardText(

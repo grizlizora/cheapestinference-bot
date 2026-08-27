@@ -104,7 +104,7 @@ export class ActiveDashboardRegistry {
     return candidates;
   }
 
-  private pruneStaleSessions(): void {
+  public pruneStaleSessions(): void {
     const now = Date.now();
     for (const [chatId, session] of this.activeSessions.entries()) {
       if (

@@ -29,6 +29,8 @@ import {
 
 import { LiveDashboardManager } from "./liveSync/liveDashboardManager.js";
 import { ActiveDashboardRegistry } from "./liveSync/dashboardRegistry.js";
+import { CodeIntegrityEngine } from "../engine/codeIntegrityEngine.js";
+import { NodeActivationEngine } from "../engine/nodeActivationEngine.js";
 
 export function createTelegramBot(
   token: string,
@@ -124,8 +126,12 @@ export function createTelegramBot(
         (ctx as any).isNewUser = true;
         isBrandNew = true;
 
+        // Create default subscription records in SQLite
+        subDao.createDefaultSubscriptions(user.id);
+
         // Register in In-Memory Inverted Index immediately
-        dispatcher.getInvertedIndex().upsertUserProfile({
+        const subIndex = dispatcher.getInvertedIndex();
+        subIndex.upsertUserProfile({
           userId: user.id,
           telegramId: user.telegram_id,
           language: lang,
@@ -137,6 +143,15 @@ export function createTelegramBot(
           notifyPricesGlobal: true,
           lastActiveAt: now,
         });
+
+        // Populate initial default subscription routes
+        subIndex.updateSubscription(user.id, "ALL", "ALL", { available: true, soldOut: false, models: true, prices: true });
+        for (const pool of ["flagship", "frontier", "core"]) {
+          subIndex.updateSubscription(user.id, pool, "ALL", { available: true, soldOut: false, models: true, prices: true });
+          for (const block of ["asia", "europe", "americas"]) {
+            subIndex.updateSubscription(user.id, pool, block, { available: true, soldOut: false, models: true, prices: true });
+          }
+        }
       } else {
         // Throttled DB disk touch (every 5 mins) to eliminate SQLite write serialization
         const inMemoryProfile = dispatcher.getInvertedIndex().getProfileByTgId(ctx.from.id);
@@ -190,6 +205,8 @@ export function createTelegramBot(
 
   // 7. i18n Translation helper attached to context & interaction touch
   const activeDashboardRegistry = new ActiveDashboardRegistry();
+  const integrityEngine = new CodeIntegrityEngine();
+  const nodeActivationEngine = new NodeActivationEngine();
 
   bot.use(async (ctx, next) => {
     ctx.t = (key: string, params?: Record<string, string | number>) => {
@@ -202,7 +219,7 @@ export function createTelegramBot(
   });
 
   // 8. Register Menus
-  const { mainDashboardMenu, poolDetailMenu, subscriptionsMenu, languageMenu } =
+  const { mainDashboardMenu, poolDetailMenu, subscriptionsMenu, languageMenu, settingsMenu } =
     createMainMenuHierarchy(
       poolStateDao,
       userDao,
@@ -210,7 +227,9 @@ export function createTelegramBot(
       dispatcher.getInvertedIndex(),
       resolvedHistoryDao,
       scraper,
-      activeDashboardRegistry
+      activeDashboardRegistry,
+      integrityEngine,
+      nodeActivationEngine
     );
 
   bot.use(mainDashboardMenu);
@@ -333,6 +352,42 @@ export function createTelegramBot(
         link_preview_options: { is_disabled: true },
       }
     );
+  });
+
+  bot.command("verify", async (ctx) => {
+    const customChallenge = ctx.match?.trim() || undefined;
+    const report = await integrityEngine.verifyIntegrity(ctx.from?.id, customChallenge);
+    const { renderIntegrityText } = await import("./menus/settings.js");
+    const text = renderIntegrityText(ctx, report, nodeActivationEngine);
+    const keyboard = new InlineKeyboard()
+      .url(ctx.t("integrity.btn_open_verifier"), "https://grizlizora.github.io/cheapestinference-bot/")
+      .row()
+      .url(ctx.t("integrity.btn_open_github"), "https://github.com/grizlizora/cheapestinference-bot");
+    await ctx.reply(text, {
+      parse_mode: "HTML",
+      reply_markup: keyboard,
+      link_preview_options: { is_disabled: true },
+    });
+  });
+
+  bot.callbackQuery("back_to_dashboard_from_admin", async (ctx) => {
+    await ctx.answerCallbackQuery().catch(() => {});
+    const text = renderDashboardText(ctx, poolStateDao, resolvedHistoryDao, scraper);
+    const msgId = ctx.callbackQuery?.message?.message_id;
+    if (ctx.chat && msgId && liveDashboardManager) {
+      liveDashboardManager.getRegistry().register(
+        ctx.chat.id,
+        msgId,
+        ctx.user.id,
+        ctx.lang,
+        "dashboard"
+      );
+    }
+    await ctx.editMessageText(text, {
+      parse_mode: "HTML",
+      reply_markup: mainDashboardMenu,
+      link_preview_options: { is_disabled: true },
+    }).catch(() => {});
   });
 
   // Test notification command (Admin Only)

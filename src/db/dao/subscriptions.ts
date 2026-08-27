@@ -39,10 +39,10 @@ export class SubscriptionDAO {
     this.stmtAddSub = db.prepare(`
       INSERT INTO subscriptions (
         user_id, pool_slug, block_id, notify_on_available, notify_on_sold_out, notify_on_models, notify_on_prices
-      ) VALUES (?, ?, ?, 1, 1, 1, 1)
+      ) VALUES (?, ?, ?, 1, 0, 1, 1)
       ON CONFLICT(user_id, pool_slug, block_id) DO UPDATE SET
         notify_on_available = 1,
-        notify_on_sold_out = 1,
+        notify_on_sold_out = 0,
         notify_on_models = 1,
         notify_on_prices = 1
     `);
@@ -254,6 +254,29 @@ export class SubscriptionDAO {
         },
       };
     })();
+  }
+
+  createDefaultSubscriptions(
+    userId: number,
+    pools: string[] = ["flagship", "frontier", "core"],
+    defaultBlocks: string[] = ["asia", "europe", "americas"]
+  ): void {
+    this.db.transaction(() => {
+      // Global master
+      this.stmtAddSub.run(userId, "ALL", "ALL");
+      for (const pool of pools) {
+        this.stmtAddSub.run(userId, pool, "ALL");
+        for (const block of defaultBlocks) {
+          this.stmtAddSub.run(userId, pool, block);
+        }
+      }
+    })();
+  }
+
+  getUserSubscriptions(userId: number): SubscriptionRecord[] {
+    return this.db
+      .prepare(`SELECT * FROM subscriptions WHERE user_id = ?`)
+      .all(userId) as SubscriptionRecord[];
   }
 
   updateUserGlobalCategory(

@@ -4,6 +4,7 @@ import zlib from "node:zlib";
 import tls from "node:tls";
 import util from "node:util";
 import { ProxyPool } from "../proxy/proxyPool.js";
+import { FastDnsCache } from "./dnsCache.js";
 
 const gunzipAsync = util.promisify(zlib.gunzip);
 const brotliDecompressAsync = util.promisify(zlib.brotliDecompress);
@@ -33,6 +34,7 @@ export interface HttpResponse {
 export class RobustHttpClient {
   private dispatchers = new Map<string, Dispatcher>();
   private tlsSessionCache = new Map<string, Buffer>();
+  private dnsCache = new FastDnsCache();
   private directAgent: Agent;
 
   constructor(private readonly proxyPool: ProxyPool) {
@@ -44,6 +46,7 @@ export class RobustHttpClient {
         keepAlive: true,
         keepAliveInitialDelay: 1000,
         noDelay: true,
+        lookup: (hostname: string, opts: any, cb: any) => this.dnsCache.lookup(hostname, opts, cb),
       },
       keepAliveTimeout: 45_000, // Below Cloudflare 60s idle timeout
       keepAliveMaxTimeout: 55_000,
@@ -76,6 +79,7 @@ export class RobustHttpClient {
     }
     this.dispatchers.clear();
     this.tlsSessionCache.clear();
+    this.dnsCache.clear();
   }
 
   private getOrCreateDispatcher(proxyUrl: string | null, timeoutMs: number): Dispatcher {

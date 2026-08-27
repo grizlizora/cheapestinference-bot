@@ -51,12 +51,23 @@ export function createLanguageMenu(
       }
     }
 
-    if (ctx.chat && msgId && dashboardRegistry) {
-      dashboardRegistry.register(ctx.chat.id, msgId, ctx.user.id, lang, "dashboard");
+    const fromOnboarding = (ctx.session as any)?.fromOnboarding;
+    if (fromOnboarding) {
+      delete (ctx.session as any).fromOnboarding;
+      if (ctx.chat && msgId && dashboardRegistry) {
+        dashboardRegistry.register(ctx.chat.id, msgId, ctx.user.id, lang, "dashboard");
+      }
+      await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao, scraper));
+      return ctx.menu.nav("main-dashboard-menu");
     }
 
-    await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao, scraper));
-    return ctx.menu.nav("main-dashboard-menu");
+    if (ctx.chat && msgId && dashboardRegistry) {
+      dashboardRegistry.register(ctx.chat.id, msgId, ctx.user.id, lang, "other");
+    }
+
+    const { renderSettingsText } = await import("./settings.js");
+    await safeEditMessageText(ctx, renderSettingsText(ctx));
+    return ctx.menu.nav("settings-menu");
   };
 
   return new Menu<BotContext>("language-menu")
@@ -76,8 +87,20 @@ export function createLanguageMenu(
       (ctx) => ctx.t("common.back"),
       async (ctx) => {
         await ctx.answerCallbackQuery().catch(() => {});
-        await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao, scraper));
-        return ctx.menu.nav("main-dashboard-menu");
+        const fromOnboarding = (ctx.session as any)?.fromOnboarding;
+        if (fromOnboarding) {
+          delete (ctx.session as any).fromOnboarding;
+          const msgId = ctx.callbackQuery?.message?.message_id;
+          if (ctx.chat && msgId && dashboardRegistry) {
+            dashboardRegistry.register(ctx.chat.id, msgId, ctx.user.id, ctx.lang, "dashboard");
+          }
+          await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao, scraper));
+          return ctx.menu.nav("main-dashboard-menu");
+        }
+
+        const { renderSettingsText } = await import("./settings.js");
+        await safeEditMessageText(ctx, renderSettingsText(ctx));
+        return ctx.menu.nav("settings-menu");
       }
     );
 }
