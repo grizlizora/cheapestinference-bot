@@ -70,6 +70,7 @@ export function createHealthServer(
 
     if (
       pathname === "/health" ||
+      pathname === "/healthz" ||
       pathname === "/" ||
       pathname === "/ping" ||
       pathname === "/live"
