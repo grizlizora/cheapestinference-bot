@@ -214,6 +214,30 @@ export class SubscriptionDAO {
     return !!row;
   }
 
+  toggleSubscription(userId: number, poolSlug: string, blockId: string): boolean {
+    const exists = this.hasSubscription(userId, poolSlug, blockId);
+    if (exists) {
+      this.stmtRemoveSub.run(userId, poolSlug, blockId);
+      return false;
+    } else {
+      this.stmtAddSub.run(userId, poolSlug, blockId);
+      return true;
+    }
+  }
+
+  getSubscriptionStats(): { totalRules: number; subscribedUsers: number } {
+    const row = this.db.prepare(`
+      SELECT 
+        COUNT(*) as total_rules,
+        COUNT(DISTINCT user_id) as subscribed_users
+      FROM subscriptions
+    `).get() as any;
+    return {
+      totalRules: Number(row?.total_rules || 0),
+      subscribedUsers: Number(row?.subscribed_users || 0),
+    };
+  }
+
   togglePoolWithBlocks(userId: number, poolSlug: string, blockIds: string[] = ["asia", "europe", "americas"]): boolean {
     const hasAll = this.hasSubscription(userId, poolSlug, "ALL");
     const newState = !hasAll;
