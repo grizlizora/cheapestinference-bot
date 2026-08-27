@@ -115,4 +115,54 @@ describe("UserDAO & Admin Settings", () => {
     expect(escapeHtml("Fast & Reliable < 50ms")).toBe("Fast &amp; Reliable &lt; 50ms");
     expect(escapeHtml("")).toBe("");
   });
+
+  it("should prevent duplicate new user alerts on repeated /start and suppress for admins", async () => {
+    const { isUserAdmin } = await import("../src/config/env.js");
+
+    // 1. Admin user @grizlizora starts bot
+    const adminUser = userDao.getByTelegramId(828157777);
+    const isBrandNewAdmin = !adminUser;
+    expect(isBrandNewAdmin).toBe(true);
+
+    const isAdmin = isUserAdmin(828157777, userDao, "grizlizora");
+    expect(isAdmin).toBe(true);
+
+    // Admin should NOT trigger notification
+    const shouldNotifyAdminForAdmin = isBrandNewAdmin && !isAdmin;
+    expect(shouldNotifyAdminForAdmin).toBe(false);
+
+    // Register admin in DB
+    userDao.upsertUser({
+      telegram_id: 828157777,
+      username: "grizlizora",
+      first_name: "Roman",
+    });
+
+    // 2. Regular user joins first time
+    const regUser = userDao.getByTelegramId(555666);
+    const isBrandNewUser = !regUser;
+    expect(isBrandNewUser).toBe(true);
+    const isRegAdmin = isUserAdmin(555666, userDao, "regular_john");
+    expect(isRegAdmin).toBe(false);
+
+    const shouldNotifyForRegUser = isBrandNewUser && !isRegAdmin;
+    expect(shouldNotifyForRegUser).toBe(true);
+
+    // Save regular user to DB
+    userDao.upsertUser({
+      telegram_id: 555666,
+      username: "regular_john",
+      first_name: "John",
+    });
+
+    // 3. Regular user runs /start 10 more times
+    for (let i = 0; i < 10; i++) {
+      const existingUser = userDao.getByTelegramId(555666);
+      const isBrandNewAgain = !existingUser;
+      expect(isBrandNewAgain).toBe(false);
+      const shouldNotifyAgain = isBrandNewAgain && !isUserAdmin(555666, userDao, "regular_john");
+      expect(shouldNotifyAgain).toBe(false);
+    }
+  });
 });
+

@@ -174,14 +174,16 @@ export function createTelegramBot(
       ctx.user = user;
       ctx.lang = (user.language as SupportedLanguage) || "en";
 
-      // 6. Notify Admins on New User Registration (if enabled)
-      if (isBrandNew) {
+      // 6. Notify Admins on New User Registration (if enabled & user is NOT an admin)
+      if (isBrandNew && !isUserAdmin(ctx.from.id, userDao, ctx.from.username)) {
         const userStats = userDao.getUserStats();
         const usernameStr = ctx.from.username ? `@${escapeHtml(ctx.from.username)}` : "—";
         const langFlag = getLanguageFlag(ctx.lang);
         const allAdminIds = userDao.getAllAdminTelegramIds(config.ADMIN_USER_IDS);
 
         for (const adminId of allAdminIds) {
+          if (adminId === ctx.from.id) continue;
+
           const adminUser = userDao.getByTelegramId(adminId);
           const adminLang = (adminUser?.language as SupportedLanguage) || "uk";
           const wantsAlerts = (adminUser?.notify_admin_new_users ?? 1) === 1;
