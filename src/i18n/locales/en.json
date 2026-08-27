@@ -99,7 +99,9 @@
     "slot_active": "✅ {name} ({hours})",
     "slot_inactive": "❌ {name} ({hours})",
     "pool_active": "✅ Entire {name} Pool",
-    "pool_inactive": "❌ Entire {name} Pool"
+    "pool_inactive": "❌ Entire {name} Pool",
+    "btn_pool_on": "🔕 Unsubscribe from {pool}",
+    "btn_pool_off": "🔔 Subscribe to entire {pool}"
   },
   "alerts": {
     "slot_appeared_header": "{status_icon} <b>SLOT DROP • {pool_name}</b>",

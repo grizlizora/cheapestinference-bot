@@ -145,8 +145,8 @@ export function createPoolDetailMenu(
 
       range.text(
         isSubscribedToPool
-          ? ctx.t("subscriptions.btn_pool_on", { pool: slug.toUpperCase() })
-          : ctx.t("subscriptions.btn_pool_off", { pool: slug.toUpperCase() }),
+          ? ctx.t("pool_detail.btn_unsubscribe_pool", { pool_name: slug.toUpperCase() })
+          : ctx.t("pool_detail.btn_subscribe_pool", { pool_name: slug.toUpperCase() }),
         async (c) => {
           const newSubState = subDao.togglePoolWithBlocks(c.user.id, slug, blockIds);
 

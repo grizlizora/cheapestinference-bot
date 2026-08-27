@@ -99,7 +99,9 @@
     "slot_active": "✅ {name} ({hours})",
     "slot_inactive": "❌ {name} ({hours})",
     "pool_active": "✅ Весь пул {name}",
-    "pool_inactive": "❌ Весь пул {name}"
+    "pool_inactive": "❌ Весь пул {name}",
+    "btn_pool_on": "🔕 Відписатися від пулу {pool}",
+    "btn_pool_off": "🔔 Підписатися на весь пул {pool}"
   },
   "alerts": {
     "slot_appeared_header": "{status_icon} <b>ВІЛЬНИЙ СЛОТ • {pool_name}</b>",

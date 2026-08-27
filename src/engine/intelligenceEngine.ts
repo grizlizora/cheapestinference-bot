@@ -32,12 +32,12 @@ export class AvailabilityIntelligenceEngine {
     if (rawSiteStatus === "limited") {
       const tip = analytics.avgDurationFormatted
         ? translate(lang, "intelligence.tip_limited_historical", { duration: analytics.avgDurationFormatted })
-        : translate(lang, "intelligence.tip_limited_site");
+        : undefined;
 
       return {
-        badge: translate(lang, "common.status_limited"),
-        demandTag: translate(lang, "intelligence.tag_high_demand"),
-        isHot: true,
+        badge: translate(lang, "common.status_available"),
+        demandTag: analytics.avgDurationFormatted ? translate(lang, "intelligence.tag_high_demand") : translate(lang, "intelligence.tag_stable"),
+        isHot: Boolean(analytics.avgDurationFormatted && analytics.demandCategory === "hot"),
         predictionTip: tip,
         analytics,
       };
@@ -58,7 +58,7 @@ export class AvailabilityIntelligenceEngine {
       badge: translate(lang, "common.status_available"),
       demandTag: translate(lang, "intelligence.tag_stable"),
       isHot: false,
-      predictionTip: analytics.avgDurationFormatted
+      predictionTip: analytics.avgDurationFormatted && analytics.demandCategory === "moderate"
         ? translate(lang, "intelligence.tip_stable_historical", { duration: analytics.avgDurationFormatted })
         : undefined,
       analytics,
