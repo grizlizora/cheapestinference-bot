@@ -41,7 +41,7 @@ export function getDatabase(): Database.Database {
   return dbInstance;
 }
 
-function initSchema(db: Database.Database): void {
+export function initSchema(db: Database.Database): void {
   // Embedded authoritative schema definitions
   db.exec(`
     -- 1. Users Table
