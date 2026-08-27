@@ -16,6 +16,10 @@ services:
         sync: false
       - key: DB_PATH
         value: /app/data/bot.db
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false
       - key: CF_WORKER_URL
         sync: false
       - key: CF_WORKER_SECRET

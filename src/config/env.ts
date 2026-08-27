@@ -20,6 +20,8 @@ const envSchema = z.object({
         : []
     ),
   DB_PATH: z.string().default("./data/bot.db"),
+  TURSO_DATABASE_URL: z.string().optional(),
+  TURSO_AUTH_TOKEN: z.string().optional(),
   TELEGRAM_API_ROOT: z.string().optional(),
   CF_WORKER_URL: z.string().optional(),
   CF_WORKER_SECRET: z.string().optional(),

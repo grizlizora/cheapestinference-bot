@@ -16,6 +16,7 @@ import { UserDAO } from "./db/dao/users.js";
 import { SubscriptionDAO } from "./db/dao/subscriptions.js";
 import { NotificationLogDAO } from "./db/dao/notificationLogs.js";
 import { DatabaseMaintenanceManager } from "./db/maintenance.js";
+import { tursoCloudSync } from "./db/tursoSync.js";
 import { createTelegramBot } from "./bot/index.js";
 import { createHealthServer } from "./server/health.js";
 
@@ -34,6 +35,9 @@ async function bootstrap() {
 
   // 1. Initialize SQLite Database, DAOs & Maintenance
   const db = getDatabase();
+  if (tursoCloudSync.isEnabled()) {
+    await tursoCloudSync.pullStateFromTurso(db);
+  }
   const userDao = new UserDAO(db);
   const subDao = new SubscriptionDAO(db);
   const poolStateDao = new PoolStateDAO(db);
@@ -171,6 +175,7 @@ async function bootstrap() {
     notificationLogDao.close();
     httpClient.destroy();
     healthServer.close();
+    await tursoCloudSync.close().catch(() => {});
     closeDatabase();
     console.log("👋 [Shutdown] All services stopped. Goodbye!");
     process.exit(0);

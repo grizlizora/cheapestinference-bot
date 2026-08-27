@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import { SubscriptionRecord } from "../../types/db.js";
+import { tursoCloudSync } from "../tursoSync.js";
 
 export interface SubscriptionFlags {
   notify_on_available: number;
@@ -344,6 +345,21 @@ export class SubscriptionDAO {
     const isCurrentlySubscribed = this.isPoolSubscribed(userId, poolSlug, blockIds) || this.getPoolFlags(userId, poolSlug).isSubscribed;
     const newState = !isCurrentlySubscribed;
     this.txTogglePool(userId, poolSlug, newState, blockIds, allPools);
+
+    if (newState) {
+      tursoCloudSync.pushMutation(
+        `INSERT INTO subscriptions (user_id, pool_slug, block_id, notify_on_available, notify_on_sold_out, notify_on_models, notify_on_prices)
+         VALUES (?, ?, 'ALL', 1, 0, 1, 1)
+         ON CONFLICT(user_id, pool_slug, block_id) DO UPDATE SET notify_on_available=1, notify_on_models=1, notify_on_prices=1`,
+        [userId, poolSlug]
+      );
+      for (const b of blockIds) {
+        tursoCloudSync.pushMutation(`DELETE FROM subscriptions WHERE user_id = ? AND pool_slug = ? AND block_id = ?`, [userId, poolSlug, b]);
+      }
+    } else {
+      tursoCloudSync.pushMutation(`DELETE FROM subscriptions WHERE user_id = ? AND pool_slug = ?`, [userId, poolSlug]);
+    }
+
     return newState;
   }
 
@@ -355,9 +371,36 @@ export class SubscriptionDAO {
     allPools?: Array<{ slug: string; blocks: string[] }>
   ): { isBlockSubscribed: boolean; isPoolSubscribed: boolean } {
     const result = this.txToggleBlock(userId, poolSlug, blockId, allBlockIds, allPools) as any;
+    const isBlockSubscribed = result?.isBlockSubscribed ?? this.isBlockSubscribed(userId, poolSlug, blockId);
+    const isPoolSubscribed = result?.isPoolSubscribed ?? this.isPoolSubscribed(userId, poolSlug, allBlockIds);
+
+    if (isPoolSubscribed) {
+      tursoCloudSync.pushMutation(
+        `INSERT INTO subscriptions (user_id, pool_slug, block_id, notify_on_available, notify_on_sold_out, notify_on_models, notify_on_prices)
+         VALUES (?, ?, 'ALL', 1, 0, 1, 1)
+         ON CONFLICT(user_id, pool_slug, block_id) DO UPDATE SET notify_on_available=1, notify_on_models=1, notify_on_prices=1`,
+        [userId, poolSlug]
+      );
+      for (const b of allBlockIds) {
+        tursoCloudSync.pushMutation(`DELETE FROM subscriptions WHERE user_id = ? AND pool_slug = ? AND block_id = ?`, [userId, poolSlug, b]);
+      }
+    } else {
+      tursoCloudSync.pushMutation(`DELETE FROM subscriptions WHERE user_id = ? AND pool_slug = ? AND block_id = 'ALL'`, [userId, poolSlug]);
+      if (isBlockSubscribed) {
+        tursoCloudSync.pushMutation(
+          `INSERT INTO subscriptions (user_id, pool_slug, block_id, notify_on_available, notify_on_sold_out, notify_on_models, notify_on_prices)
+           VALUES (?, ?, ?, 1, 0, 1, 1)
+           ON CONFLICT(user_id, pool_slug, block_id) DO UPDATE SET notify_on_available=1, notify_on_models=1, notify_on_prices=1`,
+          [userId, poolSlug, blockId]
+        );
+      } else {
+        tursoCloudSync.pushMutation(`DELETE FROM subscriptions WHERE user_id = ? AND pool_slug = ? AND block_id = ?`, [userId, poolSlug, blockId]);
+      }
+    }
+
     return {
-      isBlockSubscribed: result?.isBlockSubscribed ?? this.isBlockSubscribed(userId, poolSlug, blockId),
-      isPoolSubscribed: result?.isPoolSubscribed ?? this.isPoolSubscribed(userId, poolSlug, allBlockIds),
+      isBlockSubscribed,
+      isPoolSubscribed,
     };
   }
 
@@ -368,6 +411,21 @@ export class SubscriptionDAO {
     const hasGlobal = this.hasSubscription(userId, "ALL", "ALL");
     const newState = !hasGlobal;
     this.txToggleGlobal(userId, newState, pools);
+
+    if (newState) {
+      tursoCloudSync.pushMutation(
+        `INSERT INTO subscriptions (user_id, pool_slug, block_id, notify_on_available, notify_on_sold_out, notify_on_models, notify_on_prices)
+         VALUES (?, 'ALL', 'ALL', 1, 0, 1, 1)
+         ON CONFLICT(user_id, pool_slug, block_id) DO UPDATE SET notify_on_available=1, notify_on_models=1, notify_on_prices=1`,
+        [userId]
+      );
+      for (const p of pools) {
+        tursoCloudSync.pushMutation(`DELETE FROM subscriptions WHERE user_id = ? AND pool_slug = ?`, [userId, p.slug]);
+      }
+    } else {
+      tursoCloudSync.pushMutation(`DELETE FROM subscriptions WHERE user_id = ?`, [userId]);
+    }
+
     return newState;
   }
 
@@ -421,7 +479,13 @@ export class SubscriptionDAO {
     category: "available" | "sold_out" | "models" | "prices",
     _blockIds: string[] = ["asia", "europe", "americas"]
   ): { newState: boolean; flags: SubscriptionFlags } {
-    return this.txTogglePoolCategory(userId, poolSlug, category);
+    const res = this.txTogglePoolCategory(userId, poolSlug, category);
+    tursoCloudSync.pushMutation(
+      `UPDATE subscriptions SET notify_on_available = ?, notify_on_sold_out = ?, notify_on_models = ?, notify_on_prices = ?
+       WHERE user_id = ? AND pool_slug = ?`,
+      [res.flags.notify_on_available, res.flags.notify_on_sold_out, res.flags.notify_on_models, res.flags.notify_on_prices, userId, poolSlug]
+    );
+    return res;
   }
 
   getSubscriptionsForUser(userId: number): SubscriptionRecord[] {
@@ -442,5 +506,14 @@ export class SubscriptionDAO {
     else if (category === "sold_out") this.stmtUpdateGlobalSold.run(val, userId);
     else if (category === "models") this.stmtUpdateGlobalModels.run(val, userId);
     else if (category === "prices") this.stmtUpdateGlobalPrices.run(val, userId);
+
+    tursoCloudSync.pushMutation(
+      `UPDATE subscriptions SET ${
+        category === "available" ? "notify_on_available" :
+        category === "sold_out" ? "notify_on_sold_out" :
+        category === "models" ? "notify_on_models" : "notify_on_prices"
+      } = ? WHERE user_id = ?`,
+      [val, userId]
+    );
   }
 }
