@@ -34,6 +34,7 @@ export class LiveDashboardManager {
 
   // Queue of pending edits
   private updateQueue: ActiveDashboardEntry[] = [];
+  private queuedChatIds = new Set<number>();
 
   constructor(
     private bot: Bot<BotContext>,
@@ -86,8 +87,8 @@ export class LiveDashboardManager {
   }
 
   private enqueueUpdate(session: ActiveDashboardEntry): void {
-    const isAlreadyQueued = this.updateQueue.some((q) => q.chatId === session.chatId);
-    if (!isAlreadyQueued) {
+    if (!this.queuedChatIds.has(session.chatId)) {
+      this.queuedChatIds.add(session.chatId);
       this.updateQueue.push(session);
       this.startDispatchWorker();
     }
@@ -127,10 +128,14 @@ export class LiveDashboardManager {
       if (this.tokens >= 1) {
         const session = this.updateQueue.shift();
         if (session) {
+          this.queuedChatIds.delete(session.chatId);
           const chatLastSent = this.lastChatEditTime.get(session.chatId) || 0;
           if (Date.now() - chatLastSent < this.USER_EDIT_GAP_MS) {
             // Requeue at tail if chat rate limit hasn't passed
-            this.updateQueue.push(session);
+            if (!this.queuedChatIds.has(session.chatId)) {
+              this.queuedChatIds.add(session.chatId);
+              this.updateQueue.push(session);
+            }
           } else {
             this.tokens -= 1;
             this.executeEdit(session).catch(() => {});

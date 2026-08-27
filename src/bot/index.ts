@@ -89,8 +89,15 @@ export function createTelegramBot(
   // Helper function: Admin verification guard
   const requireAdmin = async (ctx: BotContext): Promise<boolean> => {
     if (!isUserAdmin(ctx.from?.id, userDao)) {
+      const plainUnauthorized =
+        ctx.lang === "uk"
+          ? `⛔ Доступ обмежено. Команда лише для адміністраторів.\nВаш Telegram ID: ${ctx.from?.id || "N/A"}`
+          : ctx.lang === "ru"
+          ? `⛔ Доступ ограничен. Команда только для администраторов.\nВаш Telegram ID: ${ctx.from?.id || "N/A"}`
+          : `⛔ Access restricted to administrators only.\nYour Telegram ID: ${ctx.from?.id || "N/A"}`;
+
       await ctx.answerCallbackQuery({
-        text: ctx.t("admin.unauthorized", { telegram_id: String(ctx.from?.id || "N/A") }),
+        text: plainUnauthorized,
         show_alert: true,
       }).catch(() => {});
       return false;
@@ -154,8 +161,9 @@ export function createTelegramBot(
         const userStats = userDao.getUserStats();
         const usernameStr = ctx.from.username ? `@${escapeHtml(ctx.from.username)}` : "—";
         const langFlag = getLanguageFlag(ctx.lang);
+        const allAdminIds = userDao.getAllAdminTelegramIds(config.ADMIN_USER_IDS);
 
-        for (const adminId of config.ADMIN_USER_IDS) {
+        for (const adminId of allAdminIds) {
           const adminUser = userDao.getByTelegramId(adminId);
           const adminLang = (adminUser?.language as SupportedLanguage) || "uk";
           const wantsAlerts = (adminUser?.notify_admin_new_users ?? 1) === 1;

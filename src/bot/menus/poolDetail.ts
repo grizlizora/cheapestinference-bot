@@ -26,6 +26,13 @@ export function createPoolDetailMenu(
       const blockIds = blocks.length > 0 ? blocks.map((b) => b.block_id) : DEFAULT_BLOCK_IDS;
       const flags = subDao.getPoolFlags(ctx.user.id, slug);
 
+      const toFlags = (f: any) => ({
+        available: f.notify_on_available === 1,
+        soldOut: f.notify_on_sold_out === 1,
+        models: f.notify_on_models === 1,
+        prices: f.notify_on_prices === 1,
+      });
+
       range
         .text(
           flags.available
@@ -33,9 +40,10 @@ export function createPoolDetailMenu(
             : ctx.t("pool_settings.btn_avail_off"),
           async (c) => {
             const res = subDao.togglePoolEventCategory(c.user.id, slug, "available", blockIds);
-            invertedIndex.updateSubscription(c.user.id, slug, "ALL", { available: res.newState });
+            const fullFlags = toFlags(res.flags);
+            invertedIndex.updateSubscription(c.user.id, slug, "ALL", fullFlags);
             for (const bId of blockIds) {
-              invertedIndex.updateSubscription(c.user.id, slug, bId, { available: res.newState });
+              invertedIndex.updateSubscription(c.user.id, slug, bId, fullFlags);
             }
             await c.answerCallbackQuery(c.t("pool_settings.toast_filter_updated")).catch(() => {});
             await safeEditMessageText(c, renderPoolSettingsText(c, poolStateDao, subDao));
@@ -48,9 +56,10 @@ export function createPoolDetailMenu(
             : ctx.t("pool_settings.btn_sold_off"),
           async (c) => {
             const res = subDao.togglePoolEventCategory(c.user.id, slug, "sold_out", blockIds);
-            invertedIndex.updateSubscription(c.user.id, slug, "ALL", { soldOut: res.newState });
+            const fullFlags = toFlags(res.flags);
+            invertedIndex.updateSubscription(c.user.id, slug, "ALL", fullFlags);
             for (const bId of blockIds) {
-              invertedIndex.updateSubscription(c.user.id, slug, bId, { soldOut: res.newState });
+              invertedIndex.updateSubscription(c.user.id, slug, bId, fullFlags);
             }
             await c.answerCallbackQuery(c.t("pool_settings.toast_filter_updated")).catch(() => {});
             await safeEditMessageText(c, renderPoolSettingsText(c, poolStateDao, subDao));
@@ -64,9 +73,10 @@ export function createPoolDetailMenu(
             : ctx.t("pool_settings.btn_models_off"),
           async (c) => {
             const res = subDao.togglePoolEventCategory(c.user.id, slug, "models", blockIds);
-            invertedIndex.updateSubscription(c.user.id, slug, "ALL", { models: res.newState });
+            const fullFlags = toFlags(res.flags);
+            invertedIndex.updateSubscription(c.user.id, slug, "ALL", fullFlags);
             for (const bId of blockIds) {
-              invertedIndex.updateSubscription(c.user.id, slug, bId, { models: res.newState });
+              invertedIndex.updateSubscription(c.user.id, slug, bId, fullFlags);
             }
             await c.answerCallbackQuery(c.t("pool_settings.toast_filter_updated")).catch(() => {});
             await safeEditMessageText(c, renderPoolSettingsText(c, poolStateDao, subDao));
@@ -79,9 +89,10 @@ export function createPoolDetailMenu(
             : ctx.t("pool_settings.btn_prices_off"),
           async (c) => {
             const res = subDao.togglePoolEventCategory(c.user.id, slug, "prices", blockIds);
-            invertedIndex.updateSubscription(c.user.id, slug, "ALL", { prices: res.newState });
+            const fullFlags = toFlags(res.flags);
+            invertedIndex.updateSubscription(c.user.id, slug, "ALL", fullFlags);
             for (const bId of blockIds) {
-              invertedIndex.updateSubscription(c.user.id, slug, bId, { prices: res.newState });
+              invertedIndex.updateSubscription(c.user.id, slug, bId, fullFlags);
             }
             await c.answerCallbackQuery(c.t("pool_settings.toast_filter_updated")).catch(() => {});
             await safeEditMessageText(c, renderPoolSettingsText(c, poolStateDao, subDao));

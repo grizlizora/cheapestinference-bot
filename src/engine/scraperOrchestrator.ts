@@ -166,7 +166,14 @@ export class ScraperOrchestrator extends EventEmitter {
       this.lastScrapeLatencyMs = result.latencyMs;
       this.lastSource = result.source;
 
-      // 1. FAST PATH: Compute diffs and dispatch alerts IMMEDIATELY at T+0ms
+      // 1. Synchronously persist state to SQLite first
+      try {
+        this.poolStateDao.saveSnapshot(result.snapshot, result.source, result.latencyMs);
+      } catch (e: any) {
+        this.emit("warn", `Failed to save snapshot to SQLite: ${e.message}`);
+      }
+
+      // 2. FAST PATH: Compute diffs and dispatch alerts IMMEDIATELY at T+0ms
       const events = this.diffEngine.processSnapshot(result.snapshot);
 
       this.emit("heartbeat", {
@@ -178,13 +185,6 @@ export class ScraperOrchestrator extends EventEmitter {
 
       if (events.length > 0) {
         this.emit("diff_events", events);
-      }
-
-      // 2. Synchronously persist state to SQLite before poll resolves to eliminate UI read races
-      try {
-        this.poolStateDao.saveSnapshot(result.snapshot, result.source, result.latencyMs);
-      } catch (e: any) {
-        this.emit("warn", `Failed to save snapshot to SQLite: ${e.message}`);
       }
 
       return events;

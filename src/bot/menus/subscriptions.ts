@@ -29,6 +29,7 @@ export function createSubscriptionsMenu(
       async (ctx) => {
         const val = userDao.toggleAvailable(ctx.from!.id);
         ctx.user.notify_available_global = val;
+        subDao.updateUserGlobalCategory(ctx.user.id, "available", val === 1);
         invertedIndex.updateUserPreferences(ctx.from!.id, {
           notifyAvailableGlobal: val === 1,
         });
@@ -52,6 +53,7 @@ export function createSubscriptionsMenu(
       async (ctx) => {
         const val = userDao.toggleSoldOut(ctx.from!.id);
         ctx.user.notify_sold_out_global = val;
+        subDao.updateUserGlobalCategory(ctx.user.id, "sold_out", val === 1);
         invertedIndex.updateUserPreferences(ctx.from!.id, {
           notifySoldOutGlobal: val === 1,
         });
@@ -77,6 +79,7 @@ export function createSubscriptionsMenu(
       async (ctx) => {
         const val = userDao.toggleModels(ctx.from!.id);
         ctx.user.notify_models_global = val;
+        subDao.updateUserGlobalCategory(ctx.user.id, "models", val === 1);
         invertedIndex.updateUserPreferences(ctx.from!.id, {
           notifyModelsGlobal: val === 1,
         });
@@ -100,6 +103,7 @@ export function createSubscriptionsMenu(
       async (ctx) => {
         const val = userDao.togglePrices(ctx.from!.id);
         ctx.user.notify_prices_global = val;
+        subDao.updateUserGlobalCategory(ctx.user.id, "prices", val === 1);
         invertedIndex.updateUserPreferences(ctx.from!.id, {
           notifyPricesGlobal: val === 1,
         });

@@ -131,7 +131,7 @@ export function createMainMenuHierarchy(
       (ctx) => ctx.t("common.help"),
       async (ctx) => {
         await ctx.answerCallbackQuery().catch(() => {});
-        await safeEditMessageText(ctx, ctx.t("help_text"));
+        await safeEditMessageText(ctx, ctx.t("help_text", { telegram_id: String(ctx.from?.id || "N/A") }));
         return ctx.menu.nav("help-menu");
       }
     )
@@ -189,10 +189,6 @@ export function renderDashboardText(
     });
   }
 
-  const intelligenceEngine = historyDao
-    ? new AvailabilityIntelligenceEngine(historyDao)
-    : null;
-
   const poolSummariesText = summaries
     .map((p) => {
       const total = p.total_blocks || 3;
@@ -208,7 +204,7 @@ export function renderDashboardText(
       return ctx.t("menu.pool_summary_card", {
         pool_name: escapeHtml(p.name),
         status_badge: statusBadge,
-        models: escapeHtml(p.models.join(", ")) || "Custom models",
+        models: escapeHtml(p.models.join(", ")) || ctx.t("common.custom_models"),
         min_price: p.min_price,
         available_count: p.available_count,
         total_blocks: p.total_blocks || 3,

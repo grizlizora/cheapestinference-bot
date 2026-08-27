@@ -255,4 +255,22 @@ export class SubscriptionDAO {
       };
     })();
   }
+
+  updateUserGlobalCategory(
+    userId: number,
+    category: "available" | "sold_out" | "models" | "prices",
+    enabled: boolean
+  ): void {
+    const col =
+      category === "available"
+        ? "notify_on_available"
+        : category === "sold_out"
+        ? "notify_on_sold_out"
+        : category === "models"
+        ? "notify_on_models"
+        : "notify_on_prices";
+    this.db
+      .prepare(`UPDATE subscriptions SET ${col} = ? WHERE user_id = ?`)
+      .run(enabled ? 1 : 0, userId);
+  }
 }
