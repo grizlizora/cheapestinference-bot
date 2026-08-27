@@ -10,7 +10,8 @@ export class JsonApiEngine implements IFetcherEngine {
   public async fetch(
     etag?: string,
     lastModified?: string,
-    timeoutMs: number = 8_000
+    timeoutMs: number = 8_000,
+    signal?: AbortSignal
   ): Promise<ScrapeResult> {
     const res = await this.httpClient.get({
       url: this.apiUrl,
@@ -18,6 +19,7 @@ export class JsonApiEngine implements IFetcherEngine {
       lastModified,
       isHtmlFallback: false,
       timeoutMs,
+      signal,
     });
 
     if (res.statusCode === 304) {

@@ -16,6 +16,16 @@ services:
         sync: false
       - key: DB_PATH
         value: /app/data/bot.db
+      - key: CF_WORKER_URL
+        sync: false
+      - key: CF_WORKER_SECRET
+        sync: false
+      - key: ALLOW_DIRECT_FALLBACK
+        value: "true"
+      - key: SCRAPE_MIN_INTERVAL_SEC
+        value: "4"
+      - key: SCRAPE_MAX_INTERVAL_SEC
+        value: "6"
       - key: TOR_ENABLED
         value: "true"
       - key: PORT

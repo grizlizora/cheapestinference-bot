@@ -97,10 +97,13 @@ export class DatabaseMaintenanceManager {
     // 5. Reclaim freed pages back to OS via dynamic incremental vacuum
     let pagesReclaimed = 0;
     try {
-      while (true) {
+      let prevFreelist = Infinity;
+      let maxPasses = 50;
+      while (maxPasses-- > 0) {
         const row = this.stmtFreelistCount.get() as any;
         const freelist = Number(row?.freelist_count || 0);
-        if (freelist <= 0) break;
+        if (freelist <= 0 || freelist >= prevFreelist) break;
+        prevFreelist = freelist;
         const batch = Math.min(freelist, 2000);
         this.db.pragma(`incremental_vacuum(${batch})`);
         pagesReclaimed += batch;

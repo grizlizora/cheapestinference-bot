@@ -231,24 +231,45 @@ describe("Hardening & Mathematical Invariants Test Suite", () => {
     });
   });
 
-  describe("6. ProxyPool Tor Quarantine on 3+ Failures", () => {
-    it("should set bannedUntil on Tor proxy when 3 consecutive errors occur", async () => {
+  describe("6. 3-Tier Proxy Cascade & Auto-Quarantine", () => {
+    it("should prioritize Direct Fast-Path (Priority 1) and auto-failover to Tor (Priority 3) on WAF 403", async () => {
       const torManager = new TorManager({ socksHost: "127.0.0.1", socksPort: 9050 });
       const pool = new ProxyPool(torManager, true);
+      
+      // Tier 2: Direct is primary fast-path
       const initial = pool.getNextProxyUrl();
-      expect(initial).toContain("tor_");
+      expect(initial).toBeNull();
 
-      await pool.reportFailure(initial);
-      await pool.reportFailure(initial);
-      await pool.reportFailure(initial); // 3rd failure
+      // Direct gets Cloudflare 403 WAF block -> demotes to Tier 3 (Tor)
+      await pool.reportFailure(null, 403);
+      const torFallback = pool.getNextProxyUrl();
+      expect(torFallback).toContain("tor_");
+
+      // Tor fails 3 consecutive times -> Tor is quarantined
+      await pool.reportFailure(torFallback, 500);
+      await pool.reportFailure(torFallback, 500);
+      await pool.reportFailure(torFallback, 500);
 
       const status = pool.getStatus();
       const torEntry = status.proxies.find((p) => p.type === "tor");
-      expect(torEntry?.bannedUntil).not.toBeNull();
+      expect(torEntry?.isBanned).toBe(true);
+    });
 
-      // With Tor quarantined and direct fallback allowed, next proxy is direct (null)
-      const fallback = pool.getNextProxyUrl();
-      expect(fallback).toBeNull();
+    it("should prioritize Cloudflare Worker (Priority 0) over Direct and Tor", async () => {
+      const torManager = new TorManager({ socksHost: "127.0.0.1", socksPort: 9050 });
+      const workerUrl = "https://cf-fastpath.workers.dev";
+      const pool = new ProxyPool(torManager, true, [], workerUrl);
+
+      // Tier 1: Worker is Priority 0
+      const initial = pool.getNextProxy();
+      expect(initial.type).toBe("worker");
+      expect(initial.url).toBe(workerUrl);
+
+      // Worker gets 403 -> demotes to Tier 2 (Direct)
+      await pool.reportFailure(workerUrl, 403);
+      const second = pool.getNextProxy();
+      expect(second.type).toBe("direct");
+      expect(second.url).toBe("");
     });
   });
 });

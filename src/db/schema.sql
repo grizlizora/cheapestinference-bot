@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_active ON users(is_active);
-CREATE INDEX IF NOT EXISTS idx_users_admins ON users(is_admin, is_active) WHERE is_admin = 1 AND is_active = 1;
+CREATE INDEX IF NOT EXISTS idx_users_admins ON users(telegram_id) WHERE is_admin = 1 AND is_active = 1;
 
 -- 2. Subscriptions Table
 CREATE TABLE IF NOT EXISTS subscriptions (

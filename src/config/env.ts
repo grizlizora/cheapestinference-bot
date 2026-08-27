@@ -4,7 +4,10 @@ import { z } from "zod";
 dotenv.config();
 
 const envSchema = z.object({
-  BOT_TOKEN: z.string().min(1, "BOT_TOKEN is required"),
+  BOT_TOKEN: z
+    .string()
+    .default(process.env.NODE_ENV === "test" ? "test_mock_token_123456789:ABCdefGHIjklMNOpqrsTUVwxyz" : "")
+    .refine((val) => val.length > 0, "BOT_TOKEN is required"),
   ADMIN_USER_IDS: z
     .string()
     .default("")
@@ -18,6 +21,8 @@ const envSchema = z.object({
     ),
   DB_PATH: z.string().default("./data/bot.db"),
   TELEGRAM_API_ROOT: z.string().optional(),
+  CF_WORKER_URL: z.string().optional(),
+  CF_WORKER_SECRET: z.string().optional(),
   PORT: z
     .string()
     .default("7860")
@@ -55,11 +60,11 @@ const envSchema = z.object({
     .transform((val) => val !== "false" && val !== "0"),
   SCRAPE_MIN_INTERVAL_SEC: z
     .string()
-    .default("15")
+    .default("4")
     .transform((val) => parseInt(val, 10)),
   SCRAPE_MAX_INTERVAL_SEC: z
     .string()
-    .default("35")
+    .default("6")
     .transform((val) => parseInt(val, 10)),
   ADMIN_USERNAMES: z
     .string()

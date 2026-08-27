@@ -107,9 +107,9 @@ export class ScraperOrchestrator extends EventEmitter {
       const isVolatile = now - this.lastSlotEventTimestamp < 5 * 60 * 1000;
       
       if (isVolatile) {
-        // Hot / Volatile mode: fast 10s - 14s polling to capture rapid stock changes
-        const fastMin = Math.max(10, this.config.minIntervalSec * 0.6);
-        const fastMax = Math.max(14, this.config.minIntervalSec);
+        // Hot / Volatile mode: fast 3s - 4.5s polling to capture rapid stock changes
+        const fastMin = Math.max(3, this.config.minIntervalSec * 0.75);
+        const fastMax = Math.max(4.5, this.config.minIntervalSec);
         return Math.floor((fastMin + Math.random() * (fastMax - fastMin)) * 1000);
       }
 
@@ -208,8 +208,6 @@ export class ScraperOrchestrator extends EventEmitter {
       return events;
     } catch (err: any) {
       this.consecutiveFailures++;
-      this.lastScrapeTimestamp = Date.now();
-      this.lastScrapeLatencyMs = Date.now() - startTime;
       this.emit("error", err);
       return [];
     } finally {
@@ -217,16 +215,15 @@ export class ScraperOrchestrator extends EventEmitter {
     }
   }
 
-  private async fetchFromEngines(bypassEtag = false): Promise<ScrapeResult> {
-    const now = Date.now();
-    const isApiCircuitOpen = this.apiConsecutiveErrors >= 2 && now < this.apiCircuitOpenUntil;
+  private async fetchFromEngines(bypassEtag: boolean): Promise<ScrapeResult> {
     const effectiveApiEtag = bypassEtag ? undefined : this.apiEtag;
     const effectiveApiLastModified = bypassEtag ? undefined : this.apiLastModified;
     const effectiveHtmlEtag = bypassEtag ? undefined : this.htmlEtag;
     const effectiveHtmlLastModified = bypassEtag ? undefined : this.htmlLastModified;
 
-    // If API Circuit is OPEN, route directly to HTML engine without incurring timeout
-    if (isApiCircuitOpen) {
+    // Fast-path Circuit Breaker: If API is healthy, use Hedged Racing
+    const isCircuitOpen = Date.now() < this.apiCircuitOpenUntil;
+    if (isCircuitOpen) {
       const htmlResult = await this.htmlEngine.fetch(
         effectiveHtmlEtag,
         effectiveHtmlLastModified,
@@ -237,14 +234,18 @@ export class ScraperOrchestrator extends EventEmitter {
       return htmlResult;
     }
 
+    const apiController = new AbortController();
+    const htmlController = new AbortController();
+
     try {
       const apiPromise = this.apiEngine.fetch(
         effectiveApiEtag,
         effectiveApiLastModified,
-        3_500 // 3.5s timeout for fast failover
+        3_000,
+        apiController.signal
       );
 
-      // Hedged Request: if primary API query exceeds 1200ms, race against concurrent HTML fallback
+      // Hedged Request: if primary API query exceeds 1000ms, race against concurrent HTML fallback
       let hedgeTimer: NodeJS.Timeout | undefined;
       const hedgePromise = new Promise<ScrapeResult>((resolve, reject) => {
         hedgeTimer = setTimeout(async () => {
@@ -252,26 +253,31 @@ export class ScraperOrchestrator extends EventEmitter {
             const htmlRes = await this.htmlEngine.fetch(
               effectiveHtmlEtag,
               effectiveHtmlLastModified,
-              3_500
+              3_000,
+              htmlController.signal
             );
             resolve(htmlRes);
           } catch (e) {
             reject(e);
           }
-        }, 1200);
-      });
-
-      apiPromise.finally(() => {
-        if (hedgeTimer) {
-          clearTimeout(hedgeTimer);
-          hedgeTimer = undefined;
-        }
+        }, 1000);
       });
 
       const result = await Promise.race([
-        apiPromise,
-        hedgePromise.catch(() => apiPromise),
+        apiPromise.then((res) => {
+          if (hedgeTimer) clearTimeout(hedgeTimer);
+          htmlController.abort(); // Immediately cancel orphaned HTML fetch
+          return res;
+        }),
+        hedgePromise.then((res) => {
+          apiController.abort(); // Immediately cancel slow API fetch
+          return res;
+        }).catch(async () => {
+          return await apiPromise;
+        }),
       ]);
+
+      if (hedgeTimer) clearTimeout(hedgeTimer);
 
       this.apiConsecutiveErrors = 0;
       if (result.etag) {

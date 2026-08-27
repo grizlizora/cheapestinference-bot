@@ -10,6 +10,16 @@ import { escapeHtml } from "../../i18n/index.js";
 
 const failedClaimAttempts = new Map<number, { count: number; lockedUntil: number }>();
 
+function cleanExpiredLockouts(now: number): void {
+  if (failedClaimAttempts.size > 50) {
+    for (const [id, rec] of failedClaimAttempts.entries()) {
+      if (now > rec.lockedUntil && rec.lockedUntil > 0) {
+        failedClaimAttempts.delete(id);
+      }
+    }
+  }
+}
+
 function isTimingSafeSha256Match(input: string, target: string): boolean {
   if (!input || !target) return false;
   const hashA = crypto.createHash("sha256").update(input.trim()).digest();

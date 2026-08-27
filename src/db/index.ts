@@ -25,6 +25,7 @@ export function getDatabase(): Database.Database {
   dbInstance.pragma("temp_store = MEMORY");
   dbInstance.pragma("wal_autocheckpoint = 1000");
   dbInstance.pragma("journal_size_limit = 67108864"); // 64MB WAL truncation cap
+  dbInstance.pragma("threads = 4"); // Multi-threaded background SQLite sorting
 
   try {
     const autoVacuum = dbInstance.pragma("auto_vacuum", { simple: true });
@@ -64,7 +65,7 @@ function initSchema(db: Database.Database): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_users_active ON users(is_active);
-    CREATE INDEX IF NOT EXISTS idx_users_admins ON users(is_admin, is_active) WHERE is_admin = 1 AND is_active = 1;
+    CREATE INDEX IF NOT EXISTS idx_users_admins ON users(telegram_id) WHERE is_admin = 1 AND is_active = 1;
 
     -- 2. Subscriptions Table
     CREATE TABLE IF NOT EXISTS subscriptions (

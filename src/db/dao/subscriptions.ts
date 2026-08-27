@@ -19,12 +19,21 @@ export class SubscriptionDAO {
   private stmtGetSubsForUser: Database.Statement;
   private stmtGetAllSubs: Database.Statement;
   private stmtGetAnyPoolSub: Database.Statement;
+  private stmtUpdateGlobalAvail: Database.Statement;
+  private stmtUpdateGlobalSold: Database.Statement;
+  private stmtUpdateGlobalModels: Database.Statement;
+  private stmtUpdateGlobalPrices: Database.Statement;
 
   private txTogglePool: (userId: number, poolSlug: string, newState: boolean, blockIds: string[]) => void;
   private txToggleBlock: (userId: number, poolSlug: string, blockId: string, newBlockState: boolean, allBlockIds: string[]) => void;
   private txToggleGlobal: (userId: number, newState: boolean, pools: Array<{ slug: string; blocks: string[] }>) => void;
 
   constructor(public readonly db: Database.Database) {
+    this.stmtUpdateGlobalAvail = db.prepare(`UPDATE subscriptions SET notify_on_available = ? WHERE user_id = ?`);
+    this.stmtUpdateGlobalSold = db.prepare(`UPDATE subscriptions SET notify_on_sold_out = ? WHERE user_id = ?`);
+    this.stmtUpdateGlobalModels = db.prepare(`UPDATE subscriptions SET notify_on_models = ? WHERE user_id = ?`);
+    this.stmtUpdateGlobalPrices = db.prepare(`UPDATE subscriptions SET notify_on_prices = ? WHERE user_id = ?`);
+
     this.stmtGetSub = db.prepare(`
       SELECT * FROM subscriptions WHERE user_id = ? AND pool_slug = ? AND block_id = ?
     `);
@@ -305,16 +314,10 @@ export class SubscriptionDAO {
     category: "available" | "sold_out" | "models" | "prices",
     enabled: boolean
   ): void {
-    const col =
-      category === "available"
-        ? "notify_on_available"
-        : category === "sold_out"
-        ? "notify_on_sold_out"
-        : category === "models"
-        ? "notify_on_models"
-        : "notify_on_prices";
-    this.db
-      .prepare(`UPDATE subscriptions SET ${col} = ? WHERE user_id = ?`)
-      .run(enabled ? 1 : 0, userId);
+    const val = enabled ? 1 : 0;
+    if (category === "available") this.stmtUpdateGlobalAvail.run(val, userId);
+    else if (category === "sold_out") this.stmtUpdateGlobalSold.run(val, userId);
+    else if (category === "models") this.stmtUpdateGlobalModels.run(val, userId);
+    else if (category === "prices") this.stmtUpdateGlobalPrices.run(val, userId);
   }
 }

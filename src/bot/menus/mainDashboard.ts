@@ -336,9 +336,6 @@ export function renderDashboardText(
   const telemetry = scraper?.getTelemetry();
   const lastVerified = poolStateDao.getLastVerified();
   const lastVerifiedTs = telemetry?.lastScrapeTimestamp || lastVerified?.timestamp;
-  const lastLatency = telemetry?.lastScrapeLatencyMs || lastVerified?.latencyMs || 0;
-  const lastProxy = telemetry?.lastUsedProxy;
-  const proxyBadge = lastProxy ? (lastProxy.includes("9050") ? " 🧅" : " 🌐") : " ⚡";
 
   let updatedAtStr = "";
   if (lastVerifiedTs && lastVerifiedTs > 0) {

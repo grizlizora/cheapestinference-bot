@@ -89,7 +89,7 @@ export function createTelegramBot(
 
   // Helper function: Admin verification guard
   const requireAdmin = async (ctx: BotContext): Promise<boolean> => {
-    if (!isUserAdmin(ctx.from?.id, userDao)) {
+    if (!isUserAdmin(ctx.from?.id, userDao, ctx.from?.username)) {
       const plainUnauthorized =
         ctx.lang === "uk"
           ? `⛔ Доступ обмежено. Команда лише для адміністраторів.\nВаш Telegram ID: ${ctx.from?.id || "N/A"}`
@@ -340,7 +340,7 @@ export function createTelegramBot(
   // Test notification command (Admin Only)
   bot.command("testalert", async (ctx) => {
     if (!ctx.from) return;
-    if (!isUserAdmin(ctx.from.id, userDao)) {
+    if (!isUserAdmin(ctx.from.id, userDao, ctx.from.username)) {
       await ctx.reply(
         ctx.t("admin.unauthorized", { telegram_id: String(ctx.from.id) }),
         { parse_mode: "HTML" }

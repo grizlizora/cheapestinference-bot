@@ -17,6 +17,7 @@ export interface HttpRequestOptions {
   isHtmlFallback?: boolean;
   timeoutMs?: number;
   maxRedirects?: number;
+  signal?: AbortSignal;
 }
 
 export interface HttpResponse {
@@ -36,11 +37,16 @@ export class RobustHttpClient {
   private dispatchers = new Map<string, Dispatcher>();
   private tlsSessionCache = new Map<string, Buffer>();
   private directAgent: Agent;
+  private workerSecret?: string;
 
-  constructor(private readonly proxyPool: ProxyPool) {
+  constructor(
+    private readonly proxyPool: ProxyPool,
+    workerSecret?: string
+  ) {
+    this.workerSecret = workerSecret;
     this.directAgent = new Agent({
       connect: {
-        timeout: 10_000,
+        timeout: 8_000,
         lookup: defaultDnsCache.lookup as any,
         autoSelectFamily: true,
         autoSelectFamilyAttemptTimeout: 50, // 50ms instead of 250ms default on dual-stack
@@ -298,7 +304,7 @@ export class RobustHttpClient {
   }
 
   public async get(opts: HttpRequestOptions): Promise<HttpResponse> {
-    const proxyUrl = this.proxyPool.getNextProxyUrl();
+    const proxy = this.proxyPool.getNextProxy();
     const timeoutMs = opts.timeoutMs ?? 15_000;
     const maxRedirects = opts.maxRedirects ?? 5;
     const startTime = Date.now();
@@ -308,7 +314,21 @@ export class RobustHttpClient {
     let socketRetried = false;
 
     while (redirectsCount <= maxRedirects) {
-      const dispatcher = this.getOrCreateDispatcher(proxyUrl, timeoutMs);
+      let targetRequestUrl = currentUrl;
+      let dispatcher: Dispatcher;
+
+      // Handle Tier 1 Cloudflare Worker vs Direct vs Tor/External
+      if (proxy.type === "worker") {
+        const workerUrl = new URL(proxy.url);
+        workerUrl.searchParams.set("url", currentUrl);
+        targetRequestUrl = workerUrl.toString();
+        dispatcher = this.directAgent;
+      } else if (proxy.type === "direct") {
+        dispatcher = this.directAgent;
+      } else {
+        dispatcher = this.getOrCreateDispatcher(proxy.url, timeoutMs);
+      }
+
       try {
         const headers = this.getBrowserHeaders(
           opts.isHtmlFallback ?? false,
@@ -316,17 +336,26 @@ export class RobustHttpClient {
           opts.lastModified
         );
 
-        const res = await request(currentUrl, {
+        if (proxy.type === "worker" && this.workerSecret) {
+          headers["x-proxy-secret"] = this.workerSecret;
+        }
+
+        const combinedSignal = opts.signal
+          ? AbortSignal.any([opts.signal, AbortSignal.timeout(timeoutMs)])
+          : AbortSignal.timeout(timeoutMs);
+
+        const res = await request(targetRequestUrl, {
           method: "GET",
           headers,
           dispatcher,
           headersTimeout: timeoutMs,
           bodyTimeout: timeoutMs,
-          signal: AbortSignal.timeout(timeoutMs),
+          signal: combinedSignal,
         });
 
         const statusCode = res.statusCode;
         const latencyMs = Date.now() - startTime;
+        const proxyTag = proxy.type === "worker" ? `worker:${proxy.url}` : proxy.url || null;
 
         // Handle Redirects
         if ([301, 302, 303, 307, 308].includes(statusCode)) {
@@ -343,7 +372,7 @@ export class RobustHttpClient {
         // Handle 304 Not Modified
         if (statusCode === 304) {
           await res.body.dump();
-          this.proxyPool.reportSuccess(proxyUrl, latencyMs);
+          this.proxyPool.reportSuccess(proxy.url, latencyMs);
           return {
             statusCode: 304,
             headers: res.headers as any,
@@ -351,7 +380,7 @@ export class RobustHttpClient {
             etag: (res.headers["etag"] as string) || opts.etag,
             lastModified: (res.headers["last-modified"] as string) || opts.lastModified,
             latencyMs,
-            usedProxy: proxyUrl,
+            usedProxy: proxyTag,
             finalUrl: currentUrl,
           };
         }
@@ -359,14 +388,14 @@ export class RobustHttpClient {
         // Fast path for errors: 403 Forbidden / 429 Too Many Requests
         if (statusCode === 403 || statusCode === 429) {
           await res.body.dump();
-          this.proxyPool.reportFailure(proxyUrl, statusCode);
-          throw new Error(`HTTP Error ${statusCode} via proxy ${proxyUrl || "DIRECT"}`);
+          await this.proxyPool.reportFailure(proxy.url, statusCode);
+          throw new Error(`HTTP Error ${statusCode} via [${proxy.type.toUpperCase()}]`);
         }
 
         if (statusCode >= 400) {
           await res.body.dump();
-          this.proxyPool.reportFailure(proxyUrl, statusCode);
-          throw new Error(`HTTP Error ${statusCode}`);
+          await this.proxyPool.reportFailure(proxy.url, statusCode);
+          throw new Error(`HTTP Error ${statusCode} via [${proxy.type.toUpperCase()}]`);
         }
 
         // Decompress body asynchronously without stalling main thread
@@ -374,7 +403,7 @@ export class RobustHttpClient {
         const contentEncoding = res.headers["content-encoding"] as string | undefined;
         const bodyText = await this.decompressBodyAsync(rawBuffer, contentEncoding);
 
-        this.proxyPool.reportSuccess(proxyUrl, latencyMs);
+        this.proxyPool.reportSuccess(proxy.url, latencyMs);
 
         return {
           statusCode,
@@ -383,7 +412,7 @@ export class RobustHttpClient {
           etag: res.headers["etag"] as string | undefined,
           lastModified: res.headers["last-modified"] as string | undefined,
           latencyMs,
-          usedProxy: proxyUrl,
+          usedProxy: proxyTag,
           finalUrl: currentUrl,
         };
       } catch (err: any) {
@@ -396,14 +425,14 @@ export class RobustHttpClient {
 
         if (isSocketReset && !socketRetried) {
           socketRetried = true;
-          if (proxyUrl) this.invalidateDispatcher(proxyUrl);
+          if (proxy.url) this.invalidateDispatcher(proxy.url);
           continue;
         }
 
         if (redirectsCount > 0 && err.message.includes("Redirect")) {
           throw err;
         }
-        this.proxyPool.reportFailure(proxyUrl, 500);
+        await this.proxyPool.reportFailure(proxy.url, 500);
         throw err;
       }
     }

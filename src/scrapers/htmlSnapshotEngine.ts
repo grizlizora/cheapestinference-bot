@@ -8,13 +8,19 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
 
   constructor(private readonly httpClient: RobustHttpClient) {}
 
-  public async fetch(etag?: string, lastModified?: string, timeoutMs: number = 5_000): Promise<ScrapeResult> {
+  public async fetch(
+    etag?: string,
+    lastModified?: string,
+    timeoutMs: number = 5_000,
+    signal?: AbortSignal
+  ): Promise<ScrapeResult> {
     const res = await this.httpClient.get({
       url: this.htmlUrl,
       etag,
       lastModified,
       isHtmlFallback: true,
       timeoutMs,
+      signal,
     });
 
     if (res.statusCode === 304) {

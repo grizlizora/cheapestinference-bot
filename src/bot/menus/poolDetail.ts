@@ -234,7 +234,7 @@ export function createPoolDetailMenu(
         async (c) => {
           const startTime = Date.now();
           await c.answerCallbackQuery({
-            text: c.lang === "uk" ? "🔄 Оновлюю дані з сайту..." : c.lang === "ru" ? "🔄 Обновляю данные с сайта..." : "🔄 Refreshing data from site...",
+            text: c.t("common.refreshed_toast"),
             show_alert: false,
           }).catch(() => {});
           if (scraper) {
@@ -373,9 +373,6 @@ export function renderPoolDetailText(
   const telemetry = scraper?.getTelemetry();
   const lastVerified = poolStateDao.getLastVerified();
   const lastVerifiedTs = telemetry?.lastScrapeTimestamp || lastVerified?.timestamp;
-  const lastLatency = telemetry?.lastScrapeLatencyMs || lastVerified?.latencyMs || 0;
-  const lastProxy = telemetry?.lastUsedProxy;
-  const proxyBadge = lastProxy ? (lastProxy.includes("9050") ? " 🧅" : " 🌐") : " ⚡";
 
   let timeFooter = "";
   if (lastVerifiedTs && lastVerifiedTs > 0) {

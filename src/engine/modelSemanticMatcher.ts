@@ -32,6 +32,12 @@ export class ModelSemanticMatcher {
     { family: "minimax", regex: /\b(minimax)[-_ ]*(m?\d+(?:\.\d+)*)?/i },
     { family: "llama", regex: /\b(llama)[-_ ]*(\d+(?:\.\d+)*)?/i },
     { family: "claude", regex: /\b(claude)[-_ ]*(\d+(?:\.\d+)*)?/i },
+    { family: "mistral", regex: /\b(mistral|mixtral)[-_ ]*(\d+(?:\.\d+)*)?/i },
+    { family: "gpt", regex: /\b(gpt)[-_ ]*(\d+(?:\.\d+)*)?/i },
+    { family: "gemma", regex: /\b(gemma)[-_ ]*(\d+(?:\.\d+)*)?/i },
+    { family: "phi", regex: /\b(phi)[-_ ]*(\d+(?:\.\d+)*)?/i },
+    { family: "yi", regex: /\b(yi)[-_ ]*(\d+(?:\.\d+)*)?/i },
+    { family: "command", regex: /\b(command)[-_ ]*(r?\d+(?:\.\d+)*)?/i },
   ];
 
   public static parseModel(raw: string): ParsedModelToken {

@@ -26,7 +26,7 @@ export function createBackupHandler(
   return async (ctx: BotContext) => {
     if (!ctx.from) return;
 
-    if (!isUserAdmin(ctx.from.id, userDao)) {
+    if (!isUserAdmin(ctx.from.id, userDao, ctx.from.username)) {
       await ctx.reply(
         ctx.t("admin.unauthorized", { telegram_id: String(ctx.from.id) }),
         { parse_mode: "HTML" }

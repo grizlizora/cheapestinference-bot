@@ -19,35 +19,19 @@ fi
 
 # Check if Tor is enabled
 if [ "$TOR_ENABLED" = "true" ] || [ "$TOR_ENABLED" = "1" ]; then
-  echo "🧅 [1/3] Starting embedded Tor Daemon..."
+  echo "🧅 [1/2] Starting embedded Tor Standby Daemon in background..."
   if [ "$IS_ROOT" -eq 1 ]; then
     su-exec tor tor -f /etc/tor/torrc --runasdaemon 1
   else
     tor -f /etc/tor/torrc --runasdaemon 1 2>/dev/null || echo "⚠️ Tor startup in non-root mode, proceeding..."
   fi
-
-  echo "⏳ [2/3] Waiting for Tor SOCKS5 proxy readiness on 127.0.0.1:9050..."
-  TOR_READY=0
-  for i in $(seq 1 30); do
-    if nc -w 1 127.0.0.1 9050 < /dev/null 2>/dev/null; then
-      echo "✅ Tor SOCKS5 proxy is ready and listening on 127.0.0.1:9050 (Attempt $i)"
-      sleep 3
-      TOR_READY=1
-      break
-    fi
-    sleep 1
-  done
-
-  if [ "$TOR_READY" -eq 0 ]; then
-    echo "⚠️ Tor daemon did not become ready within 30s. Proceeding with failover..."
-  fi
 else
   echo "⚡ Tor is disabled in environment (TOR_ENABLED=false)."
 fi
 
-echo "🚀 [3/3] Launching Node.js Bot Application..."
+echo "🚀 [2/2] Launching Node.js Bot Application (Fast-Path Active)..."
 if [ "$IS_ROOT" -eq 1 ]; then
-  exec su-exec node node --optimize-for-size dist/index.js
+  exec su-exec node --optimize-for-size dist/index.js
 else
   exec node --optimize-for-size dist/index.js
 fi

@@ -68,11 +68,12 @@ async function bootstrap() {
   const proxyPool = new ProxyPool(
     torManager,
     config.ALLOW_DIRECT_FALLBACK,
-    config.PROXY_LIST
+    config.PROXY_LIST,
+    config.CF_WORKER_URL
   );
 
   // 3. Initialize HTTP Client & Scraping Engines
-  const httpClient = new RobustHttpClient(proxyPool);
+  const httpClient = new RobustHttpClient(proxyPool, config.CF_WORKER_SECRET);
   const jsonApiEngine = new JsonApiEngine(httpClient);
   const htmlSnapshotEngine = new HtmlSnapshotEngine(httpClient);
   const sanityGuard = new SanityGuard();
@@ -98,7 +99,9 @@ async function bootstrap() {
 
   scraper.on("heartbeat", (hb: any) => {
     const proxyTag = hb.usedProxy
-      ? hb.usedProxy.includes("9050")
+      ? hb.usedProxy.startsWith("worker:")
+        ? `🏎️ CF Worker`
+        : hb.usedProxy.includes("9050")
         ? "🧅 Tor SOCKS5"
         : `🌐 Proxy (${hb.usedProxy})`
       : "⚡ Direct (DNS Cache)";
