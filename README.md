@@ -48,7 +48,7 @@
 
 ## 🎯 Executive Overview
 
-[CheapestInference.com](https://cheapestinference.com) provides fixed-price, flat-rate monthly compute access ($17.99–$149.00/mo) for unmetered frontier LLM inference (**Kimi K3**, **Qwen 3.8 Max**, **DeepSeek R1**, **DeepSeek V4 Flash**, **Claude 3.5**, **GLM 5.2**, **MiniMax M3** with 1M context) across 8-hour regional windows (**Asia 00:00–08:00 UTC**, **Europe 08:00–16:00 UTC**, **Americas 16:00–24:00 UTC**).
+[CheapestInference.com](https://cheapestinference.com) provides fixed-price, flat-rate monthly compute access ($17.99–$149.00/mo) for unmetered frontier LLM inference (**Kimi K3**, **Qwen 3.8 Max**, **GLM 5.2**, **MiniMax M3**, **DeepSeek V4 Flash**, **MIMO v2.5**) across 8-hour regional windows (**Asia 00:00–08:00 UTC**, **Europe 08:00–16:00 UTC**, **Americas 16:00–24:00 UTC**).
 
 Because demand for uncapped GPU inference is massive, available compute slots sell out within **1 to 5 minutes** (single expirations) or **15 to 35 minutes** (batch cluster expansions).
 
@@ -61,9 +61,9 @@ This system was engineered as a **financial-grade drop monitor** that continuous
 The monitor tracks all tiers, clusters, regional time windows, and AI model catalogs on CheapestInference in real-time:
 
 ### 1. Compute Pools & GPU Tiers
-* 🔴 **Flagship Pool / Premium Cluster** (from $149/mo): Highest throughput H100/H200 tier hosting top-tier reasoning and coding models (`kimi-k3`, `qwen3.8-max`, `deepseek-r1`).
-* 🟢 **Frontier Pool / Advanced Cluster** (from $59/mo): High-capability 70B/72B tier (`minimax-m3`, `glm-5.2`, `qwen-2.5-72b`, `llama-3.3-70b`).
-* 🟢 **Core Pool / Standard Cluster** (from $17.99/mo): Fast lightweight inference tier (`mimo-v2.5`, `deepseek-v4-flash`, `qwen-2.5-32b`, `mistral-nemo`).
+* 🔴 **Flagship Pool / Premium Cluster** (from $149/mo): Highest throughput H100/H200 tier hosting top-tier reasoning and coding models (`kimi-k3`, `qwen3.8-max`).
+* 🟢 **Frontier Pool / Advanced Cluster** (from $59/mo): High-capability advanced inference tier (`minimax-m3`, `glm-5.2`).
+* 🟢 **Core Pool / Standard Cluster** (from $17.99/mo): Fast lightweight inference tier (`mimo-v2.5`, `deepseek-v4-flash`).
 
 ### 2. 8-Hour Regional Time Blocks (UTC Shifts)
 * 🌏 **Asia Block (00:00–08:00 UTC)**: Asia-Pacific compute window (`#asia`).
