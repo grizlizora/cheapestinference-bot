@@ -37,10 +37,6 @@ export async function safeEditMessageText(
 
 import { ActiveDashboardRegistry } from "../liveSync/dashboardRegistry.js";
 
-import { createSettingsMenu, renderSettingsText } from "./settings.js";
-import { CodeIntegrityEngine } from "../../engine/codeIntegrityEngine.js";
-import { NodeActivationEngine } from "../../engine/nodeActivationEngine.js";
-
 export function createMainMenuHierarchy(
   poolStateDao: PoolStateDAO,
   userDao: UserDAO,
@@ -48,23 +44,71 @@ export function createMainMenuHierarchy(
   invertedIndex: SubscriberInvertedIndex,
   historyDao?: SlotHistoryDAO,
   scraper?: ScraperOrchestrator,
-  dashboardRegistry?: ActiveDashboardRegistry,
-  integrityEngine?: CodeIntegrityEngine,
-  nodeActivationEngine?: NodeActivationEngine
+  dashboardRegistry?: ActiveDashboardRegistry
 ) {
   const languageMenu = createLanguageMenu(userDao, poolStateDao, invertedIndex, historyDao, scraper, subDao, dashboardRegistry);
   const { poolDetailMenu, poolSettingsMenu } = createPoolDetailMenu(poolStateDao, subDao, invertedIndex, historyDao, scraper, dashboardRegistry);
   const subscriptionsMenu = createSubscriptionsMenu(subDao, userDao, poolStateDao, invertedIndex, historyDao, scraper, dashboardRegistry);
-  const { settingsMenu, helpMenu, integrityMenu } = createSettingsMenu(
-    userDao,
-    subDao,
-    poolStateDao,
-    historyDao,
-    scraper,
-    dashboardRegistry,
-    integrityEngine,
-    nodeActivationEngine
-  );
+
+  const settingsMenu = new Menu<BotContext>("settings-menu")
+    .text(
+      (ctx) => ctx.t("settings.btn_language"),
+      async (ctx) => {
+        await ctx.answerCallbackQuery().catch(() => {});
+        if (ctx.chat) {
+          dashboardRegistry?.updateView(ctx.chat.id, "other");
+        }
+        await safeEditMessageText(ctx, ctx.t("onboarding.change_language_prompt"));
+        return ctx.menu.nav("language-menu");
+      }
+    )
+    .row()
+    .text(
+      (ctx) => ctx.t("settings.btn_help"),
+      async (ctx) => {
+        await ctx.answerCallbackQuery().catch(() => {});
+        if (ctx.chat) {
+          dashboardRegistry?.updateView(ctx.chat.id, "other");
+        }
+        await safeEditMessageText(ctx, ctx.t("help_text", { telegram_id: String(ctx.from?.id || "N/A") }));
+        return ctx.menu.nav("help-menu");
+      }
+    )
+    .row()
+    .url(
+      (ctx) => ctx.t("settings.btn_contact_author"),
+      "https://t.me/grizlizora"
+    )
+    .row()
+    .text(
+      (ctx) => ctx.t("common.back"),
+      async (ctx) => {
+        await ctx.answerCallbackQuery().catch(() => {});
+        if (ctx.chat) {
+          dashboardRegistry?.updateView(ctx.chat.id, "dashboard");
+        }
+        await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao, scraper));
+        return ctx.menu.nav("main-dashboard-menu");
+      }
+    );
+
+  const helpMenu = new Menu<BotContext>("help-menu")
+    .url(
+      (ctx) => ctx.t("settings.btn_contact_author"),
+      "https://t.me/grizlizora"
+    )
+    .row()
+    .text(
+      (ctx) => ctx.t("common.back"),
+      async (ctx) => {
+        await ctx.answerCallbackQuery().catch(() => {});
+        if (ctx.chat) {
+          dashboardRegistry?.updateView(ctx.chat.id, "settings");
+        }
+        await safeEditMessageText(ctx, renderSettingsText(ctx));
+        return ctx.menu.nav("settings-menu");
+      }
+    );
 
   const mainDashboardMenu = new Menu<BotContext>("main-dashboard-menu")
     .dynamic((ctx, range) => {
@@ -113,7 +157,7 @@ export function createMainMenuHierarchy(
       (ctx) => ctx.t("common.refresh"),
       async (ctx) => {
         await ctx.answerCallbackQuery({
-          text: ctx.lang === "uk" ? "🔄 Оновлюю дані з сайту..." : ctx.lang === "ru" ? "🔄 Обновляю данные с сайта..." : "🔄 Refreshing data from site...",
+          text: ctx.t("common.refreshed_toast"),
           show_alert: false,
         }).catch(() => {});
         if (scraper) {
@@ -132,12 +176,13 @@ export function createMainMenuHierarchy(
         } catch {}
       }
     )
+    .row()
     .text(
       (ctx) => ctx.t("menu.btn_settings"),
       async (ctx) => {
         await ctx.answerCallbackQuery().catch(() => {});
         if (ctx.chat) {
-          dashboardRegistry?.updateView(ctx.chat.id, "other");
+          dashboardRegistry?.updateView(ctx.chat.id, "settings");
         }
         await safeEditMessageText(ctx, renderSettingsText(ctx));
         return ctx.menu.nav("settings-menu");
@@ -145,14 +190,29 @@ export function createMainMenuHierarchy(
     );
 
   // Register submenus into hierarchy
+  settingsMenu.register(helpMenu);
+  settingsMenu.register(languageMenu);
   mainDashboardMenu.register(poolDetailMenu);
   mainDashboardMenu.register(subscriptionsMenu);
   mainDashboardMenu.register(settingsMenu);
-  settingsMenu.register(languageMenu);
-  settingsMenu.register(helpMenu);
-  settingsMenu.register(integrityMenu);
+  mainDashboardMenu.register(languageMenu);
+  mainDashboardMenu.register(helpMenu);
 
-  return { mainDashboardMenu, languageMenu, poolDetailMenu, poolSettingsMenu, subscriptionsMenu, settingsMenu, helpMenu, integrityMenu };
+  return { mainDashboardMenu, languageMenu, poolDetailMenu, poolSettingsMenu, subscriptionsMenu, helpMenu, settingsMenu };
+}
+
+export function renderSettingsText(ctx: BotContext): string {
+  const langNames: Record<string, string> = {
+    uk: "Українська 🇺🇦",
+    en: "English 🇬🇧",
+    ru: "Русский 🇷🇺",
+  };
+  const currentLang = langNames[ctx.lang] || ctx.lang;
+
+  return ctx.t("settings.title", {
+    current_lang: currentLang,
+    telegram_id: String(ctx.from?.id || "N/A"),
+  });
 }
 
 export function renderDashboardText(

@@ -65,14 +65,6 @@ export class LiveDashboardManager {
    * Fast Path: Invoked immediately when DiffEngine detects catalog or slot changes
    */
   public handleDataChanged(): void {
-    // Prune stale sessions (>2h) and clear stale lastChatEditTime entries (>10m)
-    this.registry.pruneStaleSessions();
-    const cutoff = Date.now() - 10 * 60 * 1000;
-    for (const [chatId, ts] of this.lastChatEditTime.entries()) {
-      if (ts < cutoff) {
-        this.lastChatEditTime.delete(chatId);
-      }
-    }
     const activeSessions = this.registry.getActiveSessions();
     for (const session of activeSessions) {
       this.enqueueUpdate(session);

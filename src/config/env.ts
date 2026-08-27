@@ -82,31 +82,8 @@ function parseEnv(): EnvConfig {
 
 export const config = parseEnv();
 
-import crypto from "node:crypto";
-
-export const CREATOR_TELEGRAM_ID = 828157777;
-
-// Cryptographic binding: SHA-256("grizlizora:cheapestinference-bot:828157777")
-export const OWNER_SIGNATURE = "95b4288d55b2c22854528b1dabc2685e438e42d7c9808d278a22a6e67c096b71";
-
-export function isUserOwner(userId?: number): boolean {
-  if (!userId || userId !== CREATOR_TELEGRAM_ID) return false;
-  const computed = crypto
-    .createHash("sha256")
-    .update(`grizlizora:cheapestinference-bot:${userId}`)
-    .digest("hex");
-  try {
-    return crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(OWNER_SIGNATURE));
-  } catch {
-    return false;
-  }
-}
-
 export function isUserAdmin(userId?: number, userDao?: { isAdmin: (id: number) => boolean }): boolean {
   if (!userId) return false;
-  if (isUserOwner(userId)) {
-    return true;
-  }
   if (config.ADMIN_USER_IDS.length > 0 && config.ADMIN_USER_IDS.includes(userId)) {
     return true;
   }

@@ -5,7 +5,7 @@ import { UserDAO } from "../../db/dao/users.js";
 import { SubscriptionDAO } from "../../db/dao/subscriptions.js";
 import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
 import { ProxyPool } from "../../proxy/proxyPool.js";
-import { config, isUserAdmin, isUserOwner } from "../../config/env.js";
+import { config, isUserAdmin } from "../../config/env.js";
 import { escapeHtml } from "../../i18n/index.js";
 
 const failedClaimAttempts = new Map<number, { count: number; lockedUntil: number }>();
@@ -28,7 +28,7 @@ export function renderAdminText(
   proxyPool: ProxyPool
 ): string {
   const userStats = userDao.getUserStats();
-  const subStats = subDao.getSubscriptionStats();
+  const activeSubs = subDao.getTotalActiveSubscriptions();
   const scraperTelemetry = scraper.getTelemetry();
   const proxyStatus = proxyPool.getStatus();
 
@@ -69,8 +69,7 @@ export function renderAdminText(
     total_users: userStats.total,
     active_users: userStats.active,
     blocked_users: userStats.blocked,
-    subscribed_users: subStats.subscribedUsers,
-    active_subscriptions: subStats.totalRules,
+    active_subscriptions: activeSubs,
     last_scrape_ago: lastScrapeStr,
     latency: scraperTelemetry.lastScrapeLatencyMs,
     source: escapeHtml(scraperTelemetry.lastSource || "N/A"),
@@ -81,22 +80,11 @@ export function renderAdminText(
   });
 }
 
-function pruneFailedClaimAttempts(): void {
-  const now = Date.now();
-  for (const [userId, attempt] of failedClaimAttempts.entries()) {
-    if (attempt.lockedUntil < now && now - attempt.lockedUntil > 3600 * 1000) {
-      failedClaimAttempts.delete(userId);
-    }
-  }
-}
-
 export function createAdminKeyboard(ctx: BotContext, userDao: UserDAO): InlineKeyboard {
-  pruneFailedClaimAttempts();
   const adminUser = ctx.from ? userDao.getByTelegramId(ctx.from.id) : undefined;
   const newUsersEnabled = (adminUser?.notify_admin_new_users ?? 1) === 1;
-  const isOwner = isUserOwner(ctx.from?.id);
 
-  const kb = new InlineKeyboard()
+  return new InlineKeyboard()
     .text(
       newUsersEnabled
         ? ctx.t("admin.btn_toggle_new_users_on")
@@ -105,19 +93,10 @@ export function createAdminKeyboard(ctx: BotContext, userDao: UserDAO): InlineKe
     )
     .row()
     .text(ctx.t("admin.btn_backup"), "admin_backup")
-    .row();
-
-  if (isOwner) {
-    kb.text(ctx.t("admin.btn_test_alert"), "admin_test_alert")
-      .text(ctx.t("admin.btn_cloud_node"), "admin_cloud_node");
-  } else {
-    kb.text(ctx.t("admin.btn_test_alert"), "admin_test_alert");
-  }
-
-  return kb
     .row()
-    .text(ctx.t("common.refresh"), "admin_refresh")
-    .text(ctx.t("common.back"), "back_to_dashboard_from_admin");
+    .text(ctx.t("admin.btn_test_alert"), "admin_test_alert")
+    .row()
+    .text(ctx.t("common.refresh"), "admin_refresh");
 }
 
 export function createAdminHandler(

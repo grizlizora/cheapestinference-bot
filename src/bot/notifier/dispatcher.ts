@@ -228,11 +228,12 @@ export class NotificationDispatcher {
         return;
       }
 
-      while (this.tokens >= 1 && this.getTotalPending() > 0) {
+      if (this.tokens >= 1) {
         const item = this.selectNextItemDWRR();
-        if (!item) break;
-        this.tokens -= 1;
-        this.dispatchSingleMessage(item).catch(() => {});
+        if (item) {
+          this.tokens -= 1;
+          this.dispatchSingleMessage(item).catch(() => {});
+        }
       }
 
       // Jittered next tick: 37ms ± 3ms to avoid thundering harmonic edge spikes
@@ -347,13 +348,10 @@ export class NotificationDispatcher {
     try {
       this.lastUserDispatchTime.set(msg.telegramId, Date.now());
 
-      const liveProfile = this.index.getProfileByTgId(msg.telegramId);
-      const disableNotification = liveProfile ? liveProfile.isMuted : msg.isMuted;
-
       await this.bot.api.sendMessage(msg.telegramId, msg.text, {
         parse_mode: "HTML",
         reply_markup: msg.keyboard,
-        disable_notification: disableNotification,
+        disable_notification: msg.isMuted,
         link_preview_options: { is_disabled: true },
       });
 
@@ -970,9 +968,8 @@ export class NotificationDispatcher {
     }
 
     if (this.blockedUsersBatch.length === 0) return;
-    const batch = this.blockedUsersBatch;
+    const uniqueIds = Array.from(new Set(this.blockedUsersBatch));
     this.blockedUsersBatch = [];
-    const uniqueIds = Array.from(new Set(batch));
 
     try {
       this.userDao.deactivateUsersBatch(uniqueIds);

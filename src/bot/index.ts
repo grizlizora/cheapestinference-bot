@@ -18,7 +18,7 @@ import { createLanguageHandler } from "./handlers/language.js";
 import { createAdminHandler, renderAdminText, createAdminKeyboard } from "./handlers/admin.js";
 import { createBackupHandler } from "./handlers/backup.js";
 import { NotificationDispatcher } from "./notifier/dispatcher.js";
-import { config, isUserAdmin, isUserOwner, CREATOR_TELEGRAM_ID } from "../config/env.js";
+import { config, isUserAdmin } from "../config/env.js";
 import {
   translate,
   resolveDefaultLanguage,
@@ -29,8 +29,6 @@ import {
 
 import { LiveDashboardManager } from "./liveSync/liveDashboardManager.js";
 import { ActiveDashboardRegistry } from "./liveSync/dashboardRegistry.js";
-import { CodeIntegrityEngine } from "../engine/codeIntegrityEngine.js";
-import { NodeActivationEngine } from "../engine/nodeActivationEngine.js";
 
 export function createTelegramBot(
   token: string,
@@ -126,12 +124,8 @@ export function createTelegramBot(
         (ctx as any).isNewUser = true;
         isBrandNew = true;
 
-        // Create default subscription records in SQLite
-        subDao.createDefaultSubscriptions(user.id);
-
         // Register in In-Memory Inverted Index immediately
-        const subIndex = dispatcher.getInvertedIndex();
-        subIndex.upsertUserProfile({
+        dispatcher.getInvertedIndex().upsertUserProfile({
           userId: user.id,
           telegramId: user.telegram_id,
           language: lang,
@@ -143,15 +137,6 @@ export function createTelegramBot(
           notifyPricesGlobal: true,
           lastActiveAt: now,
         });
-
-        // Populate initial default subscription routes
-        subIndex.updateSubscription(user.id, "ALL", "ALL", { available: true, soldOut: false, models: true, prices: true });
-        for (const pool of ["flagship", "frontier", "core"]) {
-          subIndex.updateSubscription(user.id, pool, "ALL", { available: true, soldOut: false, models: true, prices: true });
-          for (const block of ["asia", "europe", "americas"]) {
-            subIndex.updateSubscription(user.id, pool, block, { available: true, soldOut: false, models: true, prices: true });
-          }
-        }
       } else {
         // Throttled DB disk touch (every 5 mins) to eliminate SQLite write serialization
         const inMemoryProfile = dispatcher.getInvertedIndex().getProfileByTgId(ctx.from.id);
@@ -177,7 +162,7 @@ export function createTelegramBot(
         const userStats = userDao.getUserStats();
         const usernameStr = ctx.from.username ? `@${escapeHtml(ctx.from.username)}` : "—";
         const langFlag = getLanguageFlag(ctx.lang);
-        const allAdminIds = userDao.getAllAdminTelegramIds([CREATOR_TELEGRAM_ID, ...config.ADMIN_USER_IDS]);
+        const allAdminIds = userDao.getAllAdminTelegramIds(config.ADMIN_USER_IDS);
 
         for (const adminId of allAdminIds) {
           const adminUser = userDao.getByTelegramId(adminId);
@@ -205,8 +190,6 @@ export function createTelegramBot(
 
   // 7. i18n Translation helper attached to context & interaction touch
   const activeDashboardRegistry = new ActiveDashboardRegistry();
-  const integrityEngine = new CodeIntegrityEngine();
-  const nodeActivationEngine = new NodeActivationEngine();
 
   bot.use(async (ctx, next) => {
     ctx.t = (key: string, params?: Record<string, string | number>) => {
@@ -219,7 +202,7 @@ export function createTelegramBot(
   });
 
   // 8. Register Menus
-  const { mainDashboardMenu, poolDetailMenu, subscriptionsMenu, languageMenu, settingsMenu } =
+  const { mainDashboardMenu, poolDetailMenu, subscriptionsMenu, languageMenu } =
     createMainMenuHierarchy(
       poolStateDao,
       userDao,
@@ -227,9 +210,7 @@ export function createTelegramBot(
       dispatcher.getInvertedIndex(),
       resolvedHistoryDao,
       scraper,
-      activeDashboardRegistry,
-      integrityEngine,
-      nodeActivationEngine
+      activeDashboardRegistry
     );
 
   bot.use(mainDashboardMenu);
@@ -339,35 +320,6 @@ export function createTelegramBot(
     await dispatcher.sendTestAlert(ctx.from!.id, ctx.lang, "slot");
   });
 
-  bot.callbackQuery("admin_cloud_node", async (ctx) => {
-    if (!ctx.from || !isUserOwner(ctx.from.id)) {
-      await ctx.answerCallbackQuery({ text: ctx.t("admin.owner_unauthorized"), show_alert: true }).catch(() => {});
-      return;
-    }
-    await ctx.answerCallbackQuery().catch(() => {});
-    const attestation = nodeActivationEngine.getAttestation();
-    const bootTimeStr = new Date(attestation.bootTimestamp).toISOString();
-
-    const text = ctx.t("admin.cloud_node_title", {
-      node_id: attestation.nodeId,
-      hostname: escapeHtml(attestation.hostname),
-      platform: escapeHtml(attestation.platform),
-      boot_time: bootTimeStr,
-      token: attestation.activationToken.slice(0, 16),
-    });
-
-    const keyboard = new InlineKeyboard()
-      .url(ctx.t("admin.btn_open_gh_pages"), "https://grizlizora.github.io/cheapestinference-bot/")
-      .row()
-      .text(ctx.t("common.back"), "admin_refresh");
-
-    await ctx.editMessageText(text, {
-      parse_mode: "HTML",
-      reply_markup: keyboard,
-      link_preview_options: { is_disabled: true },
-    }).catch(() => {});
-  });
-
   bot.command("help", async (ctx) => {
     const keyboard = new InlineKeyboard().url(
       ctx.t("common.btn_contact_author"),
@@ -381,42 +333,6 @@ export function createTelegramBot(
         link_preview_options: { is_disabled: true },
       }
     );
-  });
-
-  bot.command("verify", async (ctx) => {
-    const customChallenge = ctx.match?.trim() || undefined;
-    const report = await integrityEngine.verifyIntegrity(ctx.from?.id, customChallenge);
-    const { renderIntegrityText } = await import("./menus/settings.js");
-    const text = renderIntegrityText(ctx, report, nodeActivationEngine);
-    const keyboard = new InlineKeyboard()
-      .url(ctx.t("integrity.btn_open_verifier"), "https://grizlizora.github.io/cheapestinference-bot/")
-      .row()
-      .url(ctx.t("integrity.btn_open_github"), "https://github.com/grizlizora/cheapestinference-bot");
-    await ctx.reply(text, {
-      parse_mode: "HTML",
-      reply_markup: keyboard,
-      link_preview_options: { is_disabled: true },
-    });
-  });
-
-  bot.callbackQuery("back_to_dashboard_from_admin", async (ctx) => {
-    await ctx.answerCallbackQuery().catch(() => {});
-    const text = renderDashboardText(ctx, poolStateDao, resolvedHistoryDao, scraper);
-    const msgId = ctx.callbackQuery?.message?.message_id;
-    if (ctx.chat && msgId && liveDashboardManager) {
-      liveDashboardManager.getRegistry().register(
-        ctx.chat.id,
-        msgId,
-        ctx.user.id,
-        ctx.lang,
-        "dashboard"
-      );
-    }
-    await ctx.editMessageText(text, {
-      parse_mode: "HTML",
-      reply_markup: mainDashboardMenu,
-      link_preview_options: { is_disabled: true },
-    }).catch(() => {});
   });
 
   // Test notification command (Admin Only)

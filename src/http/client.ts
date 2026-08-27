@@ -4,7 +4,6 @@ import zlib from "node:zlib";
 import tls from "node:tls";
 import util from "node:util";
 import { ProxyPool } from "../proxy/proxyPool.js";
-import { FastDnsCache } from "./dnsCache.js";
 
 const gunzipAsync = util.promisify(zlib.gunzip);
 const brotliDecompressAsync = util.promisify(zlib.brotliDecompress);
@@ -34,7 +33,6 @@ export interface HttpResponse {
 export class RobustHttpClient {
   private dispatchers = new Map<string, Dispatcher>();
   private tlsSessionCache = new Map<string, Buffer>();
-  private dnsCache = new FastDnsCache();
   private directAgent: Agent;
 
   constructor(private readonly proxyPool: ProxyPool) {
@@ -46,13 +44,12 @@ export class RobustHttpClient {
         keepAlive: true,
         keepAliveInitialDelay: 1000,
         noDelay: true,
-        lookup: (hostname: string, opts: any, cb: any) => this.dnsCache.lookup(hostname, opts, cb),
       },
-      keepAliveTimeout: 30_000, // Below Cloudflare idle timeout
-      keepAliveMaxTimeout: 45_000,
+      keepAliveTimeout: 45_000, // Below Cloudflare 60s idle timeout
+      keepAliveMaxTimeout: 55_000,
       keepAliveTimeoutThreshold: 1000,
       pipelining: 1,
-      connections: 4, // Optimized memory & socket footprint for low-RAM containers
+      connections: 8, // Optimal memory & socket footprint
       strictContentLength: false,
     });
     this.proxyPool.setHttpClient(this);
@@ -68,6 +65,18 @@ export class RobustHttpClient {
     }
   }
 
+  public async warmUp(urls: string[]): Promise<void> {
+    await Promise.allSettled(
+      urls.map((url) =>
+        this.get({
+          url,
+          timeoutMs: 3_000,
+          etag: '"warmup-probe"',
+        }).catch(() => {})
+      )
+    );
+  }
+
   public destroy(): void {
     try {
       this.directAgent.destroy();
@@ -79,13 +88,20 @@ export class RobustHttpClient {
     }
     this.dispatchers.clear();
     this.tlsSessionCache.clear();
-    this.dnsCache.clear();
   }
 
   private getOrCreateDispatcher(proxyUrl: string | null, timeoutMs: number): Dispatcher {
     if (!proxyUrl) return this.directAgent;
     let dispatcher = this.dispatchers.get(proxyUrl);
     if (dispatcher) return dispatcher;
+
+    // Bound dispatchers map to max 10 entries to prevent memory growth on Tor rotation
+    if (this.dispatchers.size >= 10) {
+      const oldestKey = this.dispatchers.keys().next().value;
+      if (oldestKey) {
+        this.invalidateDispatcher(oldestKey);
+      }
+    }
 
     const parsed = new URL(proxyUrl);
     if (parsed.protocol.startsWith("socks")) {
@@ -287,6 +303,7 @@ export class RobustHttpClient {
           dispatcher,
           headersTimeout: timeoutMs,
           bodyTimeout: timeoutMs,
+          signal: AbortSignal.timeout(timeoutMs),
         });
 
         const statusCode = res.statusCode;

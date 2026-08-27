@@ -1,6 +1,6 @@
 import { SupportedLanguage } from "../../types/db.js";
 
-export type LiveViewType = "dashboard" | "pool_detail" | "subscriptions" | "other";
+export type LiveViewType = "dashboard" | "pool_detail" | "subscriptions" | "settings" | "other";
 
 export interface ActiveDashboardEntry {
   chatId: number;
@@ -104,7 +104,7 @@ export class ActiveDashboardRegistry {
     return candidates;
   }
 
-  public pruneStaleSessions(): void {
+  private pruneStaleSessions(): void {
     const now = Date.now();
     for (const [chatId, session] of this.activeSessions.entries()) {
       if (

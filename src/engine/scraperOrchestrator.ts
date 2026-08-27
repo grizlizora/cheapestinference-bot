@@ -220,15 +220,47 @@ export class ScraperOrchestrator extends EventEmitter {
     }
 
     try {
-      const apiResult = await this.apiEngine.fetch(
+      const apiPromise = this.apiEngine.fetch(
         effectiveApiEtag,
         effectiveApiLastModified,
-        3_500 // Fast 3.5s timeout for ultra-fast failover
+        3_500 // 3.5s timeout for fast failover
       );
+
+      // Hedged Request: if primary API query exceeds 1200ms, race against concurrent HTML fallback
+      let hedgeTimer: NodeJS.Timeout | undefined;
+      const hedgePromise = new Promise<ScrapeResult>((resolve, reject) => {
+        hedgeTimer = setTimeout(async () => {
+          try {
+            const htmlRes = await this.htmlEngine.fetch(
+              effectiveHtmlEtag,
+              effectiveHtmlLastModified,
+              3_500
+            );
+            resolve(htmlRes);
+          } catch (e) {
+            reject(e);
+          }
+        }, 1200);
+      });
+
+      const result = await Promise.race([
+        apiPromise.then((res) => {
+          if (hedgeTimer) clearTimeout(hedgeTimer);
+          return res;
+        }),
+        hedgePromise.catch(() => apiPromise),
+      ]);
+
       this.apiConsecutiveErrors = 0;
-      this.apiEtag = apiResult.etag ?? undefined;
-      this.apiLastModified = apiResult.lastModified ?? undefined;
-      return apiResult;
+      if (result.etag) {
+        if (result.source === "api") this.apiEtag = result.etag;
+        else this.htmlEtag = result.etag;
+      }
+      if (result.lastModified) {
+        if (result.source === "api") this.apiLastModified = result.lastModified;
+        else this.htmlLastModified = result.lastModified;
+      }
+      return result;
     } catch (apiErr: any) {
       this.apiConsecutiveErrors++;
       if (this.apiConsecutiveErrors >= 2) {

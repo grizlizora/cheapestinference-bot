@@ -6,7 +6,7 @@ import { SlotHistoryDAO } from "../../db/dao/slotHistory.js";
 import { SubscriptionDAO } from "../../db/dao/subscriptions.js";
 import { SupportedLanguage } from "../../types/db.js";
 import { SubscriberInvertedIndex } from "../notifier/subscriberIndex.js";
-import { renderDashboardText, safeEditMessageText } from "./mainDashboard.js";
+import { renderDashboardText, renderSettingsText, safeEditMessageText } from "./mainDashboard.js";
 import { renderPoolDetailText } from "./poolDetail.js";
 import { renderSubscriptionsText } from "./subscriptions.js";
 import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
@@ -33,7 +33,6 @@ export function createLanguageMenu(
     const pendingDeepLink = (ctx.session as any)?.pendingDeepLink;
     if (pendingDeepLink && typeof pendingDeepLink === "string") {
       delete (ctx.session as any).pendingDeepLink;
-      delete (ctx.session as any).fromOnboarding;
       if (pendingDeepLink.startsWith("pool_")) {
         const slug = pendingDeepLink.replace("pool_", "");
         ctx.session.tempPoolSlug = slug;
@@ -52,21 +51,10 @@ export function createLanguageMenu(
       }
     }
 
-    const fromOnboarding = (ctx.session as any)?.fromOnboarding;
-    if (fromOnboarding) {
-      delete (ctx.session as any).fromOnboarding;
-      if (ctx.chat && msgId && dashboardRegistry) {
-        dashboardRegistry.register(ctx.chat.id, msgId, ctx.user.id, lang, "dashboard");
-      }
-      await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao, scraper));
-      return ctx.menu.nav("main-dashboard-menu");
-    }
-
     if (ctx.chat && msgId && dashboardRegistry) {
-      dashboardRegistry.register(ctx.chat.id, msgId, ctx.user.id, lang, "other");
+      dashboardRegistry.register(ctx.chat.id, msgId, ctx.user.id, lang, "settings");
     }
 
-    const { renderSettingsText } = await import("./settings.js");
     await safeEditMessageText(ctx, renderSettingsText(ctx));
     return ctx.menu.nav("settings-menu");
   };
@@ -88,18 +76,9 @@ export function createLanguageMenu(
       (ctx) => ctx.t("common.back"),
       async (ctx) => {
         await ctx.answerCallbackQuery().catch(() => {});
-        const fromOnboarding = (ctx.session as any)?.fromOnboarding;
-        if (fromOnboarding) {
-          delete (ctx.session as any).fromOnboarding;
-          const msgId = ctx.callbackQuery?.message?.message_id;
-          if (ctx.chat && msgId && dashboardRegistry) {
-            dashboardRegistry.register(ctx.chat.id, msgId, ctx.user.id, ctx.lang, "dashboard");
-          }
-          await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao, scraper));
-          return ctx.menu.nav("main-dashboard-menu");
+        if (ctx.chat) {
+          dashboardRegistry?.updateView(ctx.chat.id, "settings");
         }
-
-        const { renderSettingsText } = await import("./settings.js");
         await safeEditMessageText(ctx, renderSettingsText(ctx));
         return ctx.menu.nav("settings-menu");
       }

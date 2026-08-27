@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: cheapestinference-bot
+    env: docker
+    plan: starter
+    disk:
+      name: bot-data
+      mountPath: /app/data
+      sizeGB: 1
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: ADMIN_USER_IDS
+        sync: false
+      - key: ADMIN_SECRET
+        sync: false
+      - key: DB_PATH
+        value: /app/data/bot.db
+      - key: TOR_ENABLED
+        value: "true"
+      - key: PORT
+        value: "10000"

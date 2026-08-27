@@ -27,7 +27,6 @@ export function createStartHandler(
 
     const match = (ctx as any).match;
     if (ctx.isNewUser) {
-      (ctx.session as any).fromOnboarding = true;
       if (match && typeof match === "string") {
         (ctx.session as any).pendingDeepLink = match;
       }

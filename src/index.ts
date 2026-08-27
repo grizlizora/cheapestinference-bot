@@ -100,23 +100,7 @@ async function bootstrap() {
     console.error(`❌ [Scraper Error] ${err.message}`);
   });
 
-  // 5. Perform Initial Warmup Scrape
-  if (torManager) {
-    console.log("🧅 [Tor] Waiting for Tor consensus & circuit bootstrap...");
-    await torManager.waitUntilBootstrapped(15_000).catch(() => {});
-  }
-
-  console.log("🔍 [Warmup] Performing initial scrape to establish baseline catalog...");
-  try {
-    await scraper.poll();
-  } catch (err: any) {
-    console.warn(`⚠️ [Warmup] Initial scrape encountered error (${err.message}). Scraper loop will retry.`);
-  }
-
-  // 6. Start Scraper Periodic Loop
-  scraper.start();
-
-  // 7. Initialize and Start Telegram Bot via grammY runner
+  // 5. Initialize Telegram Bot & Notification Dispatcher (Hydrates InvertedIndex & Attaches diff_events listener)
   const { bot, dispatcher, liveDashboardManager } = createTelegramBot(
     config.BOT_TOKEN,
     userDao,
@@ -129,6 +113,25 @@ async function bootstrap() {
   );
   const runner = run(bot);
   console.log("🤖 [Bot] Telegram bot is active and listening for updates.");
+
+  // 6. Perform Initial Warmup Scrape & Socket Pre-warming
+  if (torManager) {
+    console.log("🧅 [Tor] Waiting for Tor consensus & circuit bootstrap...");
+    await torManager.waitUntilBootstrapped(15_000).catch(() => {});
+  }
+
+  // Pre-warm HTTP socket connections
+  await httpClient.warmUp(["https://cheapestinference.com/pools", "https://cheapestinference.com/api/pools"]).catch(() => {});
+
+  console.log("🔍 [Warmup] Performing initial scrape to establish baseline catalog...");
+  try {
+    await scraper.poll();
+  } catch (err: any) {
+    console.warn(`⚠️ [Warmup] Initial scrape encountered error (${err.message}). Scraper loop will retry.`);
+  }
+
+  // 7. Start Scraper Periodic Loop (Now safely captured by dispatcher)
+  scraper.start();
 
   // 8. Start Lightweight HTTP Health Check Server
   const healthServer = createHealthServer(config.PORT, scraper, proxyPool);
