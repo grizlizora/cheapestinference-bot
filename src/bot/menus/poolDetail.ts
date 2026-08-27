@@ -381,8 +381,7 @@ export function renderPoolDetailText(
   if (lastVerifiedTs && lastVerifiedTs > 0) {
     const utcDateStr = new Date(lastVerifiedTs).toISOString().replace("T", " ").substring(0, 19) + " UTC";
     const elapsedText = formatRelativeTime(lastVerifiedTs, ctx.lang);
-    const latencyTag = lastLatency > 0 ? ` [${lastLatency}ms${proxyBadge}]` : "";
-    timeFooter = `\n\n🕒 <i>${ctx.lang === "uk" ? "Оновлено" : ctx.lang === "ru" ? "Обновлено" : "Updated"}: ${utcDateStr} (${elapsedText}${latencyTag})</i>`;
+    timeFooter = `\n\n🕒 <i>${ctx.lang === "uk" ? "Оновлено" : ctx.lang === "ru" ? "Обновлено" : "Updated"}: ${utcDateStr} (${elapsedText})</i>`;
   }
 
   const baseTitle = ctx.t("pool_detail.title", {

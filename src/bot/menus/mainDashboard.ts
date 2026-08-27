@@ -344,8 +344,7 @@ export function renderDashboardText(
   if (lastVerifiedTs && lastVerifiedTs > 0) {
     const utcDateStr = new Date(lastVerifiedTs).toISOString().replace("T", " ").substring(0, 19) + " UTC";
     const elapsedText = formatRelativeTime(lastVerifiedTs, ctx.lang);
-    const latencyTag = lastLatency > 0 ? ` [${lastLatency}ms${proxyBadge}]` : "";
-    updatedAtStr = `${utcDateStr} (${elapsedText}${latencyTag})`;
+    updatedAtStr = `${utcDateStr} (${elapsedText})`;
   } else {
     updatedAtStr = new Date().toISOString().replace("T", " ").substring(0, 19) + " UTC";
   }
