@@ -256,11 +256,15 @@ export class ScraperOrchestrator extends EventEmitter {
         }, 1200);
       });
 
+      apiPromise.finally(() => {
+        if (hedgeTimer) {
+          clearTimeout(hedgeTimer);
+          hedgeTimer = undefined;
+        }
+      });
+
       const result = await Promise.race([
-        apiPromise.then((res) => {
-          if (hedgeTimer) clearTimeout(hedgeTimer);
-          return res;
-        }),
+        apiPromise,
         hedgePromise.catch(() => apiPromise),
       ]);
 

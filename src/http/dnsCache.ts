@@ -70,7 +70,7 @@ export class InMemoryDnsCache {
     if (entry) {
       entry.inFlight = resolvePromise;
     } else {
-      this.cache.set(hostname, {
+      this.setEntry(hostname, {
         addresses: [],
         expiresAt: 0,
         inFlight: resolvePromise,
@@ -79,7 +79,7 @@ export class InMemoryDnsCache {
 
     try {
       const records = await resolvePromise;
-      this.cache.set(hostname, {
+      this.setEntry(hostname, {
         addresses: records,
         expiresAt: Date.now() + this.defaultTtlMs,
       });
@@ -94,13 +94,21 @@ export class InMemoryDnsCache {
     }
   }
 
+  private setEntry(hostname: string, entry: CachedDnsEntry): void {
+    if (this.cache.size >= 200 && !this.cache.has(hostname)) {
+      const oldestKey = this.cache.keys().next().value;
+      if (oldestKey) this.cache.delete(oldestKey);
+    }
+    this.cache.set(hostname, entry);
+  }
+
   private refreshInBackground(hostname: string): void {
     const entry = this.cache.get(hostname);
     if (!entry || entry.inFlight) return;
 
     entry.inFlight = this.performLookup(hostname)
       .then((records) => {
-        this.cache.set(hostname, {
+        this.setEntry(hostname, {
           addresses: records,
           expiresAt: Date.now() + this.defaultTtlMs,
         });
