@@ -7,6 +7,7 @@ import {
   EtaPrediction,
   PoolBasePricePayload,
   SlotPricePayload,
+  DropClassification,
 } from "../types/domain.js";
 import { SlotHistoryDAO } from "../db/dao/slotHistory.js";
 import { CatalogHistoryDAO } from "../db/dao/catalogHistory.js";
@@ -554,9 +555,29 @@ export class SlotDiffEngine {
       poolAppearedMap.set(e.poolSlug, (poolAppearedMap.get(e.poolSlug) || 0) + 1);
     }
 
+    const hasCatalogMutation = events.some(
+      (e) => e.type === "MODEL_UPGRADE_EVENT" || e.type === "POOL_BASE_PRICE_CHANGED" || e.type === "TIER_UPDATED_EVENT"
+    );
+
     for (const event of appearedEvents) {
       const poolAppearedCount = poolAppearedMap.get(event.poolSlug) || 0;
-      const isBatchDrop = isGlobalBatchDrop || poolAppearedCount >= 2;
+      const effectiveCluster = Math.max(totalAppearedCount, poolAppearedCount);
+
+      let dropClassification: DropClassification | undefined;
+      if (this.predictiveEngine) {
+        dropClassification = this.predictiveEngine.classifyDrop(
+          event.poolSlug,
+          event.block,
+          event.timestamp,
+          effectiveCluster,
+          hasCatalogMutation
+        );
+      }
+
+      const isBatchDrop = dropClassification
+        ? dropClassification.dropType === "BATCH_CAPACITY_EXPANSION"
+        : isGlobalBatchDrop || poolAppearedCount >= 2;
+
       const dropPattern: DropPatternType = isBatchDrop ? "BATCH_DROP" : "SINGLE_SLOT_RELEASE";
 
       let avgLifespanFormatted = "";
@@ -582,6 +603,7 @@ export class SlotDiffEngine {
         dropPattern,
         totalOpenings,
         lastOpenedAt,
+        dropClassification,
       };
     }
 

@@ -12,6 +12,11 @@ import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
 import { ActiveDashboardRegistry } from "../liveSync/dashboardRegistry.js";
 
 const DEFAULT_BLOCK_IDS = ["asia", "europe", "americas"];
+const DEFAULT_BLOCK_HOURS: Record<string, string> = {
+  asia: "00:00 – 08:00 UTC",
+  europe: "08:00 – 16:00 UTC",
+  americas: "16:00 – 24:00 UTC",
+};
 
 export function createPoolDetailMenu(
   poolStateDao: PoolStateDAO,
@@ -102,13 +107,13 @@ export function createPoolDetailMenu(
         const isBlockActive = subDao.isBlockSubscribed(ctx.user.id, slug, blockId);
         const blockName = translate(ctx.lang, `common.block_${blockId}`) || blockId;
         const blockRow = blocks.find((b) => b.block_id === blockId);
-        const blockHours = blockRow?.hours_utc || "";
+        const blockHours = blockRow?.hours_utc || DEFAULT_BLOCK_HOURS[blockId] || "";
 
         range
           .text(
             isBlockActive
-              ? `✅ ${blockName} (${blockHours})`
-              : `❌ ${blockName} (${blockHours})`,
+              ? ctx.t("subscriptions.slot_active", { name: blockName, hours: blockHours })
+              : ctx.t("subscriptions.slot_inactive", { name: blockName, hours: blockHours }),
             async (c) => {
               const { isBlockSubscribed: active, isPoolSubscribed: parentPoolActive } =
                 subDao.toggleBlockAndUpdatePool(c.user.id, slug, blockId, blockIds);
@@ -133,6 +138,10 @@ export function createPoolDetailMenu(
                   b,
                   bActive ? fullFlags : disabledFlags
                 );
+              }
+
+              if (!active) {
+                invertedIndex.updateSubscription(c.user.id, "ALL", "ALL", disabledFlags);
               }
 
               const toast = active
@@ -201,6 +210,15 @@ export function createPoolDetailMenu(
           invertedIndex.updateSubscription(c.user.id, slug, "ALL", flags);
           for (const bId of blockIds) {
             invertedIndex.updateSubscription(c.user.id, slug, bId, flags);
+          }
+
+          if (!newSubState) {
+            invertedIndex.updateSubscription(c.user.id, "ALL", "ALL", {
+              available: false,
+              soldOut: false,
+              models: false,
+              prices: false,
+            });
           }
 
           const toast = newSubState

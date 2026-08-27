@@ -106,6 +106,7 @@ export interface SlotAnalyticsPayload {
   totalOpenings: number;
   lastOpenedAt?: string | null;
   eta?: EtaPrediction;
+  dropClassification?: DropClassification;
 }
 
 export interface DiffEvent {

@@ -118,4 +118,35 @@ describe("Parent-Child Pool Subscription Synchronization & Persistence Invariant
     const profile = invertedIndex.getProfileByTgId(777666);
     expect(profile?.language).toBe("uk");
   });
+
+  it("6. should immediately synchronize RAM composite index on global category toggle", () => {
+    const user = userDao.upsertUser({ telegram_id: 555444, first_name: "User4", language: "uk" });
+    const blockIds = ["asia", "europe", "americas"];
+
+    // Subscribe to Flagship pool with defaults (available=ON, sold_out=OFF)
+    subDao.togglePoolWithBlocks(user.id, "flagship", blockIds);
+    invertedIndex = new SubscriberInvertedIndex(db);
+
+    // Initial check: matches available, does NOT match sold_out
+    expect(invertedIndex.resolveSubscribers("flagship", "europe", "available").length).toBe(1);
+    expect(invertedIndex.resolveSubscribers("flagship", "europe", "sold_out").length).toBe(0);
+
+    // Now user enables global sold_out
+    userDao.toggleSoldOut(555444);
+    subDao.updateUserGlobalCategory(user.id, "sold_out", true);
+
+    // Live sync into RAM
+    const subs = subDao.getSubscriptionsForUser(user.id);
+    for (const s of subs) {
+      invertedIndex.updateSubscription(user.id, s.pool_slug, s.block_id, {
+        available: s.notify_on_available === 1,
+        soldOut: s.notify_on_sold_out === 1,
+        models: s.notify_on_models === 1,
+        prices: s.notify_on_prices === 1,
+      });
+    }
+
+    // Immediately matches sold_out in RAM without DB restart
+    expect(invertedIndex.resolveSubscribers("flagship", "europe", "sold_out").length).toBe(1);
+  });
 });

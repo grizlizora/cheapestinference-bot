@@ -21,6 +21,18 @@ export function createSubscriptionsMenu(
   scraper?: ScraperOrchestrator,
   dashboardRegistry?: ActiveDashboardRegistry
 ) {
+  const syncAllUserSubsInRam = (userId: number) => {
+    const subs = subDao.getSubscriptionsForUser(userId);
+    for (const s of subs) {
+      invertedIndex.updateSubscription(userId, s.pool_slug, s.block_id, {
+        available: s.notify_on_available === 1,
+        soldOut: s.notify_on_sold_out === 1,
+        models: s.notify_on_models === 1,
+        prices: s.notify_on_prices === 1,
+      });
+    }
+  };
+
   return new Menu<BotContext>("subscriptions-menu")
     // Row 1: Available Slots & Sold Out (2x2 Grid)
     .text(
@@ -35,6 +47,7 @@ export function createSubscriptionsMenu(
         invertedIndex.updateUserPreferences(ctx.from!.id, {
           notifyAvailableGlobal: val === 1,
         });
+        syncAllUserSubsInRam(ctx.user.id);
 
         const toast =
           val === 1
@@ -56,6 +69,7 @@ export function createSubscriptionsMenu(
         invertedIndex.updateUserPreferences(ctx.from!.id, {
           notifySoldOutGlobal: val === 1,
         });
+        syncAllUserSubsInRam(ctx.user.id);
 
         const toast =
           val === 1
@@ -79,6 +93,7 @@ export function createSubscriptionsMenu(
         invertedIndex.updateUserPreferences(ctx.from!.id, {
           notifyModelsGlobal: val === 1,
         });
+        syncAllUserSubsInRam(ctx.user.id);
 
         const toast =
           val === 1
@@ -100,6 +115,7 @@ export function createSubscriptionsMenu(
         invertedIndex.updateUserPreferences(ctx.from!.id, {
           notifyPricesGlobal: val === 1,
         });
+        syncAllUserSubsInRam(ctx.user.id);
 
         const toast =
           val === 1
