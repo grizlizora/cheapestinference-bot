@@ -90,6 +90,21 @@ describe("UserDAO & Admin Settings", () => {
     expect(admins).toContain(11111);
   });
 
+  it("should evaluate isUserAdmin strictly", async () => {
+    const { isUserAdmin } = await import("../src/config/env.js");
+
+    expect(isUserAdmin(undefined, userDao)).toBe(false);
+    expect(isUserAdmin(0, userDao)).toBe(false);
+
+    // Not in env list and not in DB -> false
+    expect(isUserAdmin(1234567, userDao)).toBe(false);
+
+    // Promoted in DB -> true
+    userDao.upsertUser({ telegram_id: 1234567, first_name: "VIP" });
+    userDao.setAdmin(1234567, true);
+    expect(isUserAdmin(1234567, userDao)).toBe(true);
+  });
+
   it("should escape HTML characters safely", () => {
     expect(escapeHtml("<script>alert('xss')</script>")).toBe("&lt;script&gt;alert('xss')&lt;/script&gt;");
     expect(escapeHtml("Fast & Reliable < 50ms")).toBe("Fast &amp; Reliable &lt; 50ms");

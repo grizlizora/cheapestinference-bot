@@ -9,6 +9,7 @@ import { translate, escapeHtml, formatRelativeTime } from "../../i18n/index.js";
 import { renderDashboardText, safeEditMessageText } from "./mainDashboard.js";
 
 import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
+import { ActiveDashboardRegistry } from "../liveSync/dashboardRegistry.js";
 
 const DEFAULT_BLOCK_IDS = ["asia", "europe", "americas"];
 
@@ -17,7 +18,8 @@ export function createPoolDetailMenu(
   subDao: SubscriptionDAO,
   invertedIndex: SubscriberInvertedIndex,
   historyDao?: SlotHistoryDAO,
-  scraper?: ScraperOrchestrator
+  scraper?: ScraperOrchestrator,
+  dashboardRegistry?: ActiveDashboardRegistry
 ) {
   const poolSettingsMenu = new Menu<BotContext>("pool-settings-menu")
     .dynamic((ctx, range) => {
@@ -105,6 +107,9 @@ export function createPoolDetailMenu(
       (ctx) => ctx.t("pool_settings.btn_back_to_pool", { pool_name: (ctx.session.tempPoolSlug || "flagship").toUpperCase() }),
       async (ctx) => {
         await ctx.answerCallbackQuery().catch(() => {});
+        if (ctx.chat) {
+          dashboardRegistry?.updateView(ctx.chat.id, "pool_detail", ctx.session.tempPoolSlug);
+        }
         await safeEditMessageText(ctx, renderPoolDetailText(ctx, poolStateDao, historyDao, scraper));
         return ctx.menu.nav("pool-detail-menu");
       }
@@ -140,37 +145,23 @@ export function createPoolDetailMenu(
 
       range.text(
         isSubscribedToPool
-          ? ctx.t("pool_detail.btn_unsubscribe_pool", { pool_name: slug.toUpperCase() })
-          : ctx.t("pool_detail.btn_subscribe_pool", { pool_name: slug.toUpperCase() }),
+          ? ctx.t("subscriptions.btn_pool_on", { pool: slug.toUpperCase() })
+          : ctx.t("subscriptions.btn_pool_off", { pool: slug.toUpperCase() }),
         async (c) => {
-          const active = subDao.togglePoolWithBlocks(c.user.id, slug, blockIds);
+          const newSubState = subDao.togglePoolWithBlocks(c.user.id, slug, blockIds);
 
-          invertedIndex.updateSubscription(c.user.id, slug, "ALL", {
-            available: active,
-            soldOut: active,
-            models: active,
-            prices: active,
-          });
-
+          const flags = {
+            available: newSubState,
+            soldOut: false,
+            models: newSubState,
+            prices: newSubState,
+          };
+          invertedIndex.updateSubscription(c.user.id, slug, "ALL", flags);
           for (const bId of blockIds) {
-            invertedIndex.updateSubscription(c.user.id, slug, bId, {
-              available: active,
-              soldOut: active,
-              models: active,
-              prices: active,
-            });
+            invertedIndex.updateSubscription(c.user.id, slug, bId, flags);
           }
 
-          if (!active) {
-            invertedIndex.updateSubscription(c.user.id, "ALL", "ALL", {
-              available: false,
-              soldOut: false,
-              models: false,
-              prices: false,
-            });
-          }
-
-          const toast = active
+          const toast = newSubState
             ? c.t("subscriptions.toast_pool_on", { pool: slug.toUpperCase() })
             : c.t("subscriptions.toast_pool_off", { pool: slug.toUpperCase() });
           await c.answerCallbackQuery(toast).catch(() => {});
@@ -186,6 +177,9 @@ export function createPoolDetailMenu(
         ctx.t("pool_detail.btn_pool_filters", { pool_name: slug.toUpperCase() }),
         async (c) => {
           await c.answerCallbackQuery().catch(() => {});
+          if (c.chat) {
+            dashboardRegistry?.updateView(c.chat.id, "other");
+          }
           await safeEditMessageText(c, renderPoolSettingsText(c, poolStateDao, subDao));
           return c.menu.nav("pool-settings-menu");
         }
@@ -213,6 +207,9 @@ export function createPoolDetailMenu(
       (ctx) => ctx.t("common.back"),
       async (ctx) => {
         await ctx.answerCallbackQuery().catch(() => {});
+        if (ctx.chat) {
+          dashboardRegistry?.updateView(ctx.chat.id, "dashboard");
+        }
         await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao, scraper));
         return ctx.menu.nav("main-dashboard-menu");
       }

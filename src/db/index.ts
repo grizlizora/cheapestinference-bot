@@ -63,6 +63,7 @@ function initSchema(db: Database.Database): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_users_active ON users(is_active);
+    CREATE INDEX IF NOT EXISTS idx_users_admins ON users(is_admin, is_active) WHERE is_admin = 1 AND is_active = 1;
 
     -- 2. Subscriptions Table
     CREATE TABLE IF NOT EXISTS subscriptions (
@@ -181,12 +182,16 @@ function initSchema(db: Database.Database): void {
   try {
     db.exec(`ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0;`);
   } catch {}
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN notify_admin_new_users INTEGER NOT NULL DEFAULT 1;`);
+  } catch {}
 }
 
 export function closeDatabase(): void {
   if (dbInstance) {
     try {
       dbInstance.pragma("optimize");
+      dbInstance.pragma("wal_checkpoint(TRUNCATE)");
     } catch {}
     dbInstance.close();
     dbInstance = null;

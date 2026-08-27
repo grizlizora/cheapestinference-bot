@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { InlineKeyboard } from "grammy";
 import { BotContext } from "../../types/context.js";
 import { UserDAO } from "../../db/dao/users.js";
@@ -6,6 +7,18 @@ import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
 import { ProxyPool } from "../../proxy/proxyPool.js";
 import { config, isUserAdmin } from "../../config/env.js";
 import { escapeHtml } from "../../i18n/index.js";
+
+const failedClaimAttempts = new Map<number, { count: number; lockedUntil: number }>();
+
+function isTimingSafeMatch(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) {
+    crypto.timingSafeEqual(bufA, bufA);
+    return false;
+  }
+  return crypto.timingSafeEqual(bufA, bufB);
+}
 
 export function renderAdminText(
   ctx: BotContext,
@@ -99,9 +112,25 @@ export function createAdminHandler(
     const match = (ctx as any).match;
     if (typeof match === "string" && match.trim().length > 0) {
       const secretAttempt = match.trim();
-      if (config.ADMIN_SECRET && secretAttempt === config.ADMIN_SECRET) {
-        userDao.setAdmin(ctx.from.id, true);
+      const tgId = ctx.from.id;
+      const now = Date.now();
+      const attemptRecord = failedClaimAttempts.get(tgId) || { count: 0, lockedUntil: 0 };
+
+      if (now < attemptRecord.lockedUntil) {
+        await ctx.reply("⛔ Too many failed attempts. Please try again in 15 minutes.", { parse_mode: "HTML" });
+        return;
+      }
+
+      if (config.ADMIN_SECRET && isTimingSafeMatch(secretAttempt, config.ADMIN_SECRET)) {
+        userDao.setAdmin(tgId, true);
+        failedClaimAttempts.delete(tgId);
         await ctx.reply(ctx.t("admin.claim_success"), { parse_mode: "HTML" });
+      } else {
+        attemptRecord.count += 1;
+        if (attemptRecord.count >= 3) {
+          attemptRecord.lockedUntil = now + 15 * 60 * 1000;
+        }
+        failedClaimAttempts.set(tgId, attemptRecord);
       }
     }
 

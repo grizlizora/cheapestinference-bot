@@ -8,6 +8,7 @@ import { SubscriberInvertedIndex } from "../notifier/subscriberIndex.js";
 import { renderDashboardText, safeEditMessageText } from "./mainDashboard.js";
 
 import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
+import { ActiveDashboardRegistry } from "../liveSync/dashboardRegistry.js";
 
 const DEFAULT_BLOCK_IDS = ["asia", "europe", "americas"];
 
@@ -17,7 +18,8 @@ export function createSubscriptionsMenu(
   poolStateDao: PoolStateDAO,
   invertedIndex: SubscriberInvertedIndex,
   historyDao?: SlotHistoryDAO,
-  scraper?: ScraperOrchestrator
+  scraper?: ScraperOrchestrator,
+  dashboardRegistry?: ActiveDashboardRegistry
 ) {
   return new Menu<BotContext>("subscriptions-menu")
     // Row 1: Available Slots & Sold Out (2x2 Grid)
@@ -326,6 +328,9 @@ export function createSubscriptionsMenu(
       (ctx) => ctx.t("common.back"),
       async (ctx) => {
         await ctx.answerCallbackQuery().catch(() => {});
+        if (ctx.chat) {
+          dashboardRegistry?.updateView(ctx.chat.id, "dashboard");
+        }
         await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao, scraper));
         return ctx.menu.nav("main-dashboard-menu");
       }

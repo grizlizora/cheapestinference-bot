@@ -35,17 +35,20 @@ export async function safeEditMessageText(
   }
 }
 
+import { ActiveDashboardRegistry } from "../liveSync/dashboardRegistry.js";
+
 export function createMainMenuHierarchy(
   poolStateDao: PoolStateDAO,
   userDao: UserDAO,
   subDao: SubscriptionDAO,
   invertedIndex: SubscriberInvertedIndex,
   historyDao?: SlotHistoryDAO,
-  scraper?: ScraperOrchestrator
+  scraper?: ScraperOrchestrator,
+  dashboardRegistry?: ActiveDashboardRegistry
 ) {
-  const languageMenu = createLanguageMenu(userDao, poolStateDao, invertedIndex, historyDao, scraper, subDao);
-  const { poolDetailMenu, poolSettingsMenu } = createPoolDetailMenu(poolStateDao, subDao, invertedIndex, historyDao, scraper);
-  const subscriptionsMenu = createSubscriptionsMenu(subDao, userDao, poolStateDao, invertedIndex, historyDao, scraper);
+  const languageMenu = createLanguageMenu(userDao, poolStateDao, invertedIndex, historyDao, scraper, subDao, dashboardRegistry);
+  const { poolDetailMenu, poolSettingsMenu } = createPoolDetailMenu(poolStateDao, subDao, invertedIndex, historyDao, scraper, dashboardRegistry);
+  const subscriptionsMenu = createSubscriptionsMenu(subDao, userDao, poolStateDao, invertedIndex, historyDao, scraper, dashboardRegistry);
 
   const helpMenu = new Menu<BotContext>("help-menu")
     .url(
@@ -57,6 +60,9 @@ export function createMainMenuHierarchy(
       (ctx) => ctx.t("common.back"),
       async (ctx) => {
         await ctx.answerCallbackQuery().catch(() => {});
+        if (ctx.chat) {
+          dashboardRegistry?.updateView(ctx.chat.id, "dashboard");
+        }
         await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao, scraper));
         return ctx.menu.nav("main-dashboard-menu");
       }
@@ -93,6 +99,9 @@ export function createMainMenuHierarchy(
           .text(`${icon} ${pool.name}`, async (c) => {
             await c.answerCallbackQuery().catch(() => {});
             c.session.tempPoolSlug = pool.slug;
+            if (c.chat) {
+              dashboardRegistry?.updateView(c.chat.id, "pool_detail", pool.slug);
+            }
             await safeEditMessageText(
               c,
               renderPoolDetailText(c, poolStateDao, historyDao, scraper)
@@ -106,6 +115,9 @@ export function createMainMenuHierarchy(
       (ctx) => ctx.t("menu.btn_subscriptions"),
       async (ctx) => {
         await ctx.answerCallbackQuery().catch(() => {});
+        if (ctx.chat) {
+          dashboardRegistry?.updateView(ctx.chat.id, "subscriptions");
+        }
         await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
         return ctx.menu.nav("subscriptions-menu");
       }
@@ -131,6 +143,9 @@ export function createMainMenuHierarchy(
       (ctx) => ctx.t("common.help"),
       async (ctx) => {
         await ctx.answerCallbackQuery().catch(() => {});
+        if (ctx.chat) {
+          dashboardRegistry?.updateView(ctx.chat.id, "other");
+        }
         await safeEditMessageText(ctx, ctx.t("help_text", { telegram_id: String(ctx.from?.id || "N/A") }));
         return ctx.menu.nav("help-menu");
       }
@@ -140,6 +155,9 @@ export function createMainMenuHierarchy(
       (ctx) => ctx.t("menu.btn_language"),
       async (ctx) => {
         await ctx.answerCallbackQuery().catch(() => {});
+        if (ctx.chat) {
+          dashboardRegistry?.updateView(ctx.chat.id, "other");
+        }
         await safeEditMessageText(ctx, ctx.t("onboarding.welcome_title"));
         return ctx.menu.nav("language-menu");
       }

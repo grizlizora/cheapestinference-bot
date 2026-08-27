@@ -66,6 +66,10 @@ describe("Live Dashboard Registry & Granular Subscriptions Test Suite", () => {
         language: "uk",
         isMuted: false,
         isActive: true,
+        notifyAvailableGlobal: true,
+        notifySoldOutGlobal: true,
+        notifyModelsGlobal: true,
+        notifyPricesGlobal: true,
       });
 
       // Initially Flagship has default flags

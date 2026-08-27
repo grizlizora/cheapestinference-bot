@@ -28,6 +28,7 @@ import {
 } from "../i18n/index.js";
 
 import { LiveDashboardManager } from "./liveSync/liveDashboardManager.js";
+import { ActiveDashboardRegistry } from "./liveSync/dashboardRegistry.js";
 
 export function createTelegramBot(
   token: string,
@@ -187,11 +188,16 @@ export function createTelegramBot(
     await next();
   });
 
-  // 7. i18n Translation helper attached to context
+  // 7. i18n Translation helper attached to context & interaction touch
+  const activeDashboardRegistry = new ActiveDashboardRegistry();
+
   bot.use(async (ctx, next) => {
     ctx.t = (key: string, params?: Record<string, string | number>) => {
       return translate(ctx.lang, key, params);
     };
+    if (ctx.chat?.id) {
+      activeDashboardRegistry.touchInteraction(ctx.chat.id);
+    }
     await next();
   });
 
@@ -203,7 +209,8 @@ export function createTelegramBot(
       subDao,
       dispatcher.getInvertedIndex(),
       resolvedHistoryDao,
-      scraper
+      scraper,
+      activeDashboardRegistry
     );
 
   bot.use(mainDashboardMenu);
@@ -216,7 +223,8 @@ export function createTelegramBot(
     scraper,
     mainDashboardMenu,
     poolDetailMenu,
-    resolvedHistoryDao
+    resolvedHistoryDao,
+    { registry: activeDashboardRegistry }
   );
 
   // 10. Command Handlers

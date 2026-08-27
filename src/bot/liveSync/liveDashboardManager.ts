@@ -11,12 +11,13 @@ import { renderPoolDetailText } from "../menus/poolDetail.js";
 import { translate } from "../../i18n/index.js";
 
 export interface LiveDashboardManagerOptions {
-  heartbeatSyncThrottleMs?: number; // Minimum gap between timestamp-only edits (default: 45s)
-  maxEditsPerSecond?: number;       // Rate limiting token bucket rate (default: 20/s)
+  heartbeatSyncThrottleMs?: number; // Throttle timestamp updates during heartbeat (default 45s)
+  maxEditsPerSecond?: number; // Token bucket dispatch capacity (default 20/s)
+  registry?: ActiveDashboardRegistry;
 }
 
 export class LiveDashboardManager {
-  private registry = new ActiveDashboardRegistry();
+  private registry: ActiveDashboardRegistry;
   private isDispatching = false;
   private isPaused = false;
   private pauseUntil = 0;
@@ -46,6 +47,7 @@ export class LiveDashboardManager {
     private historyDao?: SlotHistoryDAO,
     options: LiveDashboardManagerOptions = {}
   ) {
+    this.registry = options.registry || new ActiveDashboardRegistry();
     this.heartbeatSyncThrottleMs = options.heartbeatSyncThrottleMs ?? 45_000;
     this.targetRatePerSec = options.maxEditsPerSecond ?? 20;
     this.tokenIntervalMs = 1000 / this.targetRatePerSec;
@@ -174,11 +176,17 @@ export class LiveDashboardManager {
 
       this.lastChatEditTime.set(session.chatId, Date.now());
 
-      await this.bot.api.editMessageText(session.chatId, session.messageId, text, {
+      const payload: Record<string, any> = {
         parse_mode: "HTML",
         reply_markup: targetMenu,
         link_preview_options: { is_disabled: true },
-      });
+      };
+
+      if (typeof (targetMenu as any).prepare === "function") {
+        await (targetMenu as any).prepare(payload, syntheticCtx);
+      }
+
+      await this.bot.api.editMessageText(session.chatId, session.messageId, text, payload as any);
 
       session.lastRenderedTextHash = textHash;
       session.lastTelegramEditAt = Date.now();
@@ -204,12 +212,14 @@ export class LiveDashboardManager {
       desc.includes("message can't be edited") ||
       desc.includes("chat not found")
     ) {
+      this.lastChatEditTime.delete(session.chatId);
       this.registry.remove(session.chatId);
       return;
     }
 
     // 3. User blocked bot
     if (errorCode === 403 || desc.includes("bot was blocked by the user")) {
+      this.lastChatEditTime.delete(session.chatId);
       this.registry.remove(session.chatId);
       return;
     }
@@ -226,6 +236,7 @@ export class LiveDashboardManager {
     // 5. General Error (increment retry count)
     session.consecutiveErrors++;
     if (session.consecutiveErrors >= 3) {
+      this.lastChatEditTime.delete(session.chatId);
       this.registry.remove(session.chatId);
     }
   }

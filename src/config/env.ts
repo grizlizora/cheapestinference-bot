@@ -90,8 +90,5 @@ export function isUserAdmin(userId?: number, userDao?: { isAdmin: (id: number) =
   if (userDao && userDao.isAdmin(userId)) {
     return true;
   }
-  if (config.NODE_ENV !== "production" && config.ADMIN_USER_IDS.length === 0) {
-    return true;
-  }
   return false;
 }

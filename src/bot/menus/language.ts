@@ -10,6 +10,7 @@ import { renderDashboardText, safeEditMessageText } from "./mainDashboard.js";
 import { renderPoolDetailText } from "./poolDetail.js";
 import { renderSubscriptionsText } from "./subscriptions.js";
 import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
+import { ActiveDashboardRegistry } from "../liveSync/dashboardRegistry.js";
 
 export function createLanguageMenu(
   userDao: UserDAO,
@@ -17,7 +18,8 @@ export function createLanguageMenu(
   invertedIndex: SubscriberInvertedIndex,
   historyDao?: SlotHistoryDAO,
   scraper?: ScraperOrchestrator,
-  subDao?: SubscriptionDAO
+  subDao?: SubscriptionDAO,
+  dashboardRegistry?: ActiveDashboardRegistry
 ) {
   const switchLanguage = async (ctx: BotContext, lang: SupportedLanguage, toast: string) => {
     userDao.setLanguage(ctx.from!.id, lang);
@@ -27,18 +29,30 @@ export function createLanguageMenu(
 
     await ctx.answerCallbackQuery(toast).catch(() => {});
 
+    const msgId = ctx.callbackQuery?.message?.message_id;
     const pendingDeepLink = (ctx.session as any)?.pendingDeepLink;
     if (pendingDeepLink && typeof pendingDeepLink === "string") {
       delete (ctx.session as any).pendingDeepLink;
       if (pendingDeepLink.startsWith("pool_")) {
-        ctx.session.tempPoolSlug = pendingDeepLink.replace("pool_", "");
+        const slug = pendingDeepLink.replace("pool_", "");
+        ctx.session.tempPoolSlug = slug;
+        if (ctx.chat && msgId && dashboardRegistry) {
+          dashboardRegistry.register(ctx.chat.id, msgId, ctx.user.id, lang, "pool_detail", slug);
+        }
         await safeEditMessageText(ctx, renderPoolDetailText(ctx, poolStateDao, historyDao, scraper));
         return ctx.menu.nav("pool-detail-menu");
       }
       if ((pendingDeepLink === "alerts" || pendingDeepLink === "subscriptions") && subDao) {
+        if (ctx.chat && msgId && dashboardRegistry) {
+          dashboardRegistry.register(ctx.chat.id, msgId, ctx.user.id, lang, "subscriptions");
+        }
         await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
         return ctx.menu.nav("subscriptions-menu");
       }
+    }
+
+    if (ctx.chat && msgId && dashboardRegistry) {
+      dashboardRegistry.register(ctx.chat.id, msgId, ctx.user.id, lang, "dashboard");
     }
 
     await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao, scraper));

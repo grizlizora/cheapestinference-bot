@@ -11,6 +11,15 @@ export function createHealthServer(
     const rawUrl = req.url || "/";
     const pathname = rawUrl.split("?")[0].replace(/\/+$/, "") || "/";
 
+    if (req.method !== "GET" && req.method !== "HEAD" && req.method !== "OPTIONS") {
+      res.writeHead(405, {
+        "Content-Type": "text/plain",
+        "Allow": "GET, HEAD, OPTIONS",
+      });
+      res.end("Method Not Allowed");
+      return;
+    }
+
     // Handle CORS Preflight
     if (req.method === "OPTIONS") {
       res.writeHead(204, {
@@ -19,6 +28,43 @@ export function createHealthServer(
         "Access-Control-Allow-Headers": "Content-Type",
       });
       res.end();
+      return;
+    }
+
+    if (pathname === "/metrics") {
+      try {
+        const telemetry = scraper.getTelemetry();
+        const mem = process.memoryUsage();
+        const metrics = [
+          "# HELP bot_uptime_seconds Bot process uptime in seconds",
+          "# TYPE bot_uptime_seconds gauge",
+          `bot_uptime_seconds ${Math.floor(process.uptime())}`,
+          "# HELP bot_memory_heap_used_bytes V8 Heap memory used in bytes",
+          "# TYPE bot_memory_heap_used_bytes gauge",
+          `bot_memory_heap_used_bytes ${mem.heapUsed}`,
+          "# HELP bot_memory_rss_bytes Process RSS memory in bytes",
+          "# TYPE bot_memory_rss_bytes gauge",
+          `bot_memory_rss_bytes ${mem.rss}`,
+          "# HELP scraper_scrapes_total Total number of scrape cycles performed",
+          "# TYPE scraper_scrapes_total counter",
+          `scraper_scrapes_total ${telemetry.totalScrapes}`,
+          "# HELP scraper_last_latency_ms Latency of the last scrape in milliseconds",
+          "# TYPE scraper_last_latency_ms gauge",
+          `scraper_last_latency_ms ${telemetry.lastScrapeLatencyMs}`,
+          "# HELP scraper_consecutive_failures Consecutive scrape failure count",
+          "# TYPE scraper_consecutive_failures gauge",
+          `scraper_consecutive_failures ${telemetry.consecutiveFailures}`,
+        ].join("\n") + "\n";
+
+        res.writeHead(200, {
+          "Content-Type": "text/plain; version=0.0.4; charset=utf-8",
+          "Cache-Control": "no-store, no-cache, must-revalidate",
+        });
+        res.end(metrics);
+      } catch (err: any) {
+        res.writeHead(500, { "Content-Type": "text/plain" });
+        res.end(`Error collecting metrics: ${err.message}`);
+      }
       return;
     }
 
