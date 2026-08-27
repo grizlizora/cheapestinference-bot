@@ -436,17 +436,28 @@ export class NotificationDispatcher {
       truncated = truncated.substring(0, lastNewline);
     }
     truncated = truncated.replace(/<[^>]*$/, "");
-    const openTags = (truncated.match(/<(?!(?:\/|br|hr))[a-z]+[^>]*>/gi) || [])
-      .map(tag => tag.match(/<([a-z]+)/i)?.[1].toLowerCase())
-      .filter(Boolean) as string[];
-    const closeTags = (truncated.match(/<\/[a-z]+>/gi) || [])
-      .map(tag => tag.match(/<\/([a-z]+)>/i)?.[1].toLowerCase())
-      .filter(Boolean) as string[];
 
-    while (openTags.length > closeTags.length) {
-      const tagToClose = openTags.pop();
+    // Strict LIFO tag stack for 100% valid HTML closing
+    const stack: string[] = [];
+    for (const match of truncated.matchAll(/<\/?([a-z0-9]+)[^>]*>/gi)) {
+      const fullTag = match[0];
+      const tagName = match[1].toLowerCase();
+      if (tagName === "br" || tagName === "hr") continue;
+
+      if (fullTag.startsWith("</")) {
+        if (stack.length > 0 && stack[stack.length - 1] === tagName) {
+          stack.pop();
+        }
+      } else {
+        stack.push(tagName);
+      }
+    }
+
+    while (stack.length > 0) {
+      const tagToClose = stack.pop();
       truncated += `</${tagToClose}>`;
     }
+
     return truncated + "\n\n<i>...[truncated]</i>";
   }
 

@@ -142,29 +142,25 @@ export function createSubscriptionsMenu(
         }));
 
         const active = subDao.toggleGlobalWithAllPools(ctx.user.id, pools);
+        const userAvail = (ctx.user.notify_available_global ?? 1) === 1;
+        const userSold = (ctx.user.notify_sold_out_global ?? 0) === 1;
+        const userModels = (ctx.user.notify_models_global ?? 1) === 1;
+        const userPrices = (ctx.user.notify_prices_global ?? 1) === 1;
+
+        const flags = {
+          available: active ? userAvail : false,
+          soldOut: active ? userSold : false,
+          models: active ? userModels : false,
+          prices: active ? userPrices : false,
+        };
 
         // Synchronize in-memory inverted index
-        invertedIndex.updateSubscription(ctx.user.id, "ALL", "ALL", {
-          available: active,
-          soldOut: active,
-          models: active,
-          prices: active,
-        });
+        invertedIndex.updateSubscription(ctx.user.id, "ALL", "ALL", flags);
 
         for (const p of pools) {
-          invertedIndex.updateSubscription(ctx.user.id, p.slug, "ALL", {
-            available: active,
-            soldOut: active,
-            models: active,
-            prices: active,
-          });
+          invertedIndex.updateSubscription(ctx.user.id, p.slug, "ALL", flags);
           for (const b of p.blocks) {
-            invertedIndex.updateSubscription(ctx.user.id, p.slug, b, {
-              available: active,
-              soldOut: active,
-              models: active,
-              prices: active,
-            });
+            invertedIndex.updateSubscription(ctx.user.id, p.slug, b, flags);
           }
         }
 
@@ -284,21 +280,22 @@ export function createSubscriptionsMenu(
                 : ctx.t("subscriptions.slot_inactive", { name: blockTitle, hours: blockHours }),
               async (c) => {
                 // Child Block Toggle: Auto-updates parent "Весь пул" state
-                const active = subDao.toggleBlockAndUpdatePool(c.user.id, pool.slug, block.id, blockIds);
-                const parentPoolActive = subDao.hasSubscription(c.user.id, pool.slug, "ALL");
+                const { isBlockSubscribed: active, isPoolSubscribed: parentPoolActive } =
+                  subDao.toggleBlockAndUpdatePool(c.user.id, pool.slug, block.id, blockIds);
+                const currentFlags = subDao.getPoolFlags(c.user.id, pool.slug);
 
                 invertedIndex.updateSubscription(c.user.id, pool.slug, block.id, {
-                  available: active,
-                  soldOut: active,
-                  models: active,
-                  prices: active,
+                  available: active ? currentFlags.available : false,
+                  soldOut: active ? currentFlags.soldOut : false,
+                  models: active ? currentFlags.models : false,
+                  prices: active ? currentFlags.prices : false,
                 });
 
                 invertedIndex.updateSubscription(c.user.id, pool.slug, "ALL", {
-                  available: parentPoolActive,
-                  soldOut: parentPoolActive,
-                  models: parentPoolActive,
-                  prices: parentPoolActive,
+                  available: parentPoolActive ? currentFlags.available : false,
+                  soldOut: parentPoolActive ? currentFlags.soldOut : false,
+                  models: parentPoolActive ? currentFlags.models : false,
+                  prices: parentPoolActive ? currentFlags.prices : false,
                 });
 
                 if (!active) {

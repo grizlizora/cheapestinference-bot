@@ -237,6 +237,7 @@ export class ScraperOrchestrator extends EventEmitter {
     const apiController = new AbortController();
     const htmlController = new AbortController();
 
+    let hedgeTimer: NodeJS.Timeout | undefined;
     try {
       const apiPromise = this.apiEngine.fetch(
         effectiveApiEtag,
@@ -246,7 +247,6 @@ export class ScraperOrchestrator extends EventEmitter {
       );
 
       // Hedged Request: if primary API query exceeds 1000ms, race against concurrent HTML fallback
-      let hedgeTimer: NodeJS.Timeout | undefined;
       const hedgePromise = new Promise<ScrapeResult>((resolve, reject) => {
         hedgeTimer = setTimeout(async () => {
           try {
@@ -290,6 +290,7 @@ export class ScraperOrchestrator extends EventEmitter {
       }
       return result;
     } catch (apiErr: any) {
+      if (hedgeTimer) clearTimeout(hedgeTimer);
       this.apiConsecutiveErrors++;
       if (this.apiConsecutiveErrors >= 2) {
         // Open circuit for 60 seconds

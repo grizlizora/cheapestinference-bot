@@ -121,6 +121,7 @@ export function createAdminHandler(
       const secretAttempt = match.trim();
       const tgId = ctx.from.id;
       const now = Date.now();
+      cleanExpiredLockouts(now);
       const attemptRecord = failedClaimAttempts.get(tgId) || { count: 0, lockedUntil: 0 };
 
       if (now < attemptRecord.lockedUntil) {

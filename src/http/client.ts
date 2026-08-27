@@ -399,9 +399,14 @@ export class RobustHttpClient {
         }
 
         // Decompress body asynchronously without stalling main thread
-        const rawBuffer = Buffer.from(await res.body.arrayBuffer());
         const contentEncoding = res.headers["content-encoding"] as string | undefined;
-        const bodyText = await this.decompressBodyAsync(rawBuffer, contentEncoding);
+        let bodyText: string;
+        if (!contentEncoding || contentEncoding.toLowerCase() === "identity") {
+          bodyText = await res.body.text();
+        } else {
+          const rawBuffer = Buffer.from(await res.body.arrayBuffer());
+          bodyText = await this.decompressBodyAsync(rawBuffer, contentEncoding);
+        }
 
         this.proxyPool.reportSuccess(proxy.url, latencyMs);
 

@@ -23,19 +23,28 @@ export class InMemoryDnsCache {
 
   public lookup = (
     hostname: string,
-    options: dns.LookupOptions,
-    callback: (err: NodeJS.ErrnoException | null, address: any, family?: number) => void
+    options: dns.LookupOptions | ((err: NodeJS.ErrnoException | null, address: any, family?: number) => void),
+    callback?: (err: NodeJS.ErrnoException | null, address: any, family?: number) => void
   ): void => {
-    this.resolve(hostname, options)
+    let cb = callback;
+    let opts: dns.LookupOptions = {};
+    if (typeof options === "function") {
+      cb = options;
+      opts = {};
+    } else if (options) {
+      opts = options;
+    }
+    const effectiveCb = cb || (() => {});
+    this.resolve(hostname, opts)
       .then((records) => {
-        if (options.all) {
-          callback(null, records);
+        if (opts.all) {
+          effectiveCb(null, records);
         } else {
-          const first = records[0];
-          callback(null, first.address, first.family);
+          const first = records[0] || { address: "127.0.0.1", family: 4 };
+          effectiveCb(null, first.address, first.family);
         }
       })
-      .catch((err) => callback(err, "", 4));
+      .catch((err) => effectiveCb(err, "", 4));
   };
 
   public async resolve(

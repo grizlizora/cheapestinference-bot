@@ -27,6 +27,7 @@ export class SubscriptionDAO {
   private txTogglePool: (userId: number, poolSlug: string, newState: boolean, blockIds: string[]) => void;
   private txToggleBlock: (userId: number, poolSlug: string, blockId: string, newBlockState: boolean, allBlockIds: string[]) => void;
   private txToggleGlobal: (userId: number, newState: boolean, pools: Array<{ slug: string; blocks: string[] }>) => void;
+  private txTogglePoolCategory: (userId: number, poolSlug: string, category: "available" | "sold_out" | "models" | "prices") => { newState: boolean; flags: SubscriptionFlags };
 
   constructor(public readonly db: Database.Database) {
     this.stmtUpdateGlobalAvail = db.prepare(`UPDATE subscriptions SET notify_on_available = ? WHERE user_id = ?`);
@@ -89,56 +90,123 @@ export class SubscriptionDAO {
     `);
 
     this.stmtHasSub = db.prepare(`
-      SELECT id FROM subscriptions WHERE user_id = ? AND pool_slug = ? AND block_id = ?
+      SELECT 1 FROM subscriptions WHERE user_id = ? AND pool_slug = ? AND block_id = ? LIMIT 1
     `);
 
-    this.txTogglePool = this.db.transaction((userId: number, poolSlug: string, newState: boolean, blockIds: string[]) => {
-      this.setSubscription(userId, poolSlug, "ALL", newState);
-      for (const b of blockIds) {
-        this.setSubscription(userId, poolSlug, b, newState);
-      }
-      if (!newState) {
-        this.setSubscription(userId, "ALL", "ALL", false);
-      }
-    });
-
-    this.txToggleBlock = this.db.transaction((
-      userId: number,
-      poolSlug: string,
-      blockId: string,
-      newBlockState: boolean,
-      allBlockIds: string[]
-    ) => {
-      this.setSubscription(userId, poolSlug, blockId, newBlockState);
-
-      let allActive = true;
-      for (const b of allBlockIds) {
-        const sub = b === blockId ? newBlockState : this.hasSubscription(userId, poolSlug, b);
-        if (!sub) {
-          allActive = false;
-          break;
+    this.txTogglePool = db.transaction((userId: number, poolSlug: string, newState: boolean, blockIds: string[]) => {
+      if (newState) {
+        this.stmtAddSub.run(userId, poolSlug, "ALL");
+        for (const b of blockIds) {
+          this.stmtRemoveSub.run(userId, poolSlug, b);
         }
-      }
-
-      this.setSubscription(userId, poolSlug, "ALL", allActive);
-      if (!newBlockState) {
-        this.setSubscription(userId, "ALL", "ALL", false);
-      }
-    });
-
-    this.txToggleGlobal = this.db.transaction((
-      userId: number,
-      newState: boolean,
-      pools: Array<{ slug: string; blocks: string[] }>
-    ) => {
-      this.setSubscription(userId, "ALL", "ALL", newState);
-      for (const p of pools) {
-        this.setSubscription(userId, p.slug, "ALL", newState);
-        for (const b of p.blocks) {
-          this.setSubscription(userId, p.slug, b, newState);
+      } else {
+        this.stmtRemoveSub.run(userId, poolSlug, "ALL");
+        for (const b of blockIds) {
+          this.stmtRemoveSub.run(userId, poolSlug, b);
         }
       }
     });
+
+    this.txToggleBlock = db.transaction((userId: number, poolSlug: string, blockId: string, newBlockState: boolean, allBlockIds: string[]) => {
+      const hasAll = this.hasSubscription(userId, poolSlug, "ALL");
+      if (hasAll) {
+        this.stmtRemoveSub.run(userId, poolSlug, "ALL");
+        for (const b of allBlockIds) {
+          if (b === blockId) {
+            if (newBlockState) this.stmtAddSub.run(userId, poolSlug, b);
+          } else {
+            this.stmtAddSub.run(userId, poolSlug, b);
+          }
+        }
+        return;
+      }
+
+      if (newBlockState) {
+        this.stmtAddSub.run(userId, poolSlug, blockId);
+      } else {
+        this.stmtRemoveSub.run(userId, poolSlug, blockId);
+      }
+    });
+
+    this.txToggleGlobal = db.transaction((userId: number, newState: boolean, pools: Array<{ slug: string; blocks: string[] }>) => {
+      if (newState) {
+        this.stmtAddSub.run(userId, "ALL", "ALL");
+        for (const p of pools) {
+          this.stmtRemoveSub.run(userId, p.slug, "ALL");
+          for (const b of p.blocks) {
+            this.stmtRemoveSub.run(userId, p.slug, b);
+          }
+        }
+      } else {
+        this.stmtRemoveSub.run(userId, "ALL", "ALL");
+        for (const p of pools) {
+          this.stmtRemoveSub.run(userId, p.slug, "ALL");
+          for (const b of p.blocks) {
+            this.stmtRemoveSub.run(userId, p.slug, b);
+          }
+        }
+      }
+    });
+
+    this.txTogglePoolCategory = db.transaction((userId: number, poolSlug: string, category: "available" | "sold_out" | "models" | "prices") => {
+      const hasAll = this.hasSubscription(userId, poolSlug, "ALL");
+      let current = this.getSubscription(userId, poolSlug, "ALL");
+      if (!current) {
+        const childSub = this.stmtGetAnyPoolSub.get(userId, poolSlug) as SubscriptionRecord | undefined;
+        if (childSub) current = childSub;
+      }
+
+      const currentFlags = {
+        avail: current?.notify_on_available ?? 1,
+        sold: current?.notify_on_sold_out ?? 0,
+        models: current?.notify_on_models ?? 1,
+        prices: current?.notify_on_prices ?? 1,
+      };
+
+      if (category === "available") currentFlags.avail = currentFlags.avail === 1 ? 0 : 1;
+      if (category === "sold_out") currentFlags.sold = currentFlags.sold === 1 ? 0 : 1;
+      if (category === "models") currentFlags.models = currentFlags.models === 1 ? 0 : 1;
+      if (category === "prices") currentFlags.prices = currentFlags.prices === 1 ? 0 : 1;
+
+      // Upsert pool master 'ALL' with custom flags to persist preferences even before subscribing
+      if (hasAll || !current) {
+        this.stmtUpsertSubWithFlags.run({
+          user_id: userId,
+          pool_slug: poolSlug,
+          block_id: "ALL",
+          ...currentFlags,
+        });
+      }
+
+      // Synchronize only EXISTING child blocks (never insert phantom blocks for disabled regions)
+      this.stmtUpdateExistingChildren.run({
+        user_id: userId,
+        pool_slug: poolSlug,
+        ...currentFlags,
+      });
+
+      const newState = (category === "available" ? currentFlags.avail :
+                        category === "sold_out" ? currentFlags.sold :
+                        category === "models" ? currentFlags.models : currentFlags.prices) === 1;
+
+      return {
+        newState,
+        flags: {
+          notify_on_available: currentFlags.avail,
+          notify_on_sold_out: currentFlags.sold,
+          notify_on_models: currentFlags.models,
+          notify_on_prices: currentFlags.prices,
+        },
+      };
+    });
+  }
+
+  setSubscription(userId: number, poolSlug: string, blockId: string, enabled: boolean): void {
+    if (enabled) {
+      this.stmtAddSub.run(userId, poolSlug, blockId);
+    } else {
+      this.stmtRemoveSub.run(userId, poolSlug, blockId);
+    }
   }
 
   hasSubscription(userId: number, poolSlug: string, blockId: string): boolean {
@@ -146,64 +214,35 @@ export class SubscriptionDAO {
     return !!row;
   }
 
-  toggleSubscription(userId: number, poolSlug: string, blockId: string): boolean {
-    const exists = this.hasSubscription(userId, poolSlug, blockId);
-    if (exists) {
-      this.stmtRemoveSub.run(userId, poolSlug, blockId);
-      return false;
-    } else {
-      this.stmtAddSub.run(userId, poolSlug, blockId);
-      return true;
-    }
-  }
-
-  setSubscription(userId: number, poolSlug: string, blockId: string, active: boolean): void {
-    if (active) {
-      this.stmtAddSub.run(userId, poolSlug, blockId);
-    } else {
-      this.stmtRemoveSub.run(userId, poolSlug, blockId);
-    }
-  }
-
-  /**
-   * Cascading Master Toggle for an entire pool:
-   * Toggling "Весь пул" synchronizes the pool ('ALL') and all its regional blocks ('asia', 'europe', 'americas').
-   * Also deactivates 'ALL:ALL' if the pool is turned off.
-   */
   togglePoolWithBlocks(userId: number, poolSlug: string, blockIds: string[] = ["asia", "europe", "americas"]): boolean {
-    const isCurrentlySubscribed = this.hasSubscription(userId, poolSlug, "ALL");
-    const newState = !isCurrentlySubscribed;
+    const hasAll = this.hasSubscription(userId, poolSlug, "ALL");
+    const newState = !hasAll;
     this.txTogglePool(userId, poolSlug, newState, blockIds);
     return newState;
   }
 
-  /**
-   * Child Block Toggle:
-   * Toggles a single regional block, and auto-updates the parent "Весь пул" state if all blocks are now active or not.
-   * Also deactivates 'ALL:ALL' if any block is turned off.
-   */
   toggleBlockAndUpdatePool(
     userId: number,
     poolSlug: string,
     blockId: string,
     allBlockIds: string[] = ["asia", "europe", "americas"]
-  ): boolean {
-    const isCurrentlySubscribed = this.hasSubscription(userId, poolSlug, blockId);
-    const newBlockState = !isCurrentlySubscribed;
+  ): { isBlockSubscribed: boolean; isPoolSubscribed: boolean } {
+    const isBlockSubscribed = this.hasSubscription(userId, poolSlug, blockId);
+    const newBlockState = !isBlockSubscribed;
     this.txToggleBlock(userId, poolSlug, blockId, newBlockState, allBlockIds);
-    return newBlockState;
+
+    return {
+      isBlockSubscribed: newBlockState,
+      isPoolSubscribed: this.hasSubscription(userId, poolSlug, "ALL"),
+    };
   }
 
-  /**
-   * Global Master Toggle:
-   * Synchronizes Global ('ALL:ALL') and all pools/blocks.
-   */
   toggleGlobalWithAllPools(
     userId: number,
     pools: Array<{ slug: string; blocks: string[] }>
   ): boolean {
-    const isGlobal = this.hasSubscription(userId, "ALL", "ALL");
-    const newState = !isGlobal;
+    const hasGlobal = this.hasSubscription(userId, "ALL", "ALL");
+    const newState = !hasGlobal;
     this.txToggleGlobal(userId, newState, pools);
     return newState;
   }
@@ -246,59 +285,9 @@ export class SubscriptionDAO {
     userId: number,
     poolSlug: string,
     category: "available" | "sold_out" | "models" | "prices",
-    blockIds: string[] = ["asia", "europe", "americas"]
+    _blockIds: string[] = ["asia", "europe", "americas"]
   ): { newState: boolean; flags: SubscriptionFlags } {
-    return this.db.transaction(() => {
-      const hasAll = this.hasSubscription(userId, poolSlug, "ALL");
-      let current = this.getSubscription(userId, poolSlug, "ALL");
-      if (!current) {
-        const childSub = this.stmtGetAnyPoolSub.get(userId, poolSlug) as SubscriptionRecord | undefined;
-        if (childSub) current = childSub;
-      }
-
-      const currentFlags = {
-        avail: current?.notify_on_available ?? 1,
-        sold: current?.notify_on_sold_out ?? 0,
-        models: current?.notify_on_models ?? 1,
-        prices: current?.notify_on_prices ?? 1,
-      };
-
-      if (category === "available") currentFlags.avail = currentFlags.avail === 1 ? 0 : 1;
-      if (category === "sold_out") currentFlags.sold = currentFlags.sold === 1 ? 0 : 1;
-      if (category === "models") currentFlags.models = currentFlags.models === 1 ? 0 : 1;
-      if (category === "prices") currentFlags.prices = currentFlags.prices === 1 ? 0 : 1;
-
-      // Only upsert pool master 'ALL' if user already has an active ALL subscription
-      if (hasAll) {
-        this.stmtUpsertSubWithFlags.run({
-          user_id: userId,
-          pool_slug: poolSlug,
-          block_id: "ALL",
-          ...currentFlags,
-        });
-      }
-
-      // Synchronize only EXISTING child blocks (never insert phantom blocks for disabled regions)
-      this.stmtUpdateExistingChildren.run({
-        user_id: userId,
-        pool_slug: poolSlug,
-        ...currentFlags,
-      });
-
-      const newState = (category === "available" ? currentFlags.avail :
-                        category === "sold_out" ? currentFlags.sold :
-                        category === "models" ? currentFlags.models : currentFlags.prices) === 1;
-
-      return {
-        newState,
-        flags: {
-          notify_on_available: currentFlags.avail,
-          notify_on_sold_out: currentFlags.sold,
-          notify_on_models: currentFlags.models,
-          notify_on_prices: currentFlags.prices,
-        },
-      };
-    })();
+    return this.txTogglePoolCategory(userId, poolSlug, category);
   }
 
   getSubscriptionsForUser(userId: number): SubscriptionRecord[] {

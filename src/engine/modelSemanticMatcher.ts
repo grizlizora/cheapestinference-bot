@@ -78,7 +78,7 @@ export class ModelSemanticMatcher {
     }
 
     let variant = "";
-    const variantMatch = clean.match(/\b(max|flash|turbo|plus|pro|coder|reasoner|chat|instruct|lite|ultra|base)\b/i);
+    const variantMatch = clean.match(/\b(max|flash|turbo|plus|pro|coder|reasoner|chat|instruct|lite|ultra|base|large|small|medium|mini|haiku|sonnet|opus)\b/i);
     if (variantMatch) {
       variant = variantMatch[1].toLowerCase();
     }

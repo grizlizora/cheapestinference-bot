@@ -31,7 +31,7 @@ fi
 
 echo "🚀 [2/2] Launching Node.js Bot Application (Fast-Path Active)..."
 if [ "$IS_ROOT" -eq 1 ]; then
-  exec su-exec node --optimize-for-size dist/index.js
+  exec su-exec node node --optimize-for-size dist/index.js
 else
   exec node --optimize-for-size dist/index.js
 fi

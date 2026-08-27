@@ -192,12 +192,13 @@ export function createPoolDetailMenu(
           : ctx.t("pool_detail.btn_subscribe_pool", { pool_name: slug.toUpperCase() }),
         async (c) => {
           const newSubState = subDao.togglePoolWithBlocks(c.user.id, slug, blockIds);
+          const currentFlags = subDao.getPoolFlags(c.user.id, slug);
 
           const flags = {
-            available: newSubState,
-            soldOut: false,
-            models: newSubState,
-            prices: newSubState,
+            available: newSubState ? currentFlags.available : false,
+            soldOut: newSubState ? currentFlags.soldOut : false,
+            models: newSubState ? currentFlags.models : false,
+            prices: newSubState ? currentFlags.prices : false,
           };
           invertedIndex.updateSubscription(c.user.id, slug, "ALL", flags);
           for (const bId of blockIds) {
