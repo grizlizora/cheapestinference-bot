@@ -99,6 +99,10 @@ export function createAdminKeyboard(ctx: BotContext, userDao: UserDAO): InlineKe
       "admin_toggle_new_users"
     )
     .row()
+    .text(ctx.t("admin.btn_export_users"), "admin_export_users")
+    .row()
+    .text(ctx.t("admin.btn_export_history"), "admin_export_history")
+    .row()
     .text(ctx.t("admin.btn_backup"), "admin_backup")
     .row()
     .text(ctx.t("admin.btn_test_alert"), "admin_test_alert")

@@ -165,7 +165,9 @@
     "unauthorized": "⛔ <b>Доступ ограничен.</b> Эта команда доступна только администраторам бота.\n\n🆔 <b>Ваш Telegram ID:</b> <code>{telegram_id}</code>\n\nℹ️ <i>Чтобы активировать права, добавьте ваш Telegram ID в переменную ADMIN_USER_IDS на хостинге или введите команду <code>/admin &lt;пароль&gt;</code>.</i>",
     "claim_success": "🎉 <b>Поздравляем!</b> Вы успешно активировали права администратора бота.",
     "btn_test_alert": "🧪 Отправить тест",
-    "btn_backup": "💾 Скачать бэкап",
+    "btn_export_users": "👥 Экспорт пользователей (Excel/CSV)",
+    "btn_export_history": "📜 Экспорт истории изменений (Excel/CSV)",
+    "btn_backup": "💾 Полный бэкап базы (.db)",
     "btn_toggle_new_users_on": "🔔 Новые пользователи: ✅",
     "btn_toggle_new_users_off": "🔔 Новые пользователи: ❌",
     "toast_new_users_on": "🔔 Уведомления о новых пользователях включены",
@@ -173,6 +175,8 @@
     "toast_test_alert_sent": "🚀 Тестовое уведомление отправлено!",
     "test_alert_sending": "🧪 <i>Отправляю реалистичное тестовое уведомление...</i>",
     "backup_in_progress": "⏳ <i>Создание онлайн-снапшота базы данных SQLite (`VACUUM INTO`)...</i>",
+    "export_users_in_progress": "⏳ <i>Формирование Excel/CSV отчета о пользователях и подписках...</i>",
+    "export_history_in_progress": "⏳ <i>Формирование Excel/CSV отчета обо всей истории изменений...</i>",
     "new_user_alert": "👤 <b>Новый пользователь в боте!</b>\n━━━━━━━━━━━━━━━━━━━━━━━━\n• <b>Имя:</b> <code>{first_name}</code>\n• <b>Username:</b> {username}\n• <b>Telegram ID:</b> <code>{telegram_id}</code>\n• <b>Язык интерфейса:</b> {language}\n• <b>Всего пользователей:</b> <code>{total_users}</code>"
   },
   "help_text": "ℹ️ <b>Как работает этот бот?</b>\n\n1. Бот круглосуточно проверяет страницу <a href=\"https://cheapestinference.com/pools\">cheapestinference.com/pools</a> через анонимный Tor/прокси канал.\n2. Каждый тариф разделен на три 8-часовых региональных блока (Азия, Европа, Америка).\n3. Актуальное наличие слотов отображается в реальном времени в меню бота.\n4. В карточке каждого тарифа (пула) вы можете настроить персональные уведомления на нужные вам слоты или отдельные регионы.\n5. Как только слот появляется — вы моментально получаете сообщение с прямой ссылкой на покупку!\n\n🆔 <b>Ваш Telegram ID:</b> <code>{telegram_id}</code>\n\n👨‍💻 <b>Связь с автором / Поддержка:</b>\nTelegram: <a href=\"https://t.me/grizlizora\">@grizlizora</a>"

@@ -16,7 +16,7 @@ import { renderSubscriptionsText } from "./menus/subscriptions.js";
 import { createStartHandler } from "./handlers/start.js";
 import { createLanguageHandler } from "./handlers/language.js";
 import { createAdminHandler, renderAdminText, createAdminKeyboard } from "./handlers/admin.js";
-import { createBackupHandler } from "./handlers/backup.js";
+import { createBackupHandler, createUsersExportHandler, createHistoryExportHandler } from "./handlers/backup.js";
 import { NotificationDispatcher } from "./notifier/dispatcher.js";
 import { config, isUserAdmin } from "../config/env.js";
 import {
@@ -304,6 +304,8 @@ export function createTelegramBot(
   bot.command("admin", createAdminHandler(userDao, subDao, scraper, proxyPool));
   bot.command("stats", createAdminHandler(userDao, subDao, scraper, proxyPool));
   bot.command("backup", createBackupHandler(userDao.db, userDao, subDao));
+  bot.command("export_users", createUsersExportHandler(userDao.db, userDao, subDao));
+  bot.command("export_history", createHistoryExportHandler(userDao.db, userDao));
 
   // 11. Admin Interactive Callback Handlers (Protected by requireAdmin)
   bot.callbackQuery("admin_toggle_new_users", async (ctx) => {
@@ -325,6 +327,18 @@ export function createTelegramBot(
     const text = renderAdminText(ctx, userDao, subDao, scraper, proxyPool);
     const keyboard = createAdminKeyboard(ctx, userDao);
     await ctx.editMessageText(text, { parse_mode: "HTML", reply_markup: keyboard }).catch(() => {});
+  });
+
+  bot.callbackQuery("admin_export_users", async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    await ctx.answerCallbackQuery().catch(() => {});
+    await createUsersExportHandler(userDao.db, userDao, subDao)(ctx);
+  });
+
+  bot.callbackQuery("admin_export_history", async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    await ctx.answerCallbackQuery().catch(() => {});
+    await createHistoryExportHandler(userDao.db, userDao)(ctx);
   });
 
   bot.callbackQuery("admin_backup", async (ctx) => {

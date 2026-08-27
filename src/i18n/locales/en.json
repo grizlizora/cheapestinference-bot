@@ -165,7 +165,9 @@
     "unauthorized": "⛔ <b>Access Restricted.</b> This command is restricted to bot administrators.\n\n🆔 <b>Your Telegram ID:</b> <code>{telegram_id}</code>\n\nℹ️ <i>To gain access, add your Telegram ID to ADMIN_USER_IDS in host settings or run <code>/admin &lt;secret&gt;</code>.</i>",
     "claim_success": "🎉 <b>Congratulations!</b> You have successfully claimed admin privileges.",
     "btn_test_alert": "🧪 Send Test Alert",
-    "btn_backup": "💾 Download Backup",
+    "btn_export_users": "👥 Export Users (Excel/CSV)",
+    "btn_export_history": "📜 Export History (Excel/CSV)",
+    "btn_backup": "💾 Full Database Backup (.db)",
     "btn_toggle_new_users_on": "🔔 New Users: ✅",
     "btn_toggle_new_users_off": "🔔 New Users: ❌",
     "toast_new_users_on": "🔔 New user admin alerts enabled",
@@ -173,6 +175,8 @@
     "toast_test_alert_sent": "🚀 Test alert dispatched!",
     "test_alert_sending": "🧪 <i>Dispatching realistic slot drop test alert...</i>",
     "backup_in_progress": "⏳ <i>Generating hot online database snapshot (`VACUUM INTO`)...</i>",
+    "export_users_in_progress": "⏳ <i>Generating users & subscriptions Excel/CSV report...</i>",
+    "export_history_in_progress": "⏳ <i>Generating full change history Excel/CSV report...</i>",
     "new_user_alert": "👤 <b>New User Joined Bot!</b>\n━━━━━━━━━━━━━━━━━━━━━━━━\n• <b>Name:</b> <code>{first_name}</code>\n• <b>Username:</b> {username}\n• <b>Telegram ID:</b> <code>{telegram_id}</code>\n• <b>Language:</b> {language}\n• <b>Total Users:</b> <code>{total_users}</code>"
   },
   "help_text": "ℹ️ <b>How does this bot work?</b>\n\n1. The bot monitors <a href=\"https://cheapestinference.com/pools\">cheapestinference.com/pools</a> 24/7 over an encrypted Tor/proxy pipeline.\n2. Each tier is partitioned into three 8-hour regional blocks (Asia, Europe, Americas).\n3. Live slot availability is updated in real time via dashboard buttons.\n4. In each pool card, you can configure granular alerts for specific slots or regions.\n5. The moment a slot opens, you receive an instant alert with a direct checkout link!\n\n🆔 <b>Your Telegram ID:</b> <code>{telegram_id}</code>\n\n👨‍💻 <b>Author Contact & Support:</b>\nTelegram: <a href=\"https://t.me/grizlizora\">@grizlizora</a>"
