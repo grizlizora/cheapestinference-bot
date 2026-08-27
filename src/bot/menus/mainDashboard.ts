@@ -22,6 +22,11 @@ export async function safeEditMessageText(
   extra: any = { parse_mode: "HTML", link_preview_options: { is_disabled: true } }
 ) {
   try {
+    if ((ctx as any).menu && typeof (ctx as any).menu.update === "function") {
+      try {
+        (ctx as any).menu.update();
+      } catch {}
+    }
     const finalExtra = { ...extra };
     await ctx.editMessageText(text, finalExtra);
   } catch (err: any) {

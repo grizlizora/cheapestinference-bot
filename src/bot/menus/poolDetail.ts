@@ -57,7 +57,6 @@ export function createPoolDetailMenu(
             syncRamFlags(c.user.id, fullFlags);
             await c.answerCallbackQuery(c.t("pool_settings.toast_filter_updated")).catch(() => {});
             await safeEditMessageText(c, renderPoolSettingsText(c, poolStateDao, subDao));
-            try { c.menu.update(); } catch {}
           }
         )
         .text(
@@ -70,7 +69,6 @@ export function createPoolDetailMenu(
             syncRamFlags(c.user.id, fullFlags);
             await c.answerCallbackQuery(c.t("pool_settings.toast_filter_updated")).catch(() => {});
             await safeEditMessageText(c, renderPoolSettingsText(c, poolStateDao, subDao));
-            try { c.menu.update(); } catch {}
           }
         )
         .row()
@@ -84,7 +82,6 @@ export function createPoolDetailMenu(
             syncRamFlags(c.user.id, fullFlags);
             await c.answerCallbackQuery(c.t("pool_settings.toast_filter_updated")).catch(() => {});
             await safeEditMessageText(c, renderPoolSettingsText(c, poolStateDao, subDao));
-            try { c.menu.update(); } catch {}
           }
         )
         .text(
@@ -97,7 +94,6 @@ export function createPoolDetailMenu(
             syncRamFlags(c.user.id, fullFlags);
             await c.answerCallbackQuery(c.t("pool_settings.toast_filter_updated")).catch(() => {});
             await safeEditMessageText(c, renderPoolSettingsText(c, poolStateDao, subDao));
-            try { c.menu.update(); } catch {}
           }
         )
         .row();
@@ -114,8 +110,8 @@ export function createPoolDetailMenu(
               ? `✅ ${blockName} (${blockHours})`
               : `❌ ${blockName} (${blockHours})`,
             async (c) => {
-              const active = subDao.toggleBlockAndUpdatePool(c.user.id, slug, blockId, blockIds);
-              const parentPoolActive = subDao.hasSubscription(c.user.id, slug, "ALL");
+              const { isBlockSubscribed: active, isPoolSubscribed: parentPoolActive } =
+                subDao.toggleBlockAndUpdatePool(c.user.id, slug, blockId, blockIds);
               const currentFlags = subDao.getPoolFlags(c.user.id, slug);
               const fullFlags = toFlags(currentFlags);
 
@@ -140,7 +136,6 @@ export function createPoolDetailMenu(
                 : c.t("subscriptions.toast_slot_off", { pool: slug.toUpperCase(), block: blockName });
               await c.answerCallbackQuery(toast).catch(() => {});
               await safeEditMessageText(c, renderPoolSettingsText(c, poolStateDao, subDao));
-              try { c.menu.update(); } catch {}
             }
           )
           .row();
@@ -162,7 +157,7 @@ export function createPoolDetailMenu(
     .dynamic((ctx, range) => {
       const slug = ctx.session.tempPoolSlug || "flagship";
       const blocks = poolStateDao.getPoolBlocks(slug);
-      const isSubscribedToPool = subDao.hasSubscription(ctx.user.id, slug, "ALL");
+      const isSubscribedToPool = subDao.hasSubscription(ctx.user.id, slug, "ALL") || subDao.getPoolFlags(ctx.user.id, slug).isSubscribed;
 
       const availableBlocks = blocks.filter(
         (b) => b.status === "available" || b.status === "limited"
@@ -210,9 +205,6 @@ export function createPoolDetailMenu(
             : c.t("subscriptions.toast_pool_off", { pool: slug.toUpperCase() });
           await c.answerCallbackQuery(toast).catch(() => {});
           await safeEditMessageText(c, renderPoolDetailText(c, poolStateDao, historyDao, scraper));
-          try {
-            c.menu.update();
-          } catch {}
         }
       ).row();
 

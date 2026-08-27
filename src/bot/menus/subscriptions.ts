@@ -42,9 +42,6 @@ export function createSubscriptionsMenu(
             : ctx.t("subscriptions.toast_avail_off");
         await ctx.answerCallbackQuery(toast).catch(() => {});
         await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
-        try {
-          ctx.menu.update();
-        } catch {}
       }
     )
     .text(
@@ -66,9 +63,6 @@ export function createSubscriptionsMenu(
             : ctx.t("subscriptions.toast_sold_off");
         await ctx.answerCallbackQuery(toast).catch(() => {});
         await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
-        try {
-          ctx.menu.update();
-        } catch {}
       }
     )
     .row()
@@ -92,9 +86,6 @@ export function createSubscriptionsMenu(
             : ctx.t("subscriptions.toast_models_off");
         await ctx.answerCallbackQuery(toast).catch(() => {});
         await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
-        try {
-          ctx.menu.update();
-        } catch {}
       }
     )
     .text(
@@ -116,9 +107,6 @@ export function createSubscriptionsMenu(
             : ctx.t("subscriptions.toast_prices_off");
         await ctx.answerCallbackQuery(toast).catch(() => {});
         await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
-        try {
-          ctx.menu.update();
-        } catch {}
       }
     )
     .row()
@@ -169,9 +157,6 @@ export function createSubscriptionsMenu(
           : ctx.t("subscriptions.toast_global_off");
         await ctx.answerCallbackQuery(toast).catch(() => {});
         await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
-        try {
-          ctx.menu.update();
-        } catch {}
       }
     )
     .row()
@@ -194,9 +179,6 @@ export function createSubscriptionsMenu(
             : ctx.t("subscriptions.toast_sound_enabled");
         await ctx.answerCallbackQuery(toast).catch(() => {});
         await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
-        try {
-          ctx.menu.update();
-        } catch {}
       }
     )
     .row()
@@ -217,10 +199,10 @@ export function createSubscriptionsMenu(
         { id: "europe", nameKey: "common.block_europe", hours: "08:00 – 16:00 UTC" },
         { id: "americas", nameKey: "common.block_americas", hours: "16:00 – 24:00 UTC" },
       ];
+      const blockIds = blocks.map((b) => b.id);
 
       for (const pool of pools) {
         const poolBlocks = poolStateDao.getPoolBlocks(pool.slug);
-        const blockIds = poolBlocks.length > 0 ? poolBlocks.map((b) => b.block_id) : DEFAULT_BLOCK_IDS;
         const isPoolSub = subDao.hasSubscription(ctx.user.id, pool.slug, "ALL");
         range
           .text(
@@ -261,9 +243,6 @@ export function createSubscriptionsMenu(
                 : c.t("subscriptions.toast_pool_off", { pool: pool.name });
               await c.answerCallbackQuery(toast).catch(() => {});
               await safeEditMessageText(c, renderSubscriptionsText(c, subDao));
-              try {
-                c.menu.update();
-              } catch {}
             }
           )
           .row();
@@ -312,9 +291,6 @@ export function createSubscriptionsMenu(
                   : c.t("subscriptions.toast_slot_off", { pool: pool.name, block: blockTitle });
                 await c.answerCallbackQuery(toast).catch(() => {});
                 await safeEditMessageText(c, renderSubscriptionsText(c, subDao));
-                try {
-                  c.menu.update();
-                } catch {}
               }
             )
             .row();

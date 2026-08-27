@@ -240,7 +240,9 @@ export class SubscriptionDAO {
 
   togglePoolWithBlocks(userId: number, poolSlug: string, blockIds: string[] = ["asia", "europe", "americas"]): boolean {
     const hasAll = this.hasSubscription(userId, poolSlug, "ALL");
-    const newState = !hasAll;
+    const hasAny = this.getPoolFlags(userId, poolSlug).isSubscribed;
+    const isCurrentlySubscribed = hasAll || hasAny;
+    const newState = !isCurrentlySubscribed;
     this.txTogglePool(userId, poolSlug, newState, blockIds);
     return newState;
   }
