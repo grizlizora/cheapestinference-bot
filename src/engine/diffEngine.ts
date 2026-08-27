@@ -1,4 +1,10 @@
-import { DiffEvent, PoolData, PoolsSnapshot } from "../types/domain.js";
+import {
+  DiffEvent,
+  PoolData,
+  PoolsSnapshot,
+  DropPatternType,
+  DemandCategory,
+} from "../types/domain.js";
 import { SlotHistoryDAO } from "../db/dao/slotHistory.js";
 import { CatalogHistoryDAO } from "../db/dao/catalogHistory.js";
 import { ModelSemanticMatcher } from "./modelSemanticMatcher.js";
@@ -514,6 +520,49 @@ export class SlotDiffEngine {
       } else {
         this.pendingPoolDisappearances.delete(slug);
       }
+    }
+
+    // -------------------------------------------------------------
+    // Real-Time Drop Pattern Detection & Event Analytics Enrichment
+    // -------------------------------------------------------------
+    const appearedEvents = events.filter((e) => e.type === "SLOT_APPEARED");
+    const totalAppearedCount = appearedEvents.length;
+    const isGlobalBatchDrop = totalAppearedCount >= 2;
+
+    const poolAppearedMap = new Map<string, number>();
+    for (const e of appearedEvents) {
+      poolAppearedMap.set(e.poolSlug, (poolAppearedMap.get(e.poolSlug) || 0) + 1);
+    }
+
+    for (const event of appearedEvents) {
+      const poolAppearedCount = poolAppearedMap.get(event.poolSlug) || 0;
+      const isBatchDrop = isGlobalBatchDrop || poolAppearedCount >= 2;
+      const dropPattern: DropPatternType = isBatchDrop ? "BATCH_DROP" : "SINGLE_SLOT_RELEASE";
+
+      let avgLifespanFormatted = "";
+      let demandCategory: DemandCategory = "unknown";
+      let avgLifespanSeconds: number | null = null;
+      let totalOpenings = 0;
+      let lastOpenedAt: string | null = null;
+
+      if (this.historyDao) {
+        const analytics = this.historyDao.getBlockPredictiveAnalytics(event.poolSlug, event.block);
+        avgLifespanFormatted = analytics.avgDurationFormatted;
+        demandCategory = analytics.demandCategory;
+        avgLifespanSeconds = analytics.avgDurationSeconds;
+        totalOpenings = analytics.totalOpenings;
+        lastOpenedAt = analytics.lastOpenedAt;
+      }
+
+      event.analytics = {
+        avgLifespanFormatted,
+        avgLifespanSeconds,
+        demandCategory,
+        isBatchDrop,
+        dropPattern,
+        totalOpenings,
+        lastOpenedAt,
+      };
     }
 
     return events;

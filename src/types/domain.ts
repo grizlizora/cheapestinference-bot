@@ -56,6 +56,45 @@ export interface PoolBasePricePayload {
   percentageDelta: number;
 }
 
+export type DemandCategory = "flash" | "hot" | "moderate" | "stable" | "unknown";
+export type DropPatternType = "BATCH_DROP" | "SINGLE_SLOT_RELEASE" | "UNKNOWN";
+export type DropType = "BATCH_CAPACITY_EXPANSION" | "UNRENEWED_EXPIRY" | "ISOLATED_PROVISIONING" | "UNKNOWN";
+export type PredictionConfidence = "HIGH" | "MEDIUM" | "LOW" | "INSUFFICIENT_DATA";
+
+export interface DropClassification {
+  dropType: DropType;
+  confidence: number; // 0.00 to 1.00
+  isHourlyBoundary: boolean;
+  clusterSize: number;
+  labelKey: string;
+}
+
+export interface EtaPrediction {
+  isPredictable: boolean;
+  sampleCount: number;
+  minRequired: number;
+  confidence: PredictionConfidence;
+  confidenceScore: number; // 0 to 100
+  medianDowntimeSeconds: number | null;
+  downtimeIqrLowSeconds: number | null;
+  downtimeIqrHighSeconds: number | null;
+  detectedCadenceHours: number | null; // e.g. 24, 12, 1
+  expectedOpenTimestampMin: number | null; // Epoch ms
+  expectedOpenTimestampMax: number | null; // Epoch ms
+  formattedEtaWindow: string; // e.g. "~18-24 год"
+  message?: string;
+}
+
+export interface SlotAnalyticsPayload {
+  avgLifespanFormatted: string; // e.g. "~45s", "~14 min", "~2.3 h"
+  avgLifespanSeconds: number | null;
+  demandCategory: DemandCategory;
+  isBatchDrop: boolean;
+  dropPattern: DropPatternType;
+  totalOpenings: number;
+  lastOpenedAt?: string | null;
+}
+
 export interface DiffEvent {
   id: string;
   type: DiffEventType;
@@ -73,6 +112,7 @@ export interface DiffEvent {
   tierUpdate?: TierUpdatedPayload;
   slotPrice?: SlotPricePayload;
   basePrice?: PoolBasePricePayload;
+  analytics?: SlotAnalyticsPayload;
   metadata?: Record<string, unknown>;
 }
 
@@ -113,3 +153,4 @@ export interface ScrapeResult {
   latencyMs: number;
   usedProxy?: string | null;
 }
+

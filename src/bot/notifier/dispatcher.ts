@@ -504,7 +504,15 @@ export class NotificationDispatcher {
 
       text = `${header}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${body}`;
 
-      if (cachedDurationFormatted) {
+      if (event.analytics?.isBatchDrop) {
+        const batchBadge = translate(lang, "alerts.tag_multi_region_drop", { count: event.analytics.totalOpenings || 2 }) ||
+          "🆕 <i>Новий дроп потужностей</i>";
+        text = `${batchBadge}\n${text}`;
+      } else if (event.analytics?.demandCategory === "hot" && event.analytics.avgLifespanFormatted) {
+        const hotBadge = translate(lang, "alerts.tag_hot_slot_drop", { duration: escapeHtml(event.analytics.avgLifespanFormatted) }) ||
+          `🔥 <i>Гарячий слот (розбирають за ${escapeHtml(event.analytics.avgLifespanFormatted)})</i>`;
+        text = `${hotBadge}\n${text}`;
+      } else if (cachedDurationFormatted) {
         text += translate(lang, "alerts.analytics_duration_tip", {
           duration: escapeHtml(cachedDurationFormatted),
         });
@@ -756,8 +764,11 @@ export class NotificationDispatcher {
 
       if (event.type === "SLOT_APPEARED") {
         const cleanPrice = this.cleanPriceString(event.newPrice);
+        const lifespanBadge = event.analytics?.avgLifespanFormatted
+          ? ` ${event.analytics.demandCategory === "hot" ? "🔥" : "⚡"} <code>${escapeHtml(event.analytics.avgLifespanFormatted)}</code>`
+          : "";
         sectionLines.push(
-          `🟢 <b>${escapeHtml(event.poolName)} • ${escapeHtml(blockName)}</b>\n` +
+          `🟢 <b>${escapeHtml(event.poolName)} • ${escapeHtml(blockName)}</b>${lifespanBadge}\n` +
           `💰 <code>$${escapeHtml(cleanPrice)}/${currencyMonth}</code> | 🕒 <code>${escapeHtml(event.hoursUtc)}</code>\n` +
           `🤖 ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
         );

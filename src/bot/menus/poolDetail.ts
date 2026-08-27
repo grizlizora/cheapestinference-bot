@@ -352,8 +352,14 @@ export function renderPoolDetailText(
         price: b.price_month,
       });
 
-      if (smart?.predictionTip && isAvailable) {
+      if (isAvailable && smart?.predictionTip) {
         row += `\n   ${smart.predictionTip}`;
+      } else if (!isAvailable) {
+        if (smart?.etaTip) {
+          row += `\n   ${smart.etaTip}`;
+        } else if (smart?.collectingStatsTip) {
+          row += `\n   ${smart.collectingStatsTip}`;
+        }
       }
 
       return row;
