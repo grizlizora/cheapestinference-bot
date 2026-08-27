@@ -265,14 +265,17 @@ export function createMainMenuHierarchy(
           await scraper.forceRefresh(3000);
         }
         const telemetry = scraper?.getTelemetry();
-        const elapsed = Date.now() - startTime;
+        const scrapeLatency = telemetry?.lastScrapeLatencyMs || 0;
+        const rendered = renderDashboardText(ctx, poolStateDao, historyDao, scraper);
+        const tgStartTime = Date.now();
+        await safeEditMessageText(ctx, rendered);
+        const tgEditLatency = Date.now() - tgStartTime;
+        const totalE2E = Date.now() - startTime;
         const username = ctx.from?.username ? `@${ctx.from.username}` : `ID:${ctx.from?.id}`;
         const proxyTag = telemetry?.lastUsedProxy
           ? (telemetry.lastUsedProxy.includes("9050") ? "🧅 Tor SOCKS5" : "🌐 Proxy")
           : "⚡ Direct";
-        console.log(`🔄 [Manual Refresh] User ${username} on Dashboard -> ${telemetry?.lastScrapeLatencyMs || elapsed}ms via ${proxyTag} (source: ${telemetry?.lastSource || "cache"}, total UI: ${elapsed}ms)`);
-        const rendered = renderDashboardText(ctx, poolStateDao, historyDao, scraper);
-        await safeEditMessageText(ctx, rendered);
+        console.log(`🔄 [Manual Refresh] User ${username} on Dashboard -> Scrape: ${scrapeLatency}ms (${proxyTag}) | TG Edit: ${tgEditLatency}ms | Total E2E: ${totalE2E}ms (source: ${telemetry?.lastSource || "cache"})`);
         if (ctx.chat) {
           const msgId = ctx.callbackQuery?.message?.message_id;
           if (msgId) {

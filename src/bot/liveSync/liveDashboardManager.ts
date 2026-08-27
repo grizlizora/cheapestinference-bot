@@ -184,11 +184,14 @@ export class LiveDashboardManager {
         await (targetMenu as any).prepare(payload, syntheticCtx);
       }
 
+      const editStartTime = Date.now();
       await this.bot.api.editMessageText(session.chatId, session.messageId, text, payload as any);
+      const tgEditLatency = Date.now() - editStartTime;
 
       session.lastRenderedTextHash = textHash;
       session.lastTelegramEditAt = Date.now();
       session.consecutiveErrors = 0;
+      console.log(`📡 [LiveSync] In-place updated view '${session.viewType}' for chat ${session.chatId} in ${tgEditLatency}ms (TG API)`);
     } catch (err: any) {
       this.handleEditError(err, session);
     }
