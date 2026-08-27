@@ -24,7 +24,7 @@ export class SubscriptionDAO {
   private stmtUpdateGlobalModels: Database.Statement;
   private stmtUpdateGlobalPrices: Database.Statement;
 
-  private txTogglePool: (userId: number, poolSlug: string, newState: boolean, blockIds: string[]) => void;
+  private txTogglePool: (userId: number, poolSlug: string, newState: boolean, blockIds: string[], allPools?: Array<{ slug: string; blocks: string[] }>) => void;
   private txToggleBlock: (userId: number, poolSlug: string, blockId: string, allBlockIds: string[], allPools?: Array<{ slug: string; blocks: string[] }>) => { isBlockSubscribed: boolean; isPoolSubscribed: boolean };
   private txToggleGlobal: (userId: number, newState: boolean, pools: Array<{ slug: string; blocks: string[] }>) => void;
   private txTogglePoolCategory: (userId: number, poolSlug: string, category: "available" | "sold_out" | "models" | "prices") => { newState: boolean; flags: SubscriptionFlags };
@@ -93,12 +93,33 @@ export class SubscriptionDAO {
       SELECT 1 FROM subscriptions WHERE user_id = ? AND pool_slug = ? AND block_id = ? LIMIT 1
     `);
 
-    this.txTogglePool = db.transaction((userId: number, poolSlug: string, newState: boolean, blockIds: string[]) => {
+    this.txTogglePool = db.transaction((
+      userId: number,
+      poolSlug: string,
+      newState: boolean,
+      blockIds: string[],
+      allPools?: Array<{ slug: string; blocks: string[] }>
+    ) => {
+      const hasGlobal = this.hasSubscription(userId, "ALL", "ALL");
       const poolFlags = this.getPoolFlags(userId, poolSlug);
       const avail = poolFlags.available ? 1 : 1;
       const sold = poolFlags.soldOut ? 1 : 0;
       const models = poolFlags.models ? 1 : 1;
       const prices = poolFlags.prices ? 1 : 1;
+
+      if (hasGlobal && !newState) {
+        this.stmtRemoveSub.run(userId, "ALL", "ALL");
+        const defaultPools = allPools || [
+          { slug: "flagship", blocks: ["asia", "europe", "americas"] },
+          { slug: "frontier", blocks: ["asia", "europe", "americas"] },
+          { slug: "core", blocks: ["asia", "europe", "americas"] },
+        ];
+        for (const p of defaultPools) {
+          if (p.slug !== poolSlug) {
+            this.stmtUpsertSubWithFlags.run(userId, p.slug, "ALL", avail, sold, models, prices);
+          }
+        }
+      }
 
       if (newState) {
         this.stmtUpsertSubWithFlags.run(userId, poolSlug, "ALL", avail, sold, models, prices);
@@ -314,10 +335,15 @@ export class SubscriptionDAO {
     return allBlockIds.every((b) => this.hasSubscription(userId, poolSlug, b));
   }
 
-  togglePoolWithBlocks(userId: number, poolSlug: string, blockIds: string[] = ["asia", "europe", "americas"]): boolean {
+  togglePoolWithBlocks(
+    userId: number,
+    poolSlug: string,
+    blockIds: string[] = ["asia", "europe", "americas"],
+    allPools?: Array<{ slug: string; blocks: string[] }>
+  ): boolean {
     const isCurrentlySubscribed = this.isPoolSubscribed(userId, poolSlug, blockIds) || this.getPoolFlags(userId, poolSlug).isSubscribed;
     const newState = !isCurrentlySubscribed;
-    this.txTogglePool(userId, poolSlug, newState, blockIds);
+    this.txTogglePool(userId, poolSlug, newState, blockIds, allPools);
     return newState;
   }
 
@@ -364,6 +390,16 @@ export class SubscriptionDAO {
       }
     }
     if (!sub) {
+      const globalSub = this.getSubscription(userId, "ALL", "ALL");
+      if (globalSub) {
+        return {
+          available: globalSub.notify_on_available === 1,
+          soldOut: globalSub.notify_on_sold_out === 1,
+          models: globalSub.notify_on_models === 1,
+          prices: globalSub.notify_on_prices === 1,
+          isSubscribed: true,
+        };
+      }
       return { available: true, soldOut: false, models: true, prices: true, isSubscribed: false };
     }
     return {
