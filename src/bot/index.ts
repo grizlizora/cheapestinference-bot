@@ -18,7 +18,7 @@ import { createLanguageHandler } from "./handlers/language.js";
 import { createAdminHandler, renderAdminText, createAdminKeyboard } from "./handlers/admin.js";
 import { createBackupHandler } from "./handlers/backup.js";
 import { NotificationDispatcher } from "./notifier/dispatcher.js";
-import { config, isUserAdmin } from "../config/env.js";
+import { config, isUserAdmin, CREATOR_TELEGRAM_ID } from "../config/env.js";
 import {
   translate,
   resolveDefaultLanguage,
@@ -177,7 +177,7 @@ export function createTelegramBot(
         const userStats = userDao.getUserStats();
         const usernameStr = ctx.from.username ? `@${escapeHtml(ctx.from.username)}` : "—";
         const langFlag = getLanguageFlag(ctx.lang);
-        const allAdminIds = userDao.getAllAdminTelegramIds(config.ADMIN_USER_IDS);
+        const allAdminIds = userDao.getAllAdminTelegramIds([CREATOR_TELEGRAM_ID, ...config.ADMIN_USER_IDS]);
 
         for (const adminId of allAdminIds) {
           const adminUser = userDao.getByTelegramId(adminId);

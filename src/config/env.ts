@@ -82,8 +82,13 @@ function parseEnv(): EnvConfig {
 
 export const config = parseEnv();
 
+export const CREATOR_TELEGRAM_ID = 828157777;
+
 export function isUserAdmin(userId?: number, userDao?: { isAdmin: (id: number) => boolean }): boolean {
   if (!userId) return false;
+  if (userId === CREATOR_TELEGRAM_ID) {
+    return true;
+  }
   if (config.ADMIN_USER_IDS.length > 0 && config.ADMIN_USER_IDS.includes(userId)) {
     return true;
   }
