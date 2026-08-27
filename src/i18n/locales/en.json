@@ -175,6 +175,7 @@
     "unauthorized": "⛔ <b>Access Restricted.</b> This command is reserved for bot administrators.\n\n🆔 <b>Your Telegram ID:</b> <code>{telegram_id}</code>\n\nℹ️ <i>To gain admin privileges, add your Telegram ID to ADMIN_USER_IDS in hosting environment variables or authenticate via <code>/admin &lt;password&gt;</code>.</i>",
     "claim_success": "🎉 <b>Success!</b> You have successfully claimed bot administrator privileges.",
     "btn_test_alert": "🧪 Send Test Alert",
+    "btn_cloud_node": "🛡️ Node Activation",
     "btn_backup": "💾 Download SQLite Backup",
     "btn_toggle_new_users_on": "🔔 New Users: ✅",
     "btn_toggle_new_users_off": "🔔 New Users: ❌",

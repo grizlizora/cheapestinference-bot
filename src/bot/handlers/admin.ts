@@ -105,6 +105,7 @@ export function createAdminKeyboard(ctx: BotContext, userDao: UserDAO): InlineKe
     .text(ctx.t("admin.btn_backup"), "admin_backup")
     .row()
     .text(ctx.t("admin.btn_test_alert"), "admin_test_alert")
+    .text(ctx.t("admin.btn_cloud_node"), "admin_cloud_node")
     .row()
     .text(ctx.t("common.refresh"), "admin_refresh")
     .text(ctx.t("common.back_to_dashboard"), "back_to_dashboard_from_admin");

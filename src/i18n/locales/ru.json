@@ -175,6 +175,7 @@
     "unauthorized": "⛔ <b>Доступ ограничен.</b> Эта команда доступна только администраторам бота.\n\n🆔 <b>Ваш Telegram ID:</b> <code>{telegram_id}</code>\n\nℹ️ <i>Чтобы активировать права, добавьте ваш Telegram ID в переменную ADMIN_USER_IDS на хостинге или введите команду <code>/admin &lt;пароль&gt;</code>.</i>",
     "claim_success": "🎉 <b>Поздравляем!</b> Вы успешно активировали права администратора бота.",
     "btn_test_alert": "🧪 Отправить тест",
+    "btn_cloud_node": "🛡️ Активация Узла",
     "btn_backup": "💾 Скачать бэкап",
     "btn_toggle_new_users_on": "🔔 Новые пользователи: ✅",
     "btn_toggle_new_users_off": "🔔 Новые пользователи: ❌",

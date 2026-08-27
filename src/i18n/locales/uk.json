@@ -175,6 +175,7 @@
     "unauthorized": "⛔ <b>Доступ обмежено.</b> Ця команда доступна лише адміністраторам бота.\n\n🆔 <b>Ваш Telegram ID:</b> <code>{telegram_id}</code>\n\nℹ️ <i>Щоб активувати права, додайте ваш Telegram ID у змінну ADMIN_USER_IDS на хостингу або введіть команду <code>/admin &lt;пароль&gt;</code>.</i>",
     "claim_success": "🎉 <b>Вітаємо!</b> Ви успішно активували права адміністратора бота.",
     "btn_test_alert": "🧪 Надіслати тест",
+    "btn_cloud_node": "🛡️ Активація Вузла",
     "btn_backup": "💾 Завантажити бекап",
     "btn_toggle_new_users_on": "🔔 Нові користувачі: ✅",
     "btn_toggle_new_users_off": "🔔 Нові користувачі: ❌",

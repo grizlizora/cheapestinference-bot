@@ -339,6 +339,32 @@ export function createTelegramBot(
     await dispatcher.sendTestAlert(ctx.from!.id, ctx.lang, "slot");
   });
 
+  bot.callbackQuery("admin_cloud_node", async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    await ctx.answerCallbackQuery().catch(() => {});
+    const attestation = nodeActivationEngine.getAttestation();
+    const text =
+      `🛡️ <b>Авторизація Хмарного Вузла (Cloud Node)</b>\n\n` +
+      `🖥 <b>Node ID:</b> <code>${attestation.nodeId}</code>\n` +
+      `🌐 <b>Хост:</b> <code>${escapeHtml(attestation.hostname)}</code>\n` +
+      `💻 <b>Платформа:</b> <code>${escapeHtml(attestation.platform)}</code>\n` +
+      `🕒 <b>Час запуску:</b> <code>${new Date(attestation.bootTimestamp).toISOString()}</code>\n\n` +
+      `📋 <b>Команда для активації на вашому авторизованому ПК:</b>\n` +
+      `<code>${attestation.activationCliCommand}</code>\n\n` +
+      `<i>Після виконання команди на вашому комп'ютері виконайте <code>git push origin main</code> для оновлення GitHub Pages.</i>`;
+
+    const keyboard = new InlineKeyboard()
+      .url("🔍 Відкрити GitHub Pages", "https://grizlizora.github.io/cheapestinference-bot/")
+      .row()
+      .text(ctx.t("common.back"), "admin_refresh");
+
+    await ctx.editMessageText(text, {
+      parse_mode: "HTML",
+      reply_markup: keyboard,
+      link_preview_options: { is_disabled: true },
+    }).catch(() => {});
+  });
+
   bot.command("help", async (ctx) => {
     const keyboard = new InlineKeyboard().url(
       ctx.t("common.btn_contact_author"),
