@@ -5,8 +5,10 @@ import { SubscriptionDAO } from "../../db/dao/subscriptions.js";
 import { SlotHistoryDAO } from "../../db/dao/slotHistory.js";
 import { SubscriberInvertedIndex } from "../notifier/subscriberIndex.js";
 import { AvailabilityIntelligenceEngine } from "../../engine/intelligenceEngine.js";
-import { translate, escapeHtml } from "../../i18n/index.js";
+import { translate, escapeHtml, formatRelativeTime } from "../../i18n/index.js";
 import { renderDashboardText, safeEditMessageText } from "./mainDashboard.js";
+
+import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
 
 const DEFAULT_BLOCK_IDS = ["asia", "europe", "americas"];
 
@@ -14,7 +16,8 @@ export function createPoolDetailMenu(
   poolStateDao: PoolStateDAO,
   subDao: SubscriptionDAO,
   invertedIndex: SubscriberInvertedIndex,
-  historyDao?: SlotHistoryDAO
+  historyDao?: SlotHistoryDAO,
+  scraper?: ScraperOrchestrator
 ) {
   return new Menu<BotContext>("pool-detail-menu")
     .dynamic((ctx, range) => {
@@ -79,8 +82,8 @@ export function createPoolDetailMenu(
           const toast = active
             ? c.t("subscriptions.toast_pool_on", { pool: slug.toUpperCase() })
             : c.t("subscriptions.toast_pool_off", { pool: slug.toUpperCase() });
-          await c.answerCallbackQuery(toast);
-          await safeEditMessageText(c, renderPoolDetailText(c, poolStateDao, historyDao));
+          await c.answerCallbackQuery(toast).catch(() => {});
+          await safeEditMessageText(c, renderPoolDetailText(c, poolStateDao, historyDao, scraper));
           try {
             c.menu.update();
           } catch {}
@@ -92,10 +95,13 @@ export function createPoolDetailMenu(
         (c) => c.t("common.refresh"),
         async (c) => {
           await c.answerCallbackQuery({
-            text: c.t("common.refreshed_toast"),
+            text: c.lang === "uk" ? "🔄 Оновлюю дані з сайту..." : c.lang === "ru" ? "🔄 Обновляю данные с сайта..." : "🔄 Refreshing data from site...",
             show_alert: false,
-          });
-          await safeEditMessageText(c, renderPoolDetailText(c, poolStateDao, historyDao));
+          }).catch(() => {});
+          if (scraper) {
+            await scraper.forceRefresh(3000);
+          }
+          await safeEditMessageText(c, renderPoolDetailText(c, poolStateDao, historyDao, scraper));
           try {
             c.menu.update();
           } catch {}
@@ -105,8 +111,8 @@ export function createPoolDetailMenu(
     .text(
       (ctx) => ctx.t("common.back"),
       async (ctx) => {
-        await ctx.answerCallbackQuery();
-        await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao));
+        await ctx.answerCallbackQuery().catch(() => {});
+        await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao, scraper));
         return ctx.menu.nav("main-dashboard-menu");
       }
     );
@@ -115,7 +121,8 @@ export function createPoolDetailMenu(
 export function renderPoolDetailText(
   ctx: BotContext,
   poolStateDao: PoolStateDAO,
-  historyDao?: SlotHistoryDAO
+  historyDao?: SlotHistoryDAO,
+  scraper?: ScraperOrchestrator
 ): string {
   const slug = ctx.session.tempPoolSlug || "flagship";
   const blocks = poolStateDao.getPoolBlocks(slug);
@@ -173,12 +180,21 @@ export function renderPoolDetailText(
     })
     .join("\n");
 
-  const prices = blocks.map((b) => parseFloat(b.price_month)).filter((p) => !isNaN(p));
-  const minPriceNum = prices.length > 0 ? Math.min(...prices) : parseFloat(first.min_price_day) || 0;
+  const parseNum = (v: string) => parseFloat(String(v).replace(/[^0-9.-]/g, "")) || 0;
+  const prices = blocks.map((b) => parseNum(b.price_month)).filter((p) => p > 0);
+  const minPriceNum = prices.length > 0 ? Math.min(...prices) : parseNum(first.min_price_day);
   const minPrice = minPriceNum > 0 ? minPriceNum.toFixed(2) : "0.00";
   const minPriceDay = minPriceNum > 0 ? (minPriceNum / 30).toFixed(2) : "0.00";
 
-  return ctx.t("pool_detail.title", {
+  const lastVerifiedTs = scraper?.getTelemetry().lastScrapeTimestamp || poolStateDao.getLastVerified()?.timestamp;
+  let timeFooter = "";
+  if (lastVerifiedTs && lastVerifiedTs > 0) {
+    const utcDateStr = new Date(lastVerifiedTs).toISOString().replace("T", " ").substring(0, 19) + " UTC";
+    const elapsedText = formatRelativeTime(lastVerifiedTs, ctx.lang);
+    timeFooter = `\n\n🕒 <i>${ctx.lang === "uk" ? "Оновлено" : ctx.lang === "ru" ? "Обновлено" : "Updated"}: ${utcDateStr} (${elapsedText})</i>`;
+  }
+
+  const baseTitle = ctx.t("pool_detail.title", {
     pool_name: escapeHtml(first.pool_name),
     description: escapeHtml(first.description || "Unlimited AI inference pool"),
     models_list: modelsList || "  • Custom open-weights models",
@@ -188,4 +204,6 @@ export function renderPoolDetailText(
     blocks_list: blocksList,
     url: `https://cheapestinference.com/pools/${slug}`,
   });
+
+  return `${baseTitle}${timeFooter}`;
 }

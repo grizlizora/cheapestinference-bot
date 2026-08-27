@@ -80,3 +80,11 @@ function parseEnv(): EnvConfig {
 }
 
 export const config = parseEnv();
+
+export function isUserAdmin(userId?: number): boolean {
+  if (!userId) return false;
+  return (
+    (config.ADMIN_USER_IDS.length > 0 && config.ADMIN_USER_IDS.includes(userId)) ||
+    (config.NODE_ENV !== "production" && config.ADMIN_USER_IDS.length === 0)
+  );
+}

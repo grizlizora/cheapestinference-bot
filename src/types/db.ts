@@ -48,6 +48,8 @@ export interface PoolStateRecord {
   min_price_day: string;
   annual_discount: number;
   description: string;
+  infra_spec?: string;
+  manual_provisioning?: number;
   last_changed_at: string;
   updated_at: string;
 }

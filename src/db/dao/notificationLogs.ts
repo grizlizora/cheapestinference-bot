@@ -38,6 +38,7 @@ export class NotificationLogDAO {
   }
 
   public logNotification(userId: number, poolSlug: string, blockId: string, eventType: string): void {
+    if (!userId || userId <= 0) return; // Prevent FK constraint violations on synthetic/test alerts
     this.logBuffer.push({ userId, poolSlug, blockId, eventType });
     if (this.logBuffer.length >= 100) {
       this.flush();

@@ -12,6 +12,7 @@ export interface PackedUserProfile {
   notifyModelsGlobal: boolean;
   notifyPricesGlobal: boolean;
   lastActiveAt?: number;
+  lastDbTouchAt?: number;
 }
 
 export class SubscriberInvertedIndex {
@@ -73,7 +74,8 @@ export class SubscriberInvertedIndex {
         notifySoldOutGlobal: row.notify_sold_out_global === 1,
         notifyModelsGlobal: row.notify_models_global === 1,
         notifyPricesGlobal: row.notify_prices_global === 1,
-        lastActiveAt: row.last_active_at ? new Date(row.last_active_at).getTime() : 0,
+        lastActiveAt: row.last_active_at ? (Date.parse(row.last_active_at.replace(" ", "T") + "Z") || Date.parse(row.last_active_at) || 0) : 0,
+        lastDbTouchAt: row.last_active_at ? (Date.parse(row.last_active_at.replace(" ", "T") + "Z") || Date.parse(row.last_active_at) || 0) : 0,
       });
       this.tgIdToUserId.set(row.telegram_id, row.id);
     }

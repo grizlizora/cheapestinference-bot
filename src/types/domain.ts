@@ -34,6 +34,8 @@ export interface TierUpdatedPayload {
   newAnnualDiscount: number;
   previousInfraSpec?: string;
   newInfraSpec?: string;
+  previousManualProvisioning?: boolean;
+  newManualProvisioning?: boolean;
   manualProvisioningChanged?: boolean;
 }
 

@@ -34,8 +34,6 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   UNIQUE(user_id, pool_slug, block_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_subs_covering ON subscriptions(pool_slug, block_id, notify_on_available, notify_on_sold_out, user_id);
-
 -- 3. Pool State Snapshot Cache
 CREATE TABLE IF NOT EXISTS pool_state (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,6 +47,8 @@ CREATE TABLE IF NOT EXISTS pool_state (
   min_price_day TEXT NOT NULL,
   annual_discount REAL NOT NULL DEFAULT 0.15,
   description TEXT NOT NULL DEFAULT '',
+  infra_spec TEXT NOT NULL DEFAULT '',
+  manual_provisioning INTEGER NOT NULL DEFAULT 0,
   last_changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(pool_slug, block_id)
@@ -66,8 +66,9 @@ CREATE TABLE IF NOT EXISTS slot_lifecycle_history (
   price_month TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_slot_history_active ON slot_lifecycle_history(pool_slug, block_id, closed_at);
-CREATE INDEX IF NOT EXISTS idx_slot_history_analytics_covering ON slot_lifecycle_history(pool_slug, block_id, duration_seconds, opened_at) WHERE duration_seconds IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_slot_history_active ON slot_lifecycle_history(pool_slug, block_id, closed_at);
+    CREATE INDEX IF NOT EXISTS idx_slot_history_closed_at ON slot_lifecycle_history(closed_at) WHERE closed_at IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_slot_history_analytics_covering ON slot_lifecycle_history(pool_slug, block_id, duration_seconds, opened_at) WHERE duration_seconds IS NOT NULL;
 
 -- 5. Catalog & Model Upgrade History
 CREATE TABLE IF NOT EXISTS catalog_history (
@@ -116,3 +117,10 @@ CREATE TABLE IF NOT EXISTS notification_logs (
 
 CREATE INDEX IF NOT EXISTS idx_notif_logs_retention ON notification_logs(sent_at);
 CREATE INDEX IF NOT EXISTS idx_notif_logs_user_history ON notification_logs(user_id, sent_at);
+
+-- 8. System Metadata Table (for accurate scrape heartbeat & ETag tracking)
+CREATE TABLE IF NOT EXISTS system_metadata (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

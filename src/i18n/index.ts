@@ -81,3 +81,22 @@ export function getLanguageFlag(lang: SupportedLanguage): string {
       return "🌐";
   }
 }
+
+export function formatRelativeTime(timestamp: number, lang: SupportedLanguage): string {
+  if (!timestamp || timestamp <= 0) {
+    return lang === "uk" ? "невідомо" : lang === "ru" ? "неизвестно" : "unknown";
+  }
+  const elapsedSec = Math.max(0, Math.round((Date.now() - timestamp) / 1000));
+  if (elapsedSec <= 3) {
+    return lang === "uk" ? "щойно" : lang === "ru" ? "только что" : "just now";
+  }
+  if (elapsedSec < 60) {
+    return lang === "uk" ? `${elapsedSec}с тому` : lang === "ru" ? `${elapsedSec}с назад` : `${elapsedSec}s ago`;
+  }
+  const mins = Math.floor(elapsedSec / 60);
+  if (mins < 60) {
+    return lang === "uk" ? `${mins}хв тому` : lang === "ru" ? `${mins}мин назад` : `${mins}m ago`;
+  }
+  const hours = Math.floor(mins / 60);
+  return lang === "uk" ? `${hours}год тому` : lang === "ru" ? `${hours}ч назад` : `${hours}h ago`;
+}

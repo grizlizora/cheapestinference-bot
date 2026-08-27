@@ -2,7 +2,6 @@ import { Dispatcher, Agent, ProxyAgent, request } from "undici";
 import { SocksClient } from "socks";
 import zlib from "node:zlib";
 import tls from "node:tls";
-import dns from "node:dns/promises";
 import util from "node:util";
 import { ProxyPool } from "../proxy/proxyPool.js";
 
@@ -10,34 +9,6 @@ const gunzipAsync = util.promisify(zlib.gunzip);
 const brotliDecompressAsync = util.promisify(zlib.brotliDecompress);
 const inflateAsync = util.promisify(zlib.inflate);
 const inflateRawAsync = util.promisify(zlib.inflateRaw);
-
-// In-memory DNS cache with 5-minute TTL to bypass synchronous libuv getaddrinfo overhead
-interface DnsCacheEntry {
-  addresses: string[];
-  expiresAt: number;
-}
-const dnsCache = new Map<string, DnsCacheEntry>();
-
-export async function cachedDnsLookup(hostname: string): Promise<string> {
-  const now = Date.now();
-  const cached = dnsCache.get(hostname);
-  if (cached && cached.expiresAt > now && cached.addresses.length > 0) {
-    return cached.addresses[Math.floor(Math.random() * cached.addresses.length)];
-  }
-
-  try {
-    const addresses = await dns.resolve4(hostname);
-    if (addresses.length > 0) {
-      dnsCache.set(hostname, {
-        addresses,
-        expiresAt: now + 300_000, // 5 min TTL
-      });
-      return addresses[0];
-    }
-  } catch {}
-
-  return hostname;
-}
 
 export interface HttpRequestOptions {
   url: string;
@@ -105,7 +76,6 @@ export class RobustHttpClient {
     }
     this.dispatchers.clear();
     this.tlsSessionCache.clear();
-    dnsCache.clear();
   }
 
   private getOrCreateDispatcher(proxyUrl: string | null, timeoutMs: number): Dispatcher {
@@ -143,10 +113,11 @@ export class RobustHttpClient {
               host: destHost,
               port: destPort,
             },
-            timeout: timeoutMs + 5_000,
+            timeout: Math.min(timeoutMs, 6_000),
           })
             .then((info) => {
               info.socket.setNoDelay(true);
+              let isHandshakeComplete = false;
 
               if (opts.protocol === "https:" || destPort === 443) {
                 const cachedSession = this.tlsSessionCache.get(destHost);
@@ -164,19 +135,32 @@ export class RobustHttpClient {
                   this.tlsSessionCache.set(destHost, sessionBuffer);
                 });
 
-                const tlsTimeout = Math.min(timeoutMs, 10_000);
+                const tlsTimeout = Math.min(timeoutMs, 5_000);
                 tlsSocket.setTimeout(tlsTimeout, () => {
-                  info.socket.destroy();
-                  tlsSocket.destroy(new Error("TLS Handshake Timeout over SOCKS5"));
+                  if (!isHandshakeComplete) {
+                    info.socket.destroy();
+                    tlsSocket.destroy(new Error("TLS Handshake Timeout over SOCKS5"));
+                  }
                 });
 
-                tlsSocket.on("secureConnect", () => {
+                tlsSocket.once("secureConnect", () => {
+                  isHandshakeComplete = true;
                   tlsSocket.setTimeout(0);
                   callback(null, tlsSocket);
                 });
-                tlsSocket.on("error", (err) => {
-                  info.socket.destroy();
-                  callback(err, null);
+                tlsSocket.once("error", (err) => {
+                  if (!isHandshakeComplete) {
+                    isHandshakeComplete = true;
+                    info.socket.destroy();
+                    callback(err, null);
+                  }
+                });
+                info.socket.once("error", (err) => {
+                  if (!isHandshakeComplete) {
+                    isHandshakeComplete = true;
+                    tlsSocket.destroy();
+                    callback(err, null);
+                  }
                 });
               } else {
                 callback(null, info.socket);
@@ -247,9 +231,11 @@ export class RobustHttpClient {
   /**
    * Asynchronous non-blocking body decompression (prevents V8 event loop freezes on 100-300KB payloads)
    */
-  private async decompressBodyAsync(buffer: Buffer, encoding?: string): Promise<string> {
+  private async decompressBodyAsync(buffer: Buffer, encoding?: string | string[]): Promise<string> {
     if (!encoding || buffer.length === 0) return buffer.toString("utf-8");
-    const enc = encoding.toLowerCase().trim();
+    const rawEncoding = Array.isArray(encoding) ? encoding[0] : encoding;
+    if (!rawEncoding || typeof rawEncoding !== "string") return buffer.toString("utf-8");
+    const enc = rawEncoding.toLowerCase().trim();
     try {
       if (enc === "gzip" || enc === "x-gzip") {
         const decompressed = await gunzipAsync(buffer);

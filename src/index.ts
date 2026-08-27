@@ -69,6 +69,10 @@ async function bootstrap() {
   const htmlSnapshotEngine = new HtmlSnapshotEngine(httpClient);
   const sanityGuard = new SanityGuard();
   const diffEngine = new SlotDiffEngine(slotHistoryDao, catalogHistoryDao);
+  const existingRecords = poolStateDao.getAll();
+  if (existingRecords.length > 0) {
+    diffEngine.bootstrapFromDao(existingRecords);
+  }
 
   // 4. Initialize Scraper Orchestrator
   const scraper = new ScraperOrchestrator(
@@ -144,6 +148,7 @@ async function bootstrap() {
       await runner.stop();
     }
     await dispatcher.flushPending().catch(() => {});
+    notificationLogDao.close();
     httpClient.destroy();
     healthServer.close();
     closeDatabase();

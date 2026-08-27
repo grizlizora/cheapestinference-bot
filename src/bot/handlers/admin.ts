@@ -4,7 +4,7 @@ import { UserDAO } from "../../db/dao/users.js";
 import { SubscriptionDAO } from "../../db/dao/subscriptions.js";
 import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
 import { ProxyPool } from "../../proxy/proxyPool.js";
-import { config } from "../../config/env.js";
+import { config, isUserAdmin } from "../../config/env.js";
 import { escapeHtml } from "../../i18n/index.js";
 
 export function renderAdminText(
@@ -29,6 +29,14 @@ export function renderAdminText(
     scraperTelemetry.lastScrapeTimestamp > 0
       ? Math.round((Date.now() - scraperTelemetry.lastScrapeTimestamp) / 1000)
       : -1;
+  const lastScrapeStr =
+    lastScrapeAgo >= 0
+      ? ctx.lang === "uk"
+        ? `${lastScrapeAgo}с тому`
+        : ctx.lang === "ru"
+        ? `${lastScrapeAgo}с назад`
+        : `${lastScrapeAgo}s ago`
+      : "N/A";
 
   const memUsageMb = +(process.memoryUsage().rss / 1024 / 1024).toFixed(1);
 
@@ -49,7 +57,7 @@ export function renderAdminText(
     active_users: userStats.active,
     blocked_users: userStats.blocked,
     active_subscriptions: activeSubs,
-    last_scrape_ago: lastScrapeAgo >= 0 ? lastScrapeAgo : "N/A",
+    last_scrape_ago: lastScrapeStr,
     latency: scraperTelemetry.lastScrapeLatencyMs,
     source: escapeHtml(scraperTelemetry.lastSource || "N/A"),
     consecutive_failures: scraperTelemetry.consecutiveFailures,
@@ -87,11 +95,7 @@ export function createAdminHandler(
   return async (ctx: BotContext) => {
     if (!ctx.from) return;
 
-    const isAdmin =
-      (config.ADMIN_USER_IDS.length > 0 && config.ADMIN_USER_IDS.includes(ctx.from.id)) ||
-      (config.NODE_ENV !== "production" && config.ADMIN_USER_IDS.length === 0);
-
-    if (!isAdmin) {
+    if (!isUserAdmin(ctx.from.id)) {
       await ctx.reply(ctx.t("admin.unauthorized"));
       return;
     }

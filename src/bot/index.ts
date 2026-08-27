@@ -18,7 +18,7 @@ import { createLanguageHandler } from "./handlers/language.js";
 import { createAdminHandler, renderAdminText, createAdminKeyboard } from "./handlers/admin.js";
 import { createBackupHandler } from "./handlers/backup.js";
 import { NotificationDispatcher } from "./notifier/dispatcher.js";
-import { config } from "../config/env.js";
+import { config, isUserAdmin } from "../config/env.js";
 import {
   translate,
   resolveDefaultLanguage,
@@ -86,14 +86,11 @@ export function createTelegramBot(
 
   // Helper function: Admin verification guard
   const requireAdmin = async (ctx: BotContext): Promise<boolean> => {
-    const isAdmin =
-      (config.ADMIN_USER_IDS.length > 0 && ctx.from && config.ADMIN_USER_IDS.includes(ctx.from.id)) ||
-      (config.NODE_ENV !== "production" && config.ADMIN_USER_IDS.length === 0);
-    if (!isAdmin) {
+    if (!isUserAdmin(ctx.from?.id)) {
       await ctx.answerCallbackQuery({
         text: ctx.t("admin.unauthorized"),
         show_alert: true,
-      });
+      }).catch(() => {});
       return false;
     }
     return true;
@@ -133,9 +130,10 @@ export function createTelegramBot(
       } else {
         // Throttled DB disk touch (every 5 mins) to eliminate SQLite write serialization
         const inMemoryProfile = dispatcher.getInvertedIndex().getProfileByTgId(ctx.from.id);
-        const lastTouch = inMemoryProfile?.lastActiveAt || 0;
+        const lastTouch = inMemoryProfile?.lastDbTouchAt || 0;
         if (now - lastTouch > 5 * 60 * 1000) {
           userDao.touchLastActive(ctx.from.id);
+          if (inMemoryProfile) inMemoryProfile.lastDbTouchAt = now;
         }
         dispatcher.getInvertedIndex().updateUserPreferences(ctx.from.id, { lastActiveAt: now });
 
@@ -194,7 +192,8 @@ export function createTelegramBot(
       userDao,
       subDao,
       dispatcher.getInvertedIndex(),
-      resolvedHistoryDao
+      resolvedHistoryDao,
+      scraper
     );
 
   bot.use(mainDashboardMenu);
@@ -210,12 +209,13 @@ export function createTelegramBot(
       resolvedHistoryDao,
       subDao,
       subscriptionsMenu,
-      poolDetailMenu
+      poolDetailMenu,
+      scraper
     )
   );
 
   bot.command("menu", async (ctx) => {
-    const text = renderDashboardText(ctx, poolStateDao, resolvedHistoryDao);
+    const text = renderDashboardText(ctx, poolStateDao, resolvedHistoryDao, scraper);
     await ctx.reply(text, {
       parse_mode: "HTML",
       reply_markup: mainDashboardMenu,
@@ -246,7 +246,7 @@ export function createTelegramBot(
       newVal === 1
         ? ctx.t("admin.toast_new_users_on")
         : ctx.t("admin.toast_new_users_off");
-    await ctx.answerCallbackQuery(toast);
+    await ctx.answerCallbackQuery(toast).catch(() => {});
     const text = renderAdminText(ctx, userDao, subDao, scraper, proxyPool);
     const keyboard = createAdminKeyboard(ctx, userDao);
     await ctx.editMessageText(text, { parse_mode: "HTML", reply_markup: keyboard }).catch(() => {});
@@ -254,7 +254,7 @@ export function createTelegramBot(
 
   bot.callbackQuery("admin_refresh", async (ctx) => {
     if (!(await requireAdmin(ctx))) return;
-    await ctx.answerCallbackQuery({ text: ctx.t("common.refreshed_toast"), show_alert: false });
+    await ctx.answerCallbackQuery({ text: ctx.t("common.refreshed_toast"), show_alert: false }).catch(() => {});
     const text = renderAdminText(ctx, userDao, subDao, scraper, proxyPool);
     const keyboard = createAdminKeyboard(ctx, userDao);
     await ctx.editMessageText(text, { parse_mode: "HTML", reply_markup: keyboard }).catch(() => {});
@@ -262,13 +262,13 @@ export function createTelegramBot(
 
   bot.callbackQuery("admin_backup", async (ctx) => {
     if (!(await requireAdmin(ctx))) return;
-    await ctx.answerCallbackQuery();
+    await ctx.answerCallbackQuery().catch(() => {});
     await createBackupHandler(userDao.db, userDao, subDao)(ctx);
   });
 
   bot.callbackQuery("admin_test_alert", async (ctx) => {
     if (!(await requireAdmin(ctx))) return;
-    await ctx.answerCallbackQuery({ text: ctx.t("admin.toast_test_alert_sent"), show_alert: false });
+    await ctx.answerCallbackQuery({ text: ctx.t("admin.toast_test_alert_sent"), show_alert: false }).catch(() => {});
     await dispatcher.sendTestAlert(ctx.from!.id, ctx.lang, "slot");
   });
 
@@ -287,11 +287,7 @@ export function createTelegramBot(
   // Test notification command (Admin Only)
   bot.command("testalert", async (ctx) => {
     if (!ctx.from) return;
-    const isAdmin =
-      (config.ADMIN_USER_IDS.length > 0 && config.ADMIN_USER_IDS.includes(ctx.from.id)) ||
-      (config.NODE_ENV !== "production" && config.ADMIN_USER_IDS.length === 0);
-
-    if (!isAdmin) {
+    if (!isUserAdmin(ctx.from.id)) {
       await ctx.reply(ctx.t("admin.unauthorized"));
       return;
     }
@@ -348,7 +344,11 @@ export function createTelegramBot(
 
   // Wire Scraper diff_events to dispatcher
   scraper.on("diff_events", async (events) => {
-    await dispatcher.handleDiffEvents(events);
+    try {
+      await dispatcher.handleDiffEvents(events);
+    } catch (err: any) {
+      console.error("❌ [NotificationDispatcher] Error handling diff events:", err?.message || err);
+    }
   });
 
   return { bot, dispatcher };

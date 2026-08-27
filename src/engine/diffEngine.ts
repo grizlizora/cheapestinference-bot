@@ -7,7 +7,13 @@ function parseCleanPrice(val: string | undefined | null): number {
   if (!val) return 0;
   const cleaned = String(val).replace(/[^0-9.-]/g, "");
   const num = parseFloat(cleaned);
-  return isNaN(num) ? 0 : num;
+  if (isNaN(num)) return 0;
+  return Math.round(num * 100) / 100;
+}
+
+function cleanDelta(val: number): number {
+  const rounded = Math.round(val * 100) / 100;
+  return Object.is(rounded, -0) || rounded === 0 ? 0 : rounded;
 }
 
 interface TrackedSlot {
@@ -43,6 +49,82 @@ export class SlotDiffEngine {
       success: true,
       data: Array.from(this.inMemoryPools.values()),
     };
+  }
+
+  public bootstrapFromDao(records: Array<{
+    pool_slug: string;
+    pool_name: string;
+    models_json: string;
+    block_id: string;
+    status: string;
+    hours_utc: string;
+    price_month: string;
+    min_price_day: string;
+    annual_discount: number;
+    description: string;
+    infra_spec?: string;
+    manual_provisioning?: number;
+  }>): void {
+    if (this.isInitialized || records.length === 0) return;
+
+    const poolsMap = new Map<string, PoolData>();
+    const now = Date.now();
+
+    for (const r of records) {
+      let models: string[] = [];
+      try {
+        models = JSON.parse(r.models_json);
+      } catch {
+        models = [];
+      }
+
+      const key = `${r.pool_slug}:${r.block_id}`;
+      this.inMemorySlots.set(key, {
+        poolSlug: r.pool_slug,
+        poolName: r.pool_name,
+        models,
+        block: r.block_id,
+        hoursUtc: r.hours_utc,
+        status: r.status,
+        pricePerMonth: r.price_month,
+        lastSeenAt: now,
+      });
+
+      let pool = poolsMap.get(r.pool_slug);
+      if (!pool) {
+        pool = {
+          id: r.pool_slug,
+          slug: r.pool_slug,
+          modelId: r.pool_slug,
+          modelName: r.pool_name,
+          models,
+          description: r.description || "",
+          status: "active",
+          minPricePerDay: r.min_price_day || "0",
+          annualDiscount: typeof r.annual_discount === "number" ? r.annual_discount : 0.15,
+          infraSpec: r.infra_spec || undefined,
+          manualProvisioning: Boolean(r.manual_provisioning),
+          blocks: [],
+        };
+        poolsMap.set(r.pool_slug, pool);
+      }
+
+      pool.blocks.push({
+        block: r.block_id,
+        hoursUtc: r.hours_utc,
+        pricePerMonth: r.price_month,
+        status: r.status,
+      });
+    }
+
+    for (const [slug, pool] of poolsMap.entries()) {
+      this.inMemoryPools.set(slug, pool);
+    }
+
+    this.isInitialized = true;
+    console.log(
+      `✅ [SlotDiffEngine] Hydrated baseline from SQLite with ${this.inMemorySlots.size} slots across ${this.inMemoryPools.size} pools.`
+    );
   }
 
   public processSnapshot(snapshot: PoolsSnapshot): DiffEvent[] {
@@ -92,40 +174,7 @@ export class SlotDiffEngine {
           });
         }
 
-        // 2. Pool Base Price Diffing
-        const prevMin = parseFloat(prevPool.minPricePerDay || "0");
-        const newMin = parseFloat(pool.minPricePerDay || "0");
-        if (!isNaN(prevMin) && !isNaN(newMin) && Math.abs(prevMin - newMin) > 0.01) {
-          const delta = newMin - prevMin;
-          const pct = prevMin > 0 ? (delta / prevMin) * 100 : 0;
-          const basePricePayload = {
-            previousMinPrice: prevPool.minPricePerDay,
-            newMinPrice: pool.minPricePerDay,
-            priceDelta: parseFloat(delta.toFixed(2)),
-            percentageDelta: parseFloat(pct.toFixed(2)),
-          };
-          this.catalogHistoryDao?.recordBasePriceUpdate(
-            pool.slug,
-            pool.modelName,
-            pool.models || [],
-            basePricePayload
-          );
-          events.push({
-            id: crypto.randomUUID(),
-            type: "POOL_BASE_PRICE_CHANGED",
-            poolSlug: pool.slug,
-            poolName: pool.modelName,
-            block: "ALL",
-            models: pool.models || [],
-            hoursUtc: "",
-            previousPrice: prevPool.minPricePerDay,
-            newPrice: pool.minPricePerDay,
-            timestamp: now,
-            basePrice: basePricePayload,
-          });
-        }
-
-        // 3. Tier Terms & Metadata Diffing
+        // 2. Tier Terms & Metadata Diffing
         const descChanged = (prevPool.description || "") !== (pool.description || "");
         const discountChanged = (prevPool.annualDiscount || 0) !== (pool.annualDiscount || 0);
         const infraChanged = (prevPool.infraSpec || "") !== (pool.infraSpec || "");
@@ -139,6 +188,8 @@ export class SlotDiffEngine {
             newAnnualDiscount: pool.annualDiscount || 0.15,
             previousInfraSpec: prevPool.infraSpec,
             newInfraSpec: pool.infraSpec,
+            previousManualProvisioning: prevPool.manualProvisioning,
+            newManualProvisioning: pool.manualProvisioning,
             manualProvisioningChanged: manualProvChanged,
           };
           this.catalogHistoryDao?.recordTierUpdate(
@@ -177,7 +228,18 @@ export class SlotDiffEngine {
 
       this.inMemoryPools.set(pool.slug, pool);
 
-      // 4. Regional Slot Block Diffing
+      // 3. Regional Slot Block Diffing & Price Change Staging
+      interface StagedSlotPriceChange {
+        block: string;
+        hoursUtc: string;
+        prevPrice: string;
+        newPrice: string;
+        delta: number;
+        pct: number;
+        status: string;
+      }
+      const stagedSlotPriceChanges: StagedSlotPriceChange[] = [];
+
       for (const block of pool.blocks) {
         const key = `${pool.slug}:${block.block}`;
         incomingSlotKeys.add(key);
@@ -283,7 +345,7 @@ export class SlotDiffEngine {
           }
         }
 
-        // 5. Regional Slot Price Changed (SLOT_PRICE_CHANGED)
+        // Stage Regional Slot Price Changed (SLOT_PRICE_CHANGED)
         const oldPriceNum = parseCleanPrice(prevSlot.pricePerMonth);
         const newPriceNum = parseCleanPrice(block.pricePerMonth);
         if (
@@ -292,49 +354,123 @@ export class SlotDiffEngine {
           block.pricePerMonth !== "0" &&
           oldPriceNum > 0 &&
           newPriceNum > 0 &&
-          Math.abs(newPriceNum - oldPriceNum) > 0.01
+          Math.abs(newPriceNum - oldPriceNum) >= 0.01
         ) {
-          const delta = newPriceNum - oldPriceNum;
-          const pct = oldPriceNum > 0 ? (delta / oldPriceNum) * 100 : 0;
-          const slotPricePayload = {
+          const delta = cleanDelta(newPriceNum - oldPriceNum);
+          const pct = oldPriceNum > 0 ? cleanDelta((delta / oldPriceNum) * 100) : 0;
+          stagedSlotPriceChanges.push({
             block: block.block,
             hoursUtc: block.hoursUtc,
-            previousPrice: prevSlot.pricePerMonth,
+            prevPrice: prevSlot.pricePerMonth,
             newPrice: block.pricePerMonth,
-            priceDelta: parseFloat(delta.toFixed(2)),
-            percentageDelta: parseFloat(pct.toFixed(2)),
-            isDiscount: delta < 0,
+            delta,
+            pct,
+            status: block.status,
+          });
+        }
+        if (block.pricePerMonth !== "" && newPriceNum > 0) {
+          prevSlot.pricePerMonth = block.pricePerMonth;
+        }
+        prevSlot.hoursUtc = block.hoursUtc;
+        prevSlot.models = pool.models || [];
+        prevSlot.lastSeenAt = now;
+      }
+
+      // 4. Decoupled Price Evaluation: Distinguish Tariff vs Slot Changes
+      if (prevPool) {
+        const prevMin = parseCleanPrice(prevPool.minPricePerDay);
+        const newMin = parseCleanPrice(pool.minPricePerDay);
+        const basePriceChanged = prevMin > 0 && newMin > 0 && Math.abs(newMin - prevMin) >= 0.01;
+
+        const totalBlocks = pool.blocks.length;
+        const allBlocksChanged = totalBlocks > 0 && stagedSlotPriceChanges.length === totalBlocks;
+        const allBlocksHaveSamePrice =
+          allBlocksChanged &&
+          stagedSlotPriceChanges.every(
+            (c) => parseCleanPrice(c.newPrice) === parseCleanPrice(stagedSlotPriceChanges[0].newPrice)
+          );
+
+        if (allBlocksHaveSamePrice || (basePriceChanged && stagedSlotPriceChanges.length === 0)) {
+          // Case A: True Uniform Base Tariff Change across the entire pool
+          const prevPriceStr = allBlocksHaveSamePrice
+            ? stagedSlotPriceChanges[0].prevPrice
+            : prevPool.minPricePerDay;
+          const newPriceStr = allBlocksHaveSamePrice
+            ? stagedSlotPriceChanges[0].newPrice
+            : pool.minPricePerDay;
+
+          const delta = allBlocksHaveSamePrice
+            ? stagedSlotPriceChanges[0].delta
+            : cleanDelta(newMin - prevMin);
+          const pct = allBlocksHaveSamePrice
+            ? stagedSlotPriceChanges[0].pct
+            : cleanDelta(prevMin > 0 ? (delta / prevMin) * 100 : 0);
+
+          const basePricePayload = {
+            previousMinPrice: prevPriceStr,
+            newMinPrice: newPriceStr,
+            priceDelta: delta,
+            percentageDelta: pct,
           };
 
-          this.catalogHistoryDao?.recordSlotPriceChange(
+          this.catalogHistoryDao?.recordBasePriceUpdate(
             pool.slug,
-            block.block,
-            prevSlot.pricePerMonth,
-            block.pricePerMonth,
-            slotPricePayload.priceDelta,
-            slotPricePayload.percentageDelta
+            pool.modelName,
+            pool.models || [],
+            basePricePayload
           );
 
           events.push({
             id: crypto.randomUUID(),
-            type: "SLOT_PRICE_CHANGED",
+            type: "POOL_BASE_PRICE_CHANGED",
             poolSlug: pool.slug,
             poolName: pool.modelName,
-            block: block.block,
+            block: "ALL",
             models: pool.models || [],
-            hoursUtc: block.hoursUtc,
-            previousPrice: prevSlot.pricePerMonth,
-            newPrice: block.pricePerMonth,
-            newStatus: block.status,
+            hoursUtc: "",
+            previousPrice: prevPriceStr,
+            newPrice: newPriceStr,
             timestamp: now,
-            slotPrice: slotPricePayload,
+            basePrice: basePricePayload,
           });
-        }
-        prevSlot.pricePerMonth = block.pricePerMonth;
+        } else {
+          // Case B: Individual Regional Slot Price Changes (Suppress redundant POOL_BASE_PRICE_CHANGED!)
+          for (const sp of stagedSlotPriceChanges) {
+            const slotPricePayload = {
+              block: sp.block,
+              hoursUtc: sp.hoursUtc,
+              previousPrice: sp.prevPrice,
+              newPrice: sp.newPrice,
+              priceDelta: sp.delta,
+              percentageDelta: sp.pct,
+              isDiscount: sp.delta < 0,
+            };
 
-        prevSlot.hoursUtc = block.hoursUtc;
-        prevSlot.models = pool.models || [];
-        prevSlot.lastSeenAt = now;
+            this.catalogHistoryDao?.recordSlotPriceChange(
+              pool.slug,
+              sp.block,
+              sp.prevPrice,
+              sp.newPrice,
+              sp.delta,
+              sp.pct
+            );
+
+            events.push({
+              id: crypto.randomUUID(),
+              type: "SLOT_PRICE_CHANGED",
+              poolSlug: pool.slug,
+              poolName: pool.modelName,
+              block: sp.block,
+              models: pool.models || [],
+              hoursUtc: sp.hoursUtc,
+              previousPrice: sp.prevPrice,
+              newPrice: sp.newPrice,
+              newStatus: sp.status,
+              timestamp: now,
+              slotPrice: slotPricePayload,
+            });
+          }
+        }
       }
     }
 

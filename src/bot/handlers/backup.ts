@@ -6,7 +6,7 @@ import { pipeline } from "node:stream/promises";
 import Database from "better-sqlite3";
 import { InputFile } from "grammy";
 import { BotContext } from "../../types/context.js";
-import { config } from "../../config/env.js";
+import { config, isUserAdmin } from "../../config/env.js";
 import { UserDAO } from "../../db/dao/users.js";
 import { SubscriptionDAO } from "../../db/dao/subscriptions.js";
 import { escapeHtml } from "../../i18n/index.js";
@@ -26,11 +26,7 @@ export function createBackupHandler(
   return async (ctx: BotContext) => {
     if (!ctx.from) return;
 
-    const isAdmin =
-      (config.ADMIN_USER_IDS.length > 0 && config.ADMIN_USER_IDS.includes(ctx.from.id)) ||
-      (config.NODE_ENV !== "production" && config.ADMIN_USER_IDS.length === 0);
-
-    if (!isAdmin) {
+    if (!isUserAdmin(ctx.from.id)) {
       await ctx.reply(ctx.t("admin.unauthorized"));
       return;
     }

@@ -8,6 +8,9 @@ export class PoolStateDAO {
   private stmtGetBySlug: Database.Statement;
   private stmtUpsert: Database.Statement;
   private stmtDeleteMissing: Database.Statement;
+  private stmtUpsertMeta: Database.Statement;
+  private stmtGetMeta: Database.Statement;
+  private txSaveSnapshot: (pools: PoolData[]) => void;
 
   constructor(private db: Database.Database) {
     this.stmtGetBySlugAndBlock = db.prepare(`
@@ -26,10 +29,12 @@ export class PoolStateDAO {
       INSERT INTO pool_state (
         pool_slug, pool_name, models_json, block_id, status, 
         hours_utc, price_month, min_price_day, annual_discount, description,
+        infra_spec, manual_provisioning,
         last_changed_at, updated_at
       ) VALUES (
         @pool_slug, @pool_name, @models_json, @block_id, @status,
         @hours_utc, @price_month, @min_price_day, @annual_discount, @description,
+        @infra_spec, @manual_provisioning,
         CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
       )
       ON CONFLICT(pool_slug, block_id) DO UPDATE SET
@@ -41,9 +46,47 @@ export class PoolStateDAO {
         min_price_day = excluded.min_price_day,
         annual_discount = excluded.annual_discount,
         description = excluded.description,
+        infra_spec = excluded.infra_spec,
+        manual_provisioning = excluded.manual_provisioning,
         last_changed_at = CASE WHEN pool_state.status != excluded.status THEN CURRENT_TIMESTAMP ELSE pool_state.last_changed_at END,
         updated_at = CURRENT_TIMESTAMP
     `);
+
+    this.stmtUpsertMeta = db.prepare(`
+      INSERT INTO system_metadata (key, value, updated_at)
+      VALUES (@key, @value, CURRENT_TIMESTAMP)
+      ON CONFLICT(key) DO UPDATE SET
+        value = excluded.value,
+        updated_at = CURRENT_TIMESTAMP
+    `);
+
+    this.stmtGetMeta = db.prepare(`
+      SELECT value, updated_at FROM system_metadata WHERE key = ?
+    `);
+
+    this.txSaveSnapshot = this.db.transaction((pools: PoolData[]) => {
+      if (!pools || pools.length === 0) return;
+      const validSlugs = pools.map((p) => p.slug);
+      this.stmtDeleteMissing.run(JSON.stringify(validSlugs));
+      for (const pool of pools) {
+        for (const block of pool.blocks) {
+          this.stmtUpsert.run({
+            pool_slug: pool.slug,
+            pool_name: pool.modelName,
+            models_json: JSON.stringify(pool.models || []),
+            block_id: block.block,
+            status: block.status,
+            hours_utc: block.hoursUtc,
+            price_month: block.pricePerMonth,
+            min_price_day: pool.minPricePerDay || "0.00",
+            annual_discount: typeof pool.annualDiscount === "number" ? pool.annualDiscount : 0.15,
+            description: pool.description || "",
+            infra_spec: pool.infraSpec || "",
+            manual_provisioning: pool.manualProvisioning ? 1 : 0,
+          });
+        }
+      }
+    });
   }
 
   getSlot(poolSlug: string, blockId: string): PoolStateRecord | undefined {
@@ -58,29 +101,31 @@ export class PoolStateDAO {
     return this.stmtGetBySlug.all(poolSlug) as PoolStateRecord[];
   }
 
-  saveSnapshot(snapshot: PoolsSnapshot): void {
-    const insertMany = this.db.transaction((pools: PoolData[]) => {
-      const validSlugs = pools.map((p) => p.slug);
-      this.stmtDeleteMissing.run(JSON.stringify(validSlugs));
-      for (const pool of pools) {
-        for (const block of pool.blocks) {
-          this.stmtUpsert.run({
-            pool_slug: pool.slug,
-            pool_name: pool.modelName,
-            models_json: JSON.stringify(pool.models || []),
-            block_id: block.block,
-            status: block.status,
-            hours_utc: block.hoursUtc,
-            price_month: block.pricePerMonth,
-            min_price_day: pool.minPricePerDay || "0.00",
-            annual_discount: pool.annualDiscount || 0.15,
-            description: pool.description || "",
-          });
-        }
-      }
+  touchVerified(source = "cache_304", latencyMs = 0): void {
+    const meta = {
+      timestamp: Date.now(),
+      source,
+      latencyMs,
+    };
+    this.stmtUpsertMeta.run({
+      key: "last_verified",
+      value: JSON.stringify(meta),
     });
+  }
 
-    insertMany(snapshot.data);
+  getLastVerified(): { timestamp: number; source: string; latencyMs: number } | null {
+    const row = this.stmtGetMeta.get("last_verified") as { value: string; updated_at: string } | undefined;
+    if (!row) return null;
+    try {
+      return JSON.parse(row.value);
+    } catch {
+      return null;
+    }
+  }
+
+  saveSnapshot(snapshot: PoolsSnapshot, source = "api", latencyMs = 0): void {
+    this.txSaveSnapshot(snapshot.data);
+    this.touchVerified(source, latencyMs);
   }
 
   getPoolSummaries(): Array<{
@@ -119,7 +164,8 @@ export class PoolStateDAO {
       ).length;
 
       // Lowest block price
-      const prices = records.map((r) => parseFloat(r.price_month)).filter((p) => !isNaN(p));
+      const parseNum = (v: string) => parseFloat(String(v).replace(/[^0-9.-]/g, "")) || 0;
+      const prices = records.map((r) => parseNum(r.price_month)).filter((p) => p > 0);
       const minPrice = prices.length > 0 ? Math.min(...prices).toFixed(2) : "0.00";
 
       summaries.push({

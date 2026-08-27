@@ -16,6 +16,7 @@ export class UserDAO {
   private stmtDeactivate: Database.Statement;
   private stmtReactivate: Database.Statement;
   private stmtGetStats: Database.Statement;
+  private txDeactivateBatch: (ids: number[]) => void;
 
   constructor(public readonly db: Database.Database) {
     this.stmtGetByTgId = db.prepare("SELECT * FROM users WHERE telegram_id = ?");
@@ -80,6 +81,12 @@ export class UserDAO {
         COUNT(CASE WHEN is_active = 0 THEN 1 END) as blocked
       FROM users
     `);
+
+    this.txDeactivateBatch = this.db.transaction((ids: number[]) => {
+      for (const id of ids) {
+        this.stmtDeactivate.run(id);
+      }
+    });
   }
 
   getByTelegramId(tgId: number): UserRecord | undefined {
@@ -146,6 +153,11 @@ export class UserDAO {
 
   deactivateUser(tgId: number): void {
     this.stmtDeactivate.run(tgId);
+  }
+
+  deactivateUsersBatch(tgIds: number[]): void {
+    if (tgIds.length === 0) return;
+    this.txDeactivateBatch(tgIds);
   }
 
   reactivateUser(tgId: number): void {

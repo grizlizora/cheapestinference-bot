@@ -126,7 +126,26 @@ export class NotificationDispatcher {
           entry = { user: sub, matchedEvents: [] };
           userEventsMap.set(sub.userId, entry);
         }
-        entry.matchedEvents.push({ event, priority });
+        const isDuplicate = entry.matchedEvents.some(
+          (e) =>
+            e.event.id === event.id ||
+            (e.event.poolSlug === event.poolSlug &&
+              e.event.block === event.block &&
+              e.event.type === event.type &&
+              e.event.newPrice === event.newPrice)
+        );
+        if (!isDuplicate) {
+          entry.matchedEvents.push({ event, priority });
+        }
+      }
+    }
+
+    // Precompute analytics cache per event to eliminate N+1 queries in subscriber loop
+    const eventAnalyticsCache = new Map<string, string | undefined>();
+    for (const event of events) {
+      if (event.type === "SLOT_APPEARED" && this.historyDao) {
+        const analytics = this.historyDao.getSlotAnalytics(event.poolSlug, event.block);
+        eventAnalyticsCache.set(event.id, analytics.avgDurationFormatted || undefined);
       }
     }
 
@@ -134,7 +153,8 @@ export class NotificationDispatcher {
     for (const { user, matchedEvents } of userEventsMap.values()) {
       if (matchedEvents.length === 1) {
         const single = matchedEvents[0];
-        const msg = this.formatAlertMessage(user, single.event, single.priority);
+        const cachedDuration = eventAnalyticsCache.get(single.event.id);
+        const msg = this.formatAlertMessage(user, single.event, single.priority, cachedDuration);
         this.enqueue(msg);
       } else {
         // Chunk bundles so no single Telegram message exceeds the 4096 char limit
@@ -142,7 +162,8 @@ export class NotificationDispatcher {
         for (let i = 0; i < matchedEvents.length; i += MAX_BUNDLE_EVENTS_PER_MSG) {
           const slice = matchedEvents.slice(i, i + MAX_BUNDLE_EVENTS_PER_MSG);
           if (slice.length === 1) {
-            this.enqueue(this.formatAlertMessage(user, slice[0].event, slice[0].priority));
+            const cachedDuration = eventAnalyticsCache.get(slice[0].event.id);
+            this.enqueue(this.formatAlertMessage(user, slice[0].event, slice[0].priority, cachedDuration));
           } else {
             const msg = this.formatBundledAlertMessage(user, slice);
             this.enqueue(msg);
@@ -235,6 +256,11 @@ export class NotificationDispatcher {
       if (now - candidate.enqueuedAt > this.MAX_MESSAGE_AGE_MS) {
         continue;
       }
+      // Drop alerts for users deactivated/blocked while message was in queue
+      const profile = this.index.getProfileByTgId(candidate.telegramId);
+      if (profile && !profile.isActive) {
+        continue;
+      }
       // 2. Check per-user rate limit (1 msg/s)
       const lastSent = this.lastUserDispatchTime.get(candidate.telegramId) || 0;
       if (now - lastSent < this.USER_DISPATCH_GAP_MS) {
@@ -262,6 +288,10 @@ export class NotificationDispatcher {
     if (!this.p0Queue.isEmpty()) {
       return this.popValidCandidate(this.p0Queue);
     }
+
+    if (this.p1Queue.isEmpty()) this.p1Deficit = 0;
+    if (this.p2Queue.isEmpty()) this.p2Deficit = 0;
+    if (this.p3Queue.isEmpty()) this.p3Deficit = 0;
 
     // Allocate deficit quanta if all active queues are depleted of deficit
     if (this.p1Deficit <= 0 && this.p2Deficit <= 0 && this.p3Deficit <= 0) {
@@ -348,12 +378,8 @@ export class NotificationDispatcher {
       console.warn(`⚠️ [NotificationDispatcher] HTTP 429 received. Pausing queue for ${retryAfter + 0.5}s.`);
       this.isPaused = true;
       this.pauseUntil = performance.now() + (retryAfter + 0.5) * 1000;
-
-      if (msg.retries < 5) {
-        msg.retries++;
-        const targetQ = this.getQueueByPriority(msg.priority);
-        targetQ.unshift(msg);
-      }
+      const targetQ = this.getQueueByPriority(msg.priority);
+      targetQ.unshift(msg); // Push back to head of line
       return;
     }
 
@@ -367,14 +393,25 @@ export class NotificationDispatcher {
     }
   }
 
+  private cleanPriceString(val: string | number | undefined | null): string {
+    if (val === undefined || val === null || val === "") return "0";
+    const cleaned = String(val).replace(/[^0-9.-]/g, "");
+    const num = parseFloat(cleaned);
+    if (isNaN(num) || Object.is(num, -0) || num === 0) return "0";
+    return num % 1 === 0 ? num.toFixed(0) : num.toFixed(2);
+  }
+
   private formatPriceDeltaBadge(
     delta: number,
     pct: number,
     lang: SupportedLanguage
   ): string {
+    const roundedDelta = Math.round(Math.abs(delta) * 100) / 100;
+    if (roundedDelta === 0) return "";
     const currencyMonth = translate(lang, "common.currency_month") || "mo";
-    const absDelta = Math.abs(delta) % 1 === 0 ? Math.abs(delta).toFixed(0) : Math.abs(delta).toFixed(2);
-    const absPct = Math.abs(pct) % 1 === 0 ? Math.abs(pct).toFixed(0) : Math.abs(pct).toFixed(1);
+    const absDelta = Number.isInteger(roundedDelta) ? roundedDelta.toFixed(0) : roundedDelta.toFixed(2);
+    const roundedPct = Math.round(Math.abs(pct) * 10) / 10;
+    const absPct = Number.isInteger(roundedPct) ? roundedPct.toFixed(0) : roundedPct.toFixed(1);
 
     if (delta < 0) {
       return translate(lang, "alerts.price_discount_badge", {
@@ -398,6 +435,7 @@ export class NotificationDispatcher {
     if (lastNewline > maxLen / 2) {
       truncated = truncated.substring(0, lastNewline);
     }
+    truncated = truncated.replace(/<[^>]*$/, "");
     const openTags = (truncated.match(/<(?!(?:\/|br|hr))[a-z]+[^>]*>/gi) || [])
       .map(tag => tag.match(/<([a-z]+)/i)?.[1].toLowerCase())
       .filter(Boolean) as string[];
@@ -415,7 +453,8 @@ export class NotificationDispatcher {
   private formatAlertMessage(
     user: PackedUserProfile,
     event: DiffEvent,
-    priority: BroadcastPriority
+    priority: BroadcastPriority,
+    cachedDurationFormatted?: string
   ): OutgoingAlertMessage {
     const lang = user.language;
     const blockName = translate(lang, `common.block_${event.block}`) || event.block;
@@ -446,7 +485,7 @@ export class NotificationDispatcher {
         block_name: escapeHtml(blockName),
         hours_utc: escapeHtml(event.hoursUtc),
         models: (event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", "),
-        price: escapeHtml(event.newPrice || "0"),
+        price: escapeHtml(this.cleanPriceString(event.newPrice)),
         currency_month: currencyMonth,
         status_badge: statusBadge,
         timestamp: timeFormatted,
@@ -454,18 +493,15 @@ export class NotificationDispatcher {
 
       text = `${header}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${body}`;
 
-      if (this.historyDao) {
-        const analytics = this.historyDao.getSlotAnalytics(event.poolSlug, event.block);
-        if (analytics.avgDurationFormatted) {
-          text += translate(lang, "alerts.analytics_duration_tip", {
-            duration: escapeHtml(analytics.avgDurationFormatted),
-          });
-        }
+      if (cachedDurationFormatted) {
+        text += translate(lang, "alerts.analytics_duration_tip", {
+          duration: escapeHtml(cachedDurationFormatted),
+        });
       }
 
       const btnLabel = translate(lang, "alerts.btn_claim_slot_block", {
         block_name: blockName,
-        price: escapeHtml(event.newPrice || "0"),
+        price: escapeHtml(this.cleanPriceString(event.newPrice)),
         currency_month: currencyMonth,
       });
 
@@ -543,8 +579,8 @@ export class NotificationDispatcher {
       const body = translate(lang, "alerts.slot_price_changed_body", {
         pool_name: escapeHtml(event.poolName),
         block_name: escapeHtml(blockName),
-        old_price: escapeHtml(event.previousPrice || "0"),
-        new_price: escapeHtml(event.newPrice || "0"),
+        old_price: escapeHtml(this.cleanPriceString(event.previousPrice)),
+        new_price: escapeHtml(this.cleanPriceString(event.newPrice)),
         currency_month: currencyMonth,
         delta_badge: deltaBadge,
         hours_utc: escapeHtml(event.hoursUtc),
@@ -554,7 +590,7 @@ export class NotificationDispatcher {
 
       const btnLabel = translate(lang, "alerts.btn_claim_slot_block", {
         block_name: blockName,
-        price: escapeHtml(event.newPrice || "0"),
+        price: escapeHtml(this.cleanPriceString(event.newPrice)),
         currency_month: currencyMonth,
       });
 
@@ -573,8 +609,8 @@ export class NotificationDispatcher {
 
       const body = translate(lang, "alerts.pool_base_price_body", {
         pool_name: escapeHtml(event.poolName),
-        old_price: escapeHtml(event.previousPrice || "0"),
-        new_price: escapeHtml(event.newPrice || "0"),
+        old_price: escapeHtml(this.cleanPriceString(event.previousPrice)),
+        new_price: escapeHtml(this.cleanPriceString(event.newPrice)),
         currency_month: currencyMonth,
         delta_badge: deltaBadge,
         models: (event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", "),
@@ -605,6 +641,31 @@ export class NotificationDispatcher {
           })
         );
       }
+      if (event.tierUpdate?.newInfraSpec) {
+        diffLines.push(
+          translate(lang, "alerts.tier_infra_change", {
+            new_infra: escapeHtml(event.tierUpdate.newInfraSpec),
+          })
+        );
+      }
+      if (event.tierUpdate?.newManualProvisioning !== undefined) {
+        const provText = event.tierUpdate.newManualProvisioning
+          ? lang === "uk"
+            ? "Ручна видача"
+            : lang === "ru"
+            ? "Ручная выдача"
+            : "Manual"
+          : lang === "uk"
+          ? "Миттєва авто-видача"
+          : lang === "ru"
+          ? "Мгновенная авто-выдача"
+          : "Instant Automatic";
+        diffLines.push(
+          translate(lang, "alerts.tier_prov_change", {
+            provisioning: escapeHtml(provText),
+          })
+        );
+      }
 
       const body = translate(lang, "alerts.tier_updated_body", {
         pool_name: escapeHtml(event.poolName),
@@ -624,7 +685,7 @@ export class NotificationDispatcher {
       const body = translate(lang, "alerts.new_pool_body", {
         pool_name: escapeHtml(event.poolName),
         models: (event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", "),
-        min_price: escapeHtml(event.newPrice || "0"),
+        min_price: escapeHtml(this.cleanPriceString(event.newPrice)),
         currency_month: currencyMonth,
         description: escapeHtml((event.metadata?.description as string) || "High-performance compute pool"),
       });
@@ -683,14 +744,15 @@ export class NotificationDispatcher {
       const checkoutUrl = `https://cheapestinference.com/pools/${event.poolSlug}${blockHash}`;
 
       if (event.type === "SLOT_APPEARED") {
+        const cleanPrice = this.cleanPriceString(event.newPrice);
         sectionLines.push(
           `🟢 <b>${escapeHtml(event.poolName)} • ${escapeHtml(blockName)}</b>\n` +
-          `💰 <code>$${escapeHtml(event.newPrice || "0")}/${currencyMonth}</code> | 🕒 <code>${escapeHtml(event.hoursUtc)}</code>\n` +
+          `💰 <code>$${escapeHtml(cleanPrice)}/${currencyMonth}</code> | 🕒 <code>${escapeHtml(event.hoursUtc)}</code>\n` +
           `🤖 ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
         );
 
         if (buttonCount < 3) {
-          const btnLabel = `⚡ ${event.poolSlug.toUpperCase()} (${blockName}) • $${event.newPrice || "0"}`;
+          const btnLabel = `⚡ ${event.poolSlug.toUpperCase()} (${blockName}) • $${cleanPrice}`;
           keyboard.url(btnLabel, checkoutUrl).row();
           buttonCount++;
         }
@@ -698,13 +760,14 @@ export class NotificationDispatcher {
         sectionLines.push(
           `🔒 <b>${escapeHtml(event.poolName)} • ${escapeHtml(blockName)}</b> — <i>${translate(lang, "common.status_sold_out")}</i>`
         );
+        if (buttonCount < 3) {
+          const btnLabel = `🔍 ${event.poolSlug.toUpperCase()}`;
+          keyboard.url(btnLabel, `https://cheapestinference.com/pools/${event.poolSlug}`).row();
+          buttonCount++;
+        }
       } else if (event.type === "MODEL_UPGRADE_EVENT") {
         const upgradeTitle =
-          lang === "uk"
-            ? "Оновлення моделей"
-            : lang === "ru"
-            ? "Обновление моделей"
-            : "Model Upgrade";
+          translate(lang, "alerts.bundle_title_models") || "Model Upgrade";
         sectionLines.push(
           `🚀 <b>${escapeHtml(event.poolName)} • ${upgradeTitle}</b>\n` +
           `🤖 ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
@@ -713,35 +776,44 @@ export class NotificationDispatcher {
         const deltaStr = event.slotPrice
           ? ` (${this.formatPriceDeltaBadge(event.slotPrice.priceDelta, event.slotPrice.percentageDelta, lang)})`
           : "";
+        const cleanOld = this.cleanPriceString(event.previousPrice);
+        const cleanNew = this.cleanPriceString(event.newPrice);
+        const hoursStr = event.hoursUtc ? ` | 🕒 <code>${escapeHtml(event.hoursUtc)}</code>` : "";
         sectionLines.push(
           `🏷 <b>${escapeHtml(event.poolName)} • ${escapeHtml(blockName)}</b>\n` +
-          `💰 <s>$${escapeHtml(event.previousPrice || "0")}</s> ➔ <b>$${escapeHtml(event.newPrice || "0")}/${currencyMonth}</b>${deltaStr}`
+          `💰 <s>$${escapeHtml(cleanOld)}</s> ➔ <b>$${escapeHtml(cleanNew)}/${currencyMonth}</b>${deltaStr}${hoursStr}`
         );
+        if (buttonCount < 3) {
+          const btnLabel = `🏷 ${event.poolSlug.toUpperCase()} (${blockName}) • $${cleanNew}`;
+          keyboard.url(btnLabel, checkoutUrl).row();
+          buttonCount++;
+        }
       } else if (event.type === "POOL_BASE_PRICE_CHANGED" || event.type === "PRICE_CHANGED") {
         const deltaStr = event.basePrice
           ? ` (${this.formatPriceDeltaBadge(event.basePrice.priceDelta, event.basePrice.percentageDelta, lang)})`
           : "";
+        const cleanOld = this.cleanPriceString(event.previousPrice);
+        const cleanNew = this.cleanPriceString(event.newPrice);
+        const tariffBadge = translate(lang, "alerts.bundle_title_base_price") || "Base Tariff";
         sectionLines.push(
-          `💰 <b>${escapeHtml(event.poolName)}</b>\n` +
-          `💵 <s>$${escapeHtml(event.previousPrice || "0")}</s> ➔ <b>$${escapeHtml(event.newPrice || "0")}/${currencyMonth}</b>${deltaStr}`
+          `💰 <b>${escapeHtml(event.poolName)} • ${tariffBadge}</b>\n` +
+          `💵 <s>$${escapeHtml(cleanOld)}</s> ➔ <b>$${escapeHtml(cleanNew)}/${currencyMonth}</b>${deltaStr}\n` +
+          `🤖 ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
         );
+        if (buttonCount < 3) {
+          const btnLabel = `💰 ${event.poolSlug.toUpperCase()} • $${cleanNew}`;
+          keyboard.url(btnLabel, `https://cheapestinference.com/pools/${event.poolSlug}`).row();
+          buttonCount++;
+        }
       } else if (event.type === "TIER_UPDATED_EVENT") {
         const tierTitle =
-          lang === "uk"
-            ? "Оновлення тарифу"
-            : lang === "ru"
-            ? "Обновление тарифа"
-            : "Tier Specification Updated";
+          translate(lang, "alerts.bundle_title_tier") || "Tier Specification Updated";
         sectionLines.push(
           `📝 <b>${escapeHtml(event.poolName)} • ${tierTitle}</b>`
         );
       } else if (event.type === "NEW_POOL_EVENT") {
         const newPoolTitle =
-          lang === "uk"
-            ? "Новий пул запущено"
-            : lang === "ru"
-            ? "Новый пул запущен"
-            : "New Pool Launched";
+          translate(lang, "alerts.bundle_title_new_pool") || "New Pool Launched";
         sectionLines.push(
           `✨ <b>${escapeHtml(event.poolName)} • ${newPoolTitle}</b>\n` +
           `🤖 ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
@@ -899,14 +971,8 @@ export class NotificationDispatcher {
     const uniqueIds = Array.from(new Set(this.blockedUsersBatch));
     this.blockedUsersBatch = [];
 
-    const deactivateMany = (this.userDao as any).db.transaction((ids: number[]) => {
-      for (const id of ids) {
-        this.userDao.deactivateUser(id);
-      }
-    });
-
     try {
-      deactivateMany(uniqueIds);
+      this.userDao.deactivateUsersBatch(uniqueIds);
       console.log(`🧹 [NotificationDispatcher] Deactivated ${uniqueIds.length} unique blocked users in DB transaction.`);
     } catch (e: any) {
       console.error("[NotificationDispatcher] Error persisting blocked users to DB:", e.message);

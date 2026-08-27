@@ -41,14 +41,20 @@ export class ModelSemanticMatcher {
     let versionMajor = 0;
     let versionMinor = 0;
 
+    let bestMatch: { family: string; match: RegExpMatchArray; index: number } | null = null;
     for (const p of this.FAMILY_PATTERNS) {
       const m = clean.match(p.regex);
-      if (m) {
-        family = p.family;
-        if (m[2]) {
-          versionStr = m[2].replace(/^[vkr]/i, "").replace(/[-_]/g, ".");
+      if (m && m.index !== undefined) {
+        if (!bestMatch || m.index < bestMatch.index) {
+          bestMatch = { family: p.family, match: m, index: m.index };
         }
-        break;
+      }
+    }
+
+    if (bestMatch) {
+      family = bestMatch.family;
+      if (bestMatch.match[2]) {
+        versionStr = bestMatch.match[2].replace(/^[vkr]/i, "").replace(/[-_]/g, ".");
       }
     }
 

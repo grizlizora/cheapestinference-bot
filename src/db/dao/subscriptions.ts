@@ -2,8 +2,6 @@ import Database from "better-sqlite3";
 import { SubscriberMatch, SubscriptionRecord } from "../../types/db.js";
 
 export class SubscriptionDAO {
-  private stmtFindSubscribers: Database.Statement;
-  private stmtGetUserSubs: Database.Statement;
   private stmtAddSub: Database.Statement;
   private stmtRemoveSub: Database.Statement;
   private stmtCountActiveSubs: Database.Statement;
@@ -14,28 +12,6 @@ export class SubscriptionDAO {
   private txToggleGlobal: (userId: number, newState: boolean, pools: Array<{ slug: string; blocks: string[] }>) => void;
 
   constructor(public readonly db: Database.Database) {
-    this.stmtFindSubscribers = db.prepare(`
-      SELECT DISTINCT u.telegram_id, u.language, u.is_muted
-      FROM subscriptions s
-      JOIN users u ON s.user_id = u.id
-      WHERE u.is_active = 1
-        AND (
-          (s.pool_slug = 'ALL' AND s.block_id = 'ALL')
-          OR (s.pool_slug = ? AND s.block_id = 'ALL')
-          OR (s.pool_slug = ? AND s.block_id = ?)
-          OR (? = 'ALL' AND s.pool_slug = ?)
-        )
-        AND (
-          (? = 'available' AND s.notify_on_available = 1 AND COALESCE(u.notify_available_global, 1) = 1)
-          OR (? = 'sold_out' AND s.notify_on_sold_out = 1 AND COALESCE(u.notify_sold_out_global, 0) = 1)
-          OR (? = 'models' AND s.notify_on_models = 1 AND COALESCE(u.notify_models_global, 1) = 1)
-          OR (? = 'prices' AND s.notify_on_prices = 1 AND COALESCE(u.notify_prices_global, 1) = 1)
-        )
-    `);
-
-    this.stmtGetUserSubs = db.prepare(`
-      SELECT * FROM subscriptions WHERE user_id = ?
-    `);
 
     this.stmtAddSub = db.prepare(`
       INSERT INTO subscriptions (
@@ -107,28 +83,6 @@ export class SubscriptionDAO {
         }
       }
     });
-  }
-
-  findSubscribersForSlot(
-    poolSlug: string,
-    blockId: string,
-    eventType: "available" | "sold_out" | "models" | "prices"
-  ): SubscriberMatch[] {
-    return this.stmtFindSubscribers.all(
-      poolSlug,
-      poolSlug,
-      blockId,
-      blockId,
-      poolSlug,
-      eventType,
-      eventType,
-      eventType,
-      eventType
-    ) as SubscriberMatch[];
-  }
-
-  getUserSubscriptions(userId: number): SubscriptionRecord[] {
-    return this.stmtGetUserSubs.all(userId) as SubscriptionRecord[];
   }
 
   hasSubscription(userId: number, poolSlug: string, blockId: string): boolean {

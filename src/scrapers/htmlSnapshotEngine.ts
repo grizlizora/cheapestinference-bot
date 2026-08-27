@@ -93,68 +93,22 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
       } catch {}
     }
 
-    // 4. Fallback: Cheerio DOM & Schema.org Extraction with Dynamic Discovery
+    // 4. Fallback: Cheerio DOM & Schema.org Extraction
     const $ = cheerio.load(res.body);
     const pools: PoolData[] = [];
 
-    const discoveredSlugs = new Set<string>();
-    $('a[href*="/pools/"], [data-testid*="pool-"]').each((_, el) => {
-      const href = $(el).attr("href") || "";
-      const testId = $(el).attr("data-testid") || "";
-      const match = href.match(/\/pools\/([\w-]+)/) || testId.match(/pool-(?:cta-)?([\w-]+)/);
-      if (match && match[1]) {
-        discoveredSlugs.add(match[1].toLowerCase());
-      }
+    // Attempt to extract structured schema.org or data attributes if present
+    $('script[type="application/ld+json"]').each((_, el) => {
+      try {
+        const json = JSON.parse($(el).text());
+        if (json && Array.isArray(json.itemListElement)) {
+          // Process structured microdata
+        }
+      } catch {}
     });
 
-    // Ensure baseline default slugs are included
-    discoveredSlugs.add("flagship");
-    discoveredSlugs.add("frontier");
-    discoveredSlugs.add("core");
-
-    for (const slug of discoveredSlugs) {
-      const poolCard = $(`[data-testid*="${slug}"], a[href*="/pools/${slug}"]`).closest("div");
-      const cardText = poolCard.text().toLowerCase();
-      const isSoldOut =
-        cardText.includes("sold out") ||
-        res.body.toLowerCase().includes(`${slug} sold out`);
-
-      const defaultName =
-        slug === "flagship"
-          ? "Flagship Pool — Kimi K3, Qwen3.8 Max"
-          : slug === "frontier"
-          ? "Frontier Pool — GLM 5.2, MiniMax M3"
-          : slug === "core"
-          ? "Core Pool — DeepSeek V4 Flash, MiMo v2.5"
-          : `${slug.toUpperCase()} Pool`;
-
-      const defaultModels =
-        slug === "flagship"
-          ? ["kimi-k3", "qwen3.8-max"]
-          : slug === "frontier"
-          ? ["glm-5.2", "minimax-m3"]
-          : slug === "core"
-          ? ["deepseek-v4-flash", "mimo-v2.5"]
-          : [slug];
-
-      const minPrice = slug === "flagship" ? "149.00" : slug === "frontier" ? "59.00" : "16.49";
-
-      pools.push({
-        id: slug,
-        slug: slug,
-        modelId: slug,
-        modelName: defaultName,
-        models: defaultModels,
-        description: `Inference pool for ${defaultModels.join(", ")}`,
-        status: "active",
-        minPricePerDay: minPrice,
-        annualDiscount: 0.15,
-        blocks: [
-          { block: "asia", hoursUtc: "00:00-08:00 UTC", pricePerMonth: minPrice, status: isSoldOut ? "sold-out" : "limited" },
-          { block: "europe", hoursUtc: "08:00-16:00 UTC", pricePerMonth: minPrice, status: isSoldOut ? "sold-out" : "limited" },
-          { block: "americas", hoursUtc: "16:00-24:00 UTC", pricePerMonth: minPrice, status: isSoldOut ? "sold-out" : "limited" },
-        ],
-      });
+    if (pools.length === 0) {
+      throw new Error("Unable to extract valid pool data from HTML response (RSC flight stream and SSR snapshots unavailable)");
     }
 
     return {
@@ -169,31 +123,51 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
   }
 
   public extractRscPayload(html: string): PoolData[] | null {
-    const chunkRegex =
-      /(?:(?:self|window|globalThis)\.__next_f|(?:\((?:self|window|globalThis)\.__next_f=(?:self|window|globalThis)\.__next_f\|\|\[\]\)))\.push\(\[(\d+),\s*([\s\S]*?)\]\)/g;
-    let match: RegExpExecArray | null;
     let combinedFlight = "";
+    const pushPrefixRegex = /(?:(?:self|window|globalThis)\.__next_f|(?:\((?:self|window|globalThis)\.__next_f=(?:self|window|globalThis)\.__next_f\|\|\[\]\)))\.push\(\[\d+,\s*/g;
+    let match: RegExpExecArray | null;
 
-    while ((match = chunkRegex.exec(html)) !== null) {
-      const rawArg = match[2].trim();
-      try {
-        const decodedChunk = JSON.parse(rawArg);
-        if (typeof decodedChunk === "string") {
-          combinedFlight += decodedChunk;
+    while ((match = pushPrefixRegex.exec(html)) !== null) {
+      const startIndex = match.index + match[0].length;
+      const firstChar = html[startIndex];
+
+      if (firstChar === '"') {
+        let inEscape = false;
+        let endIndex = -1;
+        for (let i = startIndex + 1; i < html.length; i++) {
+          if (inEscape) {
+            inEscape = false;
+            continue;
+          }
+          if (html[i] === "\\") {
+            inEscape = true;
+            continue;
+          }
+          if (html[i] === '"') {
+            endIndex = i;
+            break;
+          }
         }
-      } catch {
-        if (rawArg.startsWith('"') && rawArg.endsWith('"')) {
-          const raw = rawArg.slice(1, -1);
-          combinedFlight += raw.replace(/\\([\\"/nrtbf])/g, (_, char) => {
-            switch (char) {
-              case "n": return "\n";
-              case "r": return "\r";
-              case "t": return "\t";
-              case '"': return '"';
-              case "\\": return "\\";
-              default: return char;
+        if (endIndex !== -1) {
+          const stringLiteral = html.substring(startIndex, endIndex + 1);
+          try {
+            const decoded = JSON.parse(stringLiteral);
+            if (typeof decoded === "string") {
+              combinedFlight += decoded;
             }
-          });
+          } catch {
+            const raw = stringLiteral.slice(1, -1);
+            combinedFlight += raw.replace(/\\([\\"/nrtbf])/g, (_, char) => {
+              switch (char) {
+                case "n": return "\n";
+                case "r": return "\r";
+                case "t": return "\t";
+                case '"': return '"';
+                case "\\": return "\\";
+                default: return char;
+              }
+            });
+          }
         }
       }
     }

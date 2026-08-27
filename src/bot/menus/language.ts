@@ -3,15 +3,21 @@ import { BotContext } from "../../types/context.js";
 import { UserDAO } from "../../db/dao/users.js";
 import { PoolStateDAO } from "../../db/dao/poolState.js";
 import { SlotHistoryDAO } from "../../db/dao/slotHistory.js";
+import { SubscriptionDAO } from "../../db/dao/subscriptions.js";
 import { SupportedLanguage } from "../../types/db.js";
 import { SubscriberInvertedIndex } from "../notifier/subscriberIndex.js";
 import { renderDashboardText, safeEditMessageText } from "./mainDashboard.js";
+import { renderPoolDetailText } from "./poolDetail.js";
+import { renderSubscriptionsText } from "./subscriptions.js";
+import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
 
 export function createLanguageMenu(
   userDao: UserDAO,
   poolStateDao: PoolStateDAO,
   invertedIndex: SubscriberInvertedIndex,
-  historyDao?: SlotHistoryDAO
+  historyDao?: SlotHistoryDAO,
+  scraper?: ScraperOrchestrator,
+  subDao?: SubscriptionDAO
 ) {
   const switchLanguage = async (ctx: BotContext, lang: SupportedLanguage, toast: string) => {
     userDao.setLanguage(ctx.from!.id, lang);
@@ -19,8 +25,23 @@ export function createLanguageMenu(
     ctx.lang = lang;
     invertedIndex.updateUserPreferences(ctx.from!.id, { language: lang });
 
-    await ctx.answerCallbackQuery(toast);
-    await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao));
+    await ctx.answerCallbackQuery(toast).catch(() => {});
+
+    const pendingDeepLink = (ctx.session as any)?.pendingDeepLink;
+    if (pendingDeepLink && typeof pendingDeepLink === "string") {
+      delete (ctx.session as any).pendingDeepLink;
+      if (pendingDeepLink.startsWith("pool_")) {
+        ctx.session.tempPoolSlug = pendingDeepLink.replace("pool_", "");
+        await safeEditMessageText(ctx, renderPoolDetailText(ctx, poolStateDao, historyDao, scraper));
+        return ctx.menu.nav("pool-detail-menu");
+      }
+      if ((pendingDeepLink === "alerts" || pendingDeepLink === "subscriptions") && subDao) {
+        await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
+        return ctx.menu.nav("subscriptions-menu");
+      }
+    }
+
+    await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao, scraper));
     return ctx.menu.nav("main-dashboard-menu");
   };
 
@@ -40,8 +61,8 @@ export function createLanguageMenu(
     .text(
       (ctx) => ctx.t("common.back"),
       async (ctx) => {
-        await ctx.answerCallbackQuery();
-        await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao));
+        await ctx.answerCallbackQuery().catch(() => {});
+        await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao, scraper));
         return ctx.menu.nav("main-dashboard-menu");
       }
     );

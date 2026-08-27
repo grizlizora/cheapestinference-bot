@@ -26,6 +26,13 @@ export class SanityGuard {
         this.consecutiveErrors++;
         throw new Error(`SanityGuard: Malformed pool record for slug: ${pool.slug}`);
       }
+
+      for (const block of pool.blocks) {
+        if (!block.block || !block.status) {
+          this.consecutiveErrors++;
+          throw new Error(`SanityGuard: Invalid block in pool ${pool.slug}`);
+        }
+      }
     }
 
     this.consecutiveErrors = 0;

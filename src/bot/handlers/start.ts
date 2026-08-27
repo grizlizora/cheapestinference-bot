@@ -7,6 +7,8 @@ import { renderDashboardText } from "../menus/mainDashboard.js";
 import { renderPoolDetailText } from "../menus/poolDetail.js";
 import { renderSubscriptionsText } from "../menus/subscriptions.js";
 
+import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
+
 export function createStartHandler(
   userDao: UserDAO,
   poolStateDao: PoolStateDAO,
@@ -15,12 +17,17 @@ export function createStartHandler(
   historyDao?: SlotHistoryDAO,
   subDao?: SubscriptionDAO,
   subscriptionsMenu?: any,
-  poolDetailMenu?: any
+  poolDetailMenu?: any,
+  scraper?: ScraperOrchestrator
 ) {
   return async (ctx: BotContext) => {
     if (!ctx.from) return;
 
+    const match = (ctx as any).match;
     if (ctx.isNewUser) {
+      if (match && typeof match === "string") {
+        (ctx.session as any).pendingDeepLink = match;
+      }
       await ctx.reply(ctx.t("onboarding.welcome_title"), {
         reply_markup: languageMenu,
         parse_mode: "HTML",
@@ -28,13 +35,11 @@ export function createStartHandler(
       });
       return;
     }
-
-    const match = (ctx as any).match;
     if (match && typeof match === "string") {
       if (match.startsWith("pool_") && poolDetailMenu) {
         const slug = match.replace("pool_", "");
         ctx.session.tempPoolSlug = slug;
-        await ctx.reply(renderPoolDetailText(ctx, poolStateDao, historyDao), {
+        await ctx.reply(renderPoolDetailText(ctx, poolStateDao, historyDao, scraper), {
           reply_markup: poolDetailMenu,
           parse_mode: "HTML",
           link_preview_options: { is_disabled: true },
@@ -51,7 +56,7 @@ export function createStartHandler(
       }
     }
 
-    await ctx.reply(renderDashboardText(ctx, poolStateDao, historyDao), {
+    await ctx.reply(renderDashboardText(ctx, poolStateDao, historyDao, scraper), {
       reply_markup: mainDashboardMenu,
       parse_mode: "HTML",
       link_preview_options: { is_disabled: true },

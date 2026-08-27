@@ -135,4 +135,86 @@ describe("SlotDiffEngine", () => {
     const snapshotAfterK2 = engine.getSnapshot();
     expect(snapshotAfterK2?.data.length).toBe(0);
   });
+
+  it("should emit ONLY SLOT_PRICE_CHANGED and suppress POOL_BASE_PRICE_CHANGED when a single slot changes price along with minPricePerDay", () => {
+    engine.processSnapshot(sampleSnapshot);
+
+    // Americas drops from 149.00 to 135.00, causing minPricePerDay to also drop to 135.00
+    const updatedSnapshot: PoolsSnapshot = JSON.parse(JSON.stringify(sampleSnapshot));
+    updatedSnapshot.data[0].minPricePerDay = "135.00";
+    updatedSnapshot.data[0].blocks[2].pricePerMonth = "135.00";
+
+    const events = engine.processSnapshot(updatedSnapshot);
+    expect(events).toHaveLength(1);
+    expect(events[0].type).toBe("SLOT_PRICE_CHANGED");
+    expect(events[0].block).toBe("americas");
+    expect(events[0].slotPrice?.priceDelta).toBe(-14.00);
+    expect(events[0].slotPrice?.isDiscount).toBe(true);
+    expect(events.some((e) => e.type === "POOL_BASE_PRICE_CHANGED")).toBe(false);
+  });
+
+  it("should emit 1x POOL_BASE_PRICE_CHANGED and suppress individual slot alerts when ALL slots change uniformly", () => {
+    engine.processSnapshot(sampleSnapshot);
+
+    const uniformDropSnapshot: PoolsSnapshot = JSON.parse(JSON.stringify(sampleSnapshot));
+    uniformDropSnapshot.data[0].minPricePerDay = "120.00";
+    for (const b of uniformDropSnapshot.data[0].blocks) {
+      b.pricePerMonth = "120.00";
+    }
+
+    const events = engine.processSnapshot(uniformDropSnapshot);
+    expect(events).toHaveLength(1);
+    expect(events[0].type).toBe("POOL_BASE_PRICE_CHANGED");
+    expect(events[0].block).toBe("ALL");
+    expect(events[0].basePrice?.newMinPrice).toBe("120.00");
+    expect(events.some((e) => e.type === "SLOT_PRICE_CHANGED")).toBe(false);
+  });
+
+  it("should hydrate baseline from SQLite via bootstrapFromDao without emitting false alerts", () => {
+    const freshEngine = new SlotDiffEngine();
+    freshEngine.bootstrapFromDao([
+      {
+        pool_slug: "flagship",
+        pool_name: "Flagship Pool — Kimi K3, Qwen3.8 Max",
+        models_json: JSON.stringify(["kimi-k3", "qwen3.8-max"]),
+        block_id: "asia",
+        status: "sold-out",
+        hours_utc: "00:00-08:00 UTC",
+        price_month: "155.00",
+        min_price_day: "149.00",
+        annual_discount: 0.15,
+        description: "Flagship tier",
+      },
+      {
+        pool_slug: "flagship",
+        pool_name: "Flagship Pool — Kimi K3, Qwen3.8 Max",
+        models_json: JSON.stringify(["kimi-k3", "qwen3.8-max"]),
+        block_id: "europe",
+        status: "sold-out",
+        hours_utc: "08:00-16:00 UTC",
+        price_month: "165.00",
+        min_price_day: "149.00",
+        annual_discount: 0.15,
+        description: "Flagship tier",
+      },
+      {
+        pool_slug: "flagship",
+        pool_name: "Flagship Pool — Kimi K3, Qwen3.8 Max",
+        models_json: JSON.stringify(["kimi-k3", "qwen3.8-max"]),
+        block_id: "americas",
+        status: "sold-out",
+        hours_utc: "16:00-24:00 UTC",
+        price_month: "149.00",
+        min_price_day: "149.00",
+        annual_discount: 0.15,
+        description: "Flagship tier",
+      },
+    ]);
+
+    expect(freshEngine.isReady()).toBe(true);
+
+    // Now process an identical snapshot: zero events should be emitted
+    const events = freshEngine.processSnapshot(sampleSnapshot);
+    expect(events).toHaveLength(0);
+  });
 });

@@ -32,6 +32,9 @@ export class ScraperOrchestrator extends EventEmitter {
   private apiConsecutiveErrors = 0;
   private apiCircuitOpenUntil = 0;
 
+  // Singleflight coalescing promise
+  private inFlightPollPromise: Promise<DiffEvent[]> | null = null;
+
   constructor(
     private readonly apiEngine: JsonApiEngine,
     private readonly htmlEngine: HtmlSnapshotEngine,
@@ -59,6 +62,42 @@ export class ScraperOrchestrator extends EventEmitter {
     console.log("🛑 [ScraperOrchestrator] Scraper engine stopped.");
   }
 
+  /**
+   * On-demand forced refresh with Singleflight coalescing and rate-limit guard.
+   * Ensures instant live feedback for users clicking "🔄 Оновити".
+   */
+  public async forceRefresh(maxAgeMs = 3000): Promise<{ refreshed: boolean; latencyMs: number; source: string }> {
+    const now = Date.now();
+    // 1. Guard against button spam: return cached telemetry if freshly scraped within maxAgeMs
+    if (now - this.lastScrapeTimestamp < maxAgeMs && this.consecutiveFailures === 0 && this.lastScrapeTimestamp > 0) {
+      return {
+        refreshed: false,
+        latencyMs: this.lastScrapeLatencyMs,
+        source: this.lastSource,
+      };
+    }
+
+    // 2. Execute live scrape coalesced through Singleflight
+    const shouldBypassEtag = now - this.lastScrapeTimestamp > 10_000;
+    await this.executeSingleflightPoll(shouldBypassEtag);
+
+    return {
+      refreshed: this.consecutiveFailures === 0,
+      latencyMs: this.lastScrapeLatencyMs,
+      source: this.lastSource,
+    };
+  }
+
+  public executeSingleflightPoll(bypassEtag = false): Promise<DiffEvent[]> {
+    if (this.inFlightPollPromise) {
+      return this.inFlightPollPromise;
+    }
+    this.inFlightPollPromise = this.poll(bypassEtag).finally(() => {
+      this.inFlightPollPromise = null;
+    });
+    return this.inFlightPollPromise;
+  }
+
   private calculateNextIntervalMs(): number {
     if (this.consecutiveFailures === 0) {
       const range = this.config.maxIntervalSec - this.config.minIntervalSec;
@@ -78,7 +117,7 @@ export class ScraperOrchestrator extends EventEmitter {
 
     this.timer = setTimeout(async () => {
       try {
-        await this.poll();
+        await this.executeSingleflightPoll(false);
       } catch (err: any) {
         this.emit("error", err);
       } finally {
@@ -89,8 +128,8 @@ export class ScraperOrchestrator extends EventEmitter {
     }, interval);
   }
 
-  public async poll(): Promise<DiffEvent[]> {
-    if (this.isPolling) {
+  public async poll(bypassEtag = false): Promise<DiffEvent[]> {
+    if (this.isPolling && !bypassEtag) {
       return [];
     }
 
@@ -99,7 +138,7 @@ export class ScraperOrchestrator extends EventEmitter {
     const startTime = Date.now();
 
     try {
-      const result = await this.fetchFromEngines();
+      const result = await this.fetchFromEngines(bypassEtag);
 
       // Handle HTTP 304 Cache Not Modified
       if (!result.modified || !result.snapshot) {
@@ -107,6 +146,9 @@ export class ScraperOrchestrator extends EventEmitter {
         this.lastScrapeTimestamp = Date.now();
         this.lastScrapeLatencyMs = result.latencyMs;
         this.lastSource = result.source;
+
+        // Touch verified in SQLite so UI knows verified timestamp
+        this.poolStateDao.touchVerified(result.source, result.latencyMs);
 
         this.emit("heartbeat", {
           source: result.source,
@@ -138,14 +180,12 @@ export class ScraperOrchestrator extends EventEmitter {
         this.emit("diff_events", events);
       }
 
-      // 2. Persist state to SQLite asynchronously without blocking alert dispatch
-      queueMicrotask(() => {
-        try {
-          this.poolStateDao.saveSnapshot(result.snapshot!);
-        } catch (e: any) {
-          this.emit("warn", `Failed to save snapshot to SQLite: ${e.message}`);
-        }
-      });
+      // 2. Synchronously persist state to SQLite before poll resolves to eliminate UI read races
+      try {
+        this.poolStateDao.saveSnapshot(result.snapshot, result.source, result.latencyMs);
+      } catch (e: any) {
+        this.emit("warn", `Failed to save snapshot to SQLite: ${e.message}`);
+      }
 
       return events;
     } catch (err: any) {
@@ -159,15 +199,19 @@ export class ScraperOrchestrator extends EventEmitter {
     }
   }
 
-  private async fetchFromEngines(): Promise<ScrapeResult> {
+  private async fetchFromEngines(bypassEtag = false): Promise<ScrapeResult> {
     const now = Date.now();
     const isApiCircuitOpen = this.apiConsecutiveErrors >= 2 && now < this.apiCircuitOpenUntil;
+    const effectiveApiEtag = bypassEtag ? undefined : this.apiEtag;
+    const effectiveApiLastModified = bypassEtag ? undefined : this.apiLastModified;
+    const effectiveHtmlEtag = bypassEtag ? undefined : this.htmlEtag;
+    const effectiveHtmlLastModified = bypassEtag ? undefined : this.htmlLastModified;
 
-    // If API Circuit is OPEN, route directly to HTML engine without incurring 3.5s timeout
+    // If API Circuit is OPEN, route directly to HTML engine without incurring timeout
     if (isApiCircuitOpen) {
       const htmlResult = await this.htmlEngine.fetch(
-        this.htmlEtag,
-        this.htmlLastModified,
+        effectiveHtmlEtag,
+        effectiveHtmlLastModified,
         5_000
       );
       if (htmlResult.etag) this.htmlEtag = htmlResult.etag;
@@ -177,8 +221,8 @@ export class ScraperOrchestrator extends EventEmitter {
 
     try {
       const apiResult = await this.apiEngine.fetch(
-        this.apiEtag,
-        this.apiLastModified,
+        effectiveApiEtag,
+        effectiveApiLastModified,
         3_500 // Fast 3.5s timeout for ultra-fast failover
       );
       this.apiConsecutiveErrors = 0;
@@ -196,8 +240,8 @@ export class ScraperOrchestrator extends EventEmitter {
       }
 
       const htmlResult = await this.htmlEngine.fetch(
-        this.htmlEtag,
-        this.htmlLastModified,
+        effectiveHtmlEtag,
+        effectiveHtmlLastModified,
         5_000
       );
       if (htmlResult.etag) this.htmlEtag = htmlResult.etag;

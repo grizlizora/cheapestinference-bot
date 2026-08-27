@@ -7,6 +7,8 @@ import { SlotHistoryDAO } from "../../db/dao/slotHistory.js";
 import { SubscriberInvertedIndex } from "../notifier/subscriberIndex.js";
 import { renderDashboardText, safeEditMessageText } from "./mainDashboard.js";
 
+import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
+
 const DEFAULT_BLOCK_IDS = ["asia", "europe", "americas"];
 
 export function createSubscriptionsMenu(
@@ -14,10 +16,11 @@ export function createSubscriptionsMenu(
   userDao: UserDAO,
   poolStateDao: PoolStateDAO,
   invertedIndex: SubscriberInvertedIndex,
-  historyDao?: SlotHistoryDAO
+  historyDao?: SlotHistoryDAO,
+  scraper?: ScraperOrchestrator
 ) {
   return new Menu<BotContext>("subscriptions-menu")
-    // Category 1: Available Slots
+    // Row 1: Available Slots & Sold Out (2x2 Grid)
     .text(
       (ctx) =>
         (ctx.user.notify_available_global ?? 1) === 1
@@ -34,15 +37,13 @@ export function createSubscriptionsMenu(
           val === 1
             ? ctx.t("subscriptions.toast_avail_on")
             : ctx.t("subscriptions.toast_avail_off");
-        await ctx.answerCallbackQuery(toast);
+        await ctx.answerCallbackQuery(toast).catch(() => {});
         await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
         try {
           ctx.menu.update();
         } catch {}
       }
     )
-    .row()
-    // Category 2: Sold Out
     .text(
       (ctx) =>
         (ctx.user.notify_sold_out_global ?? 0) === 1
@@ -59,7 +60,7 @@ export function createSubscriptionsMenu(
           val === 1
             ? ctx.t("subscriptions.toast_sold_on")
             : ctx.t("subscriptions.toast_sold_off");
-        await ctx.answerCallbackQuery(toast);
+        await ctx.answerCallbackQuery(toast).catch(() => {});
         await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
         try {
           ctx.menu.update();
@@ -67,7 +68,7 @@ export function createSubscriptionsMenu(
       }
     )
     .row()
-    // Category 3: Model Updates
+    // Row 2: Model Updates & Price Changes (2x2 Grid)
     .text(
       (ctx) =>
         (ctx.user.notify_models_global ?? 1) === 1
@@ -84,15 +85,13 @@ export function createSubscriptionsMenu(
           val === 1
             ? ctx.t("subscriptions.toast_models_on")
             : ctx.t("subscriptions.toast_models_off");
-        await ctx.answerCallbackQuery(toast);
+        await ctx.answerCallbackQuery(toast).catch(() => {});
         await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
         try {
           ctx.menu.update();
         } catch {}
       }
     )
-    .row()
-    // Category 4: Price Changes
     .text(
       (ctx) =>
         (ctx.user.notify_prices_global ?? 1) === 1
@@ -109,7 +108,7 @@ export function createSubscriptionsMenu(
           val === 1
             ? ctx.t("subscriptions.toast_prices_on")
             : ctx.t("subscriptions.toast_prices_off");
-        await ctx.answerCallbackQuery(toast);
+        await ctx.answerCallbackQuery(toast).catch(() => {});
         await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
         try {
           ctx.menu.update();
@@ -166,7 +165,7 @@ export function createSubscriptionsMenu(
         const toast = active
           ? ctx.t("subscriptions.toast_global_on")
           : ctx.t("subscriptions.toast_global_off");
-        await ctx.answerCallbackQuery(toast);
+        await ctx.answerCallbackQuery(toast).catch(() => {});
         await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
         try {
           ctx.menu.update();
@@ -191,7 +190,7 @@ export function createSubscriptionsMenu(
           newMuted === 1
             ? ctx.t("subscriptions.toast_sound_muted")
             : ctx.t("subscriptions.toast_sound_enabled");
-        await ctx.answerCallbackQuery(toast);
+        await ctx.answerCallbackQuery(toast).catch(() => {});
         await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
         try {
           ctx.menu.update();
@@ -258,7 +257,7 @@ export function createSubscriptionsMenu(
               const toast = active
                 ? c.t("subscriptions.toast_pool_on", { pool: pool.name })
                 : c.t("subscriptions.toast_pool_off", { pool: pool.name });
-              await c.answerCallbackQuery(toast);
+              await c.answerCallbackQuery(toast).catch(() => {});
               await safeEditMessageText(c, renderSubscriptionsText(c, subDao));
               try {
                 c.menu.update();
@@ -308,7 +307,7 @@ export function createSubscriptionsMenu(
                 const toast = active
                   ? c.t("subscriptions.toast_slot_on", { pool: pool.name, block: blockTitle })
                   : c.t("subscriptions.toast_slot_off", { pool: pool.name, block: blockTitle });
-                await c.answerCallbackQuery(toast);
+                await c.answerCallbackQuery(toast).catch(() => {});
                 await safeEditMessageText(c, renderSubscriptionsText(c, subDao));
                 try {
                   c.menu.update();
@@ -322,8 +321,8 @@ export function createSubscriptionsMenu(
     .text(
       (ctx) => ctx.t("common.back"),
       async (ctx) => {
-        await ctx.answerCallbackQuery();
-        await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao));
+        await ctx.answerCallbackQuery().catch(() => {});
+        await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao, scraper));
         return ctx.menu.nav("main-dashboard-menu");
       }
     );

@@ -126,10 +126,10 @@ export class ProxyPool {
 
     if (entry.consecutiveErrors >= 3) {
       if (entry.type === "tor" && this.torManager) {
-        console.warn("🧅 [ProxyPool] Tor repeated failure. Rotating stream isolation and requesting newnym...");
+        console.warn("🧅 [ProxyPool] Tor repeated failure (>=3). Quarantining Tor for 2m to enable direct/external fallback...");
+        entry.bannedUntil = Date.now() + 120_000;
         this.httpClient?.invalidateDispatcher(entry.url);
         entry.url = this.torManager.rotateStreamIsolation();
-        entry.consecutiveErrors = 0;
         void this.torManager.renewCircuit().catch(() => {});
       } else {
         entry.bannedUntil = Date.now() + 180_000; // 3 min quarantine

@@ -15,15 +15,17 @@
     "help": "ℹ️ Довідка",
     "btn_contact_author": "👨‍💻 Написати автору (@grizlizora)",
     "open_site": "🌐 Відкрити CheapestInference",
+    "custom_models": "Кастомні моделі",
     "unknown": "Невідомо"
   },
   "onboarding": {
     "welcome_title": "👋 <b>Ласкаво просимо до CheapestInference Slot Monitor!</b>\n\nЦей бот у реальному часі відстежує появу та зникнення вільних слотів у тарифах <b>Flagship, Frontier та Core</b> на сайті <a href=\"https://cheapestinference.com/pools\">cheapestinference.com</a>.\n\nБудь ласка, оберіть зручну мову для продовження:",
+    "change_language_prompt": "🌐 <b>Зміна мови інтерфейсу</b>\n\nОберіть зручну мову для роботи з ботом:",
     "language_selected": "✅ Мову встановлено: <b>Українська 🇺🇦</b>"
   },
   "menu": {
     "dashboard_title": "📊 <b>CheapestInference — Моніторинг слотів</b>\n\nАктуальний стан тарифів та регіональних блоків:\n\n{pool_summaries}\n\n🕒 <i>Останнє оновлення: {updated_at}</i>",
-    "pool_summary_card": "📦 <b>{pool_name}</b>\n• Статус: {status_badge} <i>({available_count}/{total_blocks} блоків вільно)</i>\n• Моделі: <code>{models}</code>\n• Вартість: від <b>${min_price}/міс</b>\n🔗 <a href=\"{url}\">Сторінка тарифу на сайті</a>",
+    "pool_summary_card": "📦 <b>{pool_name}</b>\n• Статус: {status_badge} <i>({available_count}/{total_blocks} блоків вільно)</i>\n• Моделі: <code>{models}</code>\n• Базовий тариф: від <b>${min_price}/міс</b>\n🔗 <a href=\"{url}\">Сторінка тарифу на сайті</a>",
     "loading_data": "⏳ <i>Завантаження даних із сайту...</i>",
     "btn_flagship": "🚀 Flagship Пул",
     "btn_frontier": "⚡ Frontier Пул",
@@ -34,7 +36,7 @@
     "btn_help": "ℹ️ Інструкція"
   },
   "pool_detail": {
-    "title": "🏷 <b>{pool_name}</b>\n\n📝 <b>Опис:</b>\n<i>{description}</i>\n\n🤖 <b>Включені моделі (безліміт):</b>\n{models_list}\n\n💰 <b>Вартість:</b>\n• Від <b>${min_price}/міс</b> (~${min_price_day}/день)\n• Знижка при оплаті за рік: <b>{annual_discount}%</b>\n\n🕒 <b>Регіональні 8-годинні блоки (UTC):</b>\n{blocks_list}\n\n🔗 <b>Офіційне посилання:</b> <a href=\"{url}\">{url}</a>",
+    "title": "🏷 <b>{pool_name}</b>\n\n📝 <b>Опис:</b>\n<i>{description}</i>\n\n🤖 <b>Включені моделі (безліміт):</b>\n{models_list}\n\n💰 <b>Вартість:</b>\n• Базовий тариф: від <b>${min_price}/міс</b> (~${min_price_day}/день)\n• Знижка при оплаті за рік: <b>{annual_discount}%</b>\n\n🕒 <b>Регіональні 8-годинні блоки (UTC):</b>\n{blocks_list}\n\n🔗 <b>Офіційне посилання:</b> <a href=\"{url}\">{url}</a>",
     "no_data": "⚠️ Дані для <b>{pool}</b> ще завантажуються. Спробуйте оновити за мить.",
     "model_item": "  • <code>{model_name}</code>",
     "block_row": "{block_icon} <b>{block_name}</b> ({hours_utc}):\n   {status_badge} — <b>${price}/міс</b>",
@@ -92,9 +94,9 @@
     "price_changed_header": "{trend_icon} <b>ЗМІНА ЦІНИ ТАРИФУ • {pool_name}</b>",
     "price_changed_body": "🌍 <b>Регіон:</b> {block_name}\n💰 <b>Тариф:</b> <s>${old_price}</s> ➔ <b>${new_price}/{currency_month}</b>\n{delta_badge}\n\n💡 <i>Зафіксувати ціну можна за посиланням нижче:</i>",
     "slot_price_changed_header": "{trend_icon} <b>ЗМІНА ЦІНИ СЛОТА • {pool_name}</b>",
-    "slot_price_changed_body": "🌍 <b>Регіон:</b> {block_name} <code>({hours_utc})</code>\n💰 <b>Тариф:</b> <s>${old_price}</s> ➔ <b>${new_price}/{currency_month}</b>\n{delta_badge}\n\n💡 <i>Зафіксувати ціну можна за посиланням нижче:</i>",
-    "pool_base_price_header": "{trend_icon} <b>ЗМІНА БАЗОВОЇ ЦІНИ • {pool_name}</b>",
-    "pool_base_price_body": "💰 <b>Базова вартість:</b> <s>${old_price}</s> ➔ <b>${new_price}/{currency_month}</b>\n{delta_badge}\n🤖 <b>Моделі:</b> {models}",
+    "slot_price_changed_body": "🌍 <b>Регіон:</b> {block_name} <code>({hours_utc})</code>\n💰 <b>Ціна слота:</b> <s>${old_price}</s> ➔ <b>${new_price}/{currency_month}</b>\n{delta_badge}\n\n💡 <i>Зафіксувати ціну можна за посиланням нижче:</i>",
+    "pool_base_price_header": "{trend_icon} <b>ЗМІНА БАЗОВОГО ТАРИФУ • {pool_name}</b>",
+    "pool_base_price_body": "💰 <b>Базовий тариф пулу:</b> <s>${old_price}</s> ➔ <b>${new_price}/{currency_month}</b>\n{delta_badge}\n🤖 <b>Моделі:</b> {models}\n\n⚡ <i>Ціна поширюється на всі нові підписки цього тарифу!</i>",
     "price_discount_badge": "🟢 <b>Знижка: -${delta}/{currency_month} (-{percentage}%) 🔥</b>",
     "price_increase_badge": "🔴 <b>Підвищення: +${delta}/{currency_month} (+{percentage}%)</b>",
     "model_upgrade_header": "🚀 <b>ОНОВЛЕННЯ МОДЕЛЕЙ • {pool_name}</b>",
@@ -106,12 +108,18 @@
     "tier_updated_body": "Змінено параметри тарифу:\n\n{tier_diff_block}\n\n🕒 <b>Час:</b> <code>{timestamp} UTC</code>",
     "tier_discount_change": "🏷️ <b>Річна знижка:</b> <s>{old_discount}%</s> ➔ <b>{new_discount}%</b>",
     "tier_desc_change": "📄 <b>Оновлені умови:</b> <i>{new_description}</i>",
+    "tier_infra_change": "⚙️ <b>Інфраструктура:</b> <code>{new_infra}</code>",
+    "tier_prov_change": "⚡ <b>Тип видачі:</b> {provisioning}",
     "catalog_updated_header": "🆕 <b>ОНОВЛЕННЯ МОДЕЛЕЙ • {pool_name}</b>",
     "catalog_updated_body": "У тарифі оновлено список моделей:\n\n🤖 <b>Актуальні моделі:</b>\n{models}",
     "new_pool_header": "✨ <b>НОВИЙ ТАРИФНИЙ ПУЛ • {pool_name}</b>",
     "new_pool_body": "На платформі CheapestInference запущено новий пул!\n\n🤖 <b>Моделі:</b> {models}\n💰 <b>Вартість:</b> від <code>${min_price}/{currency_month}</code>\n📄 <b>Опис:</b> <i>{description}</i>\n\n⚡ <i>Пул автоматично підключено до моніторингу та меню сповіщень!</i>",
     "analytics_duration_tip": "\n\n📊 <i>Статистика: зазвичай цей слот розбирають за {duration}!</i>",
     "batch_title": "⚡ <b>CheapestInference — Оновлення слотів ({count})</b>",
+    "bundle_title_models": "Оновлення моделей",
+    "bundle_title_base_price": "Базовий тариф",
+    "bundle_title_tier": "Оновлення тарифу",
+    "bundle_title_new_pool": "Новий пул запущено",
     "batch_price_update": "🏷️ Зміна ціни",
     "btn_claim_slot": "🚀 Оформити слот на сайті",
     "btn_claim_slot_block": "⚡ Забрати ({block_name}) • ${price}/{currency_month}",
@@ -128,7 +136,7 @@
     "tip_stable_historical": "⏱ <i>Середній час у наявності: {duration}.</i>"
   },
   "admin": {
-    "stats_title": "📊 <b>Панель адміністратора & Телеметрія</b>\n\n🟢 <b>Статус системи:</b> {status}\n⏱ <b>Аптайм:</b> {uptime}\n\n👥 <b>Користувачі:</b>\n• Всього зареєстровано: <b>{total_users}</b>\n• Активних спостерігачів: <b>{active_users}</b>\n• Заблокували бота: <b>{blocked_users}</b>\n• Активних правил підписок: <b>{active_subscriptions}</b>\n\n🕷 <b>Скрейпер & Anti-Ban:</b>\n• Останнє опитування: <b>{last_scrape_ago}с тому</b> (Затримка: {latency}мс)\n• Джерело даних: <code>{source}</code>\n• Помилок поспіль: <b>{consecutive_failures}</b>\n• Режим Tor / Проксі: <b>{proxy_status}</b>\n\n💾 <b>Пам'ять процесу:</b> <b>{memory_mb} MB</b>\n🔔 <b>Сповіщення про нових користувачів:</b> <b>{new_users_status}</b>",
+    "stats_title": "📊 <b>Панель адміністратора & Телеметрія</b>\n\n🟢 <b>Статус системи:</b> {status}\n⏱ <b>Аптайм:</b> {uptime}\n\n👥 <b>Користувачі:</b>\n• Всього зареєстровано: <b>{total_users}</b>\n• Активних спостерігачів: <b>{active_users}</b>\n• Заблокували бота: <b>{blocked_users}</b>\n• Активних правил підписок: <b>{active_subscriptions}</b>\n\n🕷 <b>Скрейпер & Anti-Ban:</b>\n• Останнє опитування: <b>{last_scrape_ago}</b> (Затримка: {latency}мс)\n• Джерело даних: <code>{source}</code>\n• Помилок поспіль: <b>{consecutive_failures}</b>\n• Режим Tor / Проксі: <b>{proxy_status}</b>\n\n💾 <b>Пам'ять процесу:</b> <b>{memory_mb} MB</b>\n🔔 <b>Сповіщення про нових користувачів:</b> <b>{new_users_status}</b>",
     "unauthorized": "⛔ Доступ обмежено. Команда лише для адміністраторів.",
     "btn_test_alert": "🧪 Надіслати тест",
     "btn_backup": "💾 Завантажити бекап",
