@@ -56,4 +56,22 @@ describe("RobustHttpClient", () => {
     expect(htmlHeaders["Priority"]).toBe("u=0, i");
     expect(htmlHeaders["Sec-Fetch-Mode"]).toBe("navigate");
   });
+
+  it("should cache DNS resolutions and handle raw IP addresses", async () => {
+    const { InMemoryDnsCache } = await import("../src/http/dnsCache.js");
+    const dnsCache = new InMemoryDnsCache(60);
+
+    // Raw IP should resolve immediately
+    const ipRes = await dnsCache.resolve("127.0.0.1");
+    expect(ipRes).toEqual([{ address: "127.0.0.1", family: 4 }]);
+
+    // Localhost lookup
+    const localRes = await dnsCache.resolve("localhost");
+    expect(localRes.length).toBeGreaterThan(0);
+    expect([4, 6]).toContain(localRes[0].family);
+
+    // Warm hit from cache
+    const cachedRes = await dnsCache.resolve("localhost");
+    expect(cachedRes).toEqual(localRes);
+  });
 });

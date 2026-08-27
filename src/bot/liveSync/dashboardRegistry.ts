@@ -1,6 +1,6 @@
 import { SupportedLanguage } from "../../types/db.js";
 
-export type LiveViewType = "dashboard" | "pool_detail" | "subscriptions" | "settings" | "other";
+export type LiveViewType = "dashboard" | "pool_detail" | "subscriptions" | "settings" | "admin" | "other";
 
 export interface ActiveDashboardEntry {
   chatId: number;

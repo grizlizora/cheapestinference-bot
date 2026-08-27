@@ -30,6 +30,8 @@ export interface HttpResponse {
   finalUrl: string;
 }
 
+import { defaultDnsCache } from "./dnsCache.js";
+
 export class RobustHttpClient {
   private dispatchers = new Map<string, Dispatcher>();
   private tlsSessionCache = new Map<string, Buffer>();
@@ -39,6 +41,7 @@ export class RobustHttpClient {
     this.directAgent = new Agent({
       connect: {
         timeout: 10_000,
+        lookup: defaultDnsCache.lookup as any,
         autoSelectFamily: true,
         autoSelectFamilyAttemptTimeout: 50, // 50ms instead of 250ms default on dual-stack
         keepAlive: true,

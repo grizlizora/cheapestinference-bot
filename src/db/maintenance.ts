@@ -5,6 +5,7 @@ export class DatabaseMaintenanceManager {
   private stmtPruneSlotHistoryBatch: Database.Statement;
   private stmtPruneCatalogHistoryBatch: Database.Statement;
   private stmtPruneSlotPriceHistoryBatch: Database.Statement;
+  private stmtFreelistCount: Database.Statement;
 
   constructor(
     private readonly db: Database.Database,
@@ -15,7 +16,6 @@ export class DatabaseMaintenanceManager {
       WHERE id IN (
         SELECT id FROM notification_logs 
         WHERE sent_at < datetime('now', '-' || ? || ' days')
-        ORDER BY id ASC
         LIMIT 2000
       )
     `);
@@ -26,7 +26,6 @@ export class DatabaseMaintenanceManager {
         SELECT id FROM slot_lifecycle_history 
         WHERE closed_at IS NOT NULL 
           AND closed_at < datetime('now', '-90 days')
-        ORDER BY id ASC
         LIMIT 2000
       )
     `);
@@ -36,7 +35,6 @@ export class DatabaseMaintenanceManager {
       WHERE id IN (
         SELECT id FROM catalog_history 
         WHERE detected_at < datetime('now', '-90 days')
-        ORDER BY id ASC
         LIMIT 2000
       )
     `);
@@ -46,16 +44,17 @@ export class DatabaseMaintenanceManager {
       WHERE id IN (
         SELECT id FROM slot_price_history 
         WHERE changed_at < datetime('now', '-90 days')
-        ORDER BY id ASC
         LIMIT 2000
       )
     `);
+
+    this.stmtFreelistCount = db.prepare("PRAGMA freelist_count");
   }
 
   /**
    * Non-blocking chunked rolling purge of logs and historical data
    */
-  public pruneOldLogs(): { deletedCount: number; durationMs: number } {
+  public pruneOldLogs(): { deletedCount: number; durationMs: number; pagesReclaimed: number } {
     const start = Date.now();
     let totalDeleted = 0;
 
@@ -95,15 +94,27 @@ export class DatabaseMaintenanceManager {
       }
     } catch {}
 
-    // 5. Reclaim freed pages back to OS
+    // 5. Reclaim freed pages back to OS via dynamic incremental vacuum
+    let pagesReclaimed = 0;
     try {
-      this.db.pragma("incremental_vacuum(1000)");
+      while (true) {
+        const row = this.stmtFreelistCount.get() as any;
+        const freelist = Number(row?.freelist_count || 0);
+        if (freelist <= 0) break;
+        const batch = Math.min(freelist, 2000);
+        this.db.pragma(`incremental_vacuum(${batch})`);
+        pagesReclaimed += batch;
+      }
     } catch {}
 
-    // 6. Non-blocking WAL checkpoint (PASSIVE avoids acquiring EXCLUSIVE lock)
+    // 6. Non-blocking WAL checkpoint and truncate to 0 bytes
     try {
-      this.db.pragma("wal_checkpoint(PASSIVE)");
-    } catch {}
+      this.db.pragma("wal_checkpoint(TRUNCATE)");
+    } catch {
+      try {
+        this.db.pragma("wal_checkpoint(PASSIVE)");
+      } catch {}
+    }
 
     // 7. Update SQLite query optimizer statistics
     try {
@@ -113,6 +124,7 @@ export class DatabaseMaintenanceManager {
     return {
       deletedCount: totalDeleted,
       durationMs: Date.now() - start,
+      pagesReclaimed,
     };
   }
 

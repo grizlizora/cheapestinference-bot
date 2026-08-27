@@ -39,6 +39,7 @@
   },
   "settings": {
     "title": "⚙️ <b>Bot Settings</b>\n\nManage interface language, view user guide, and author contacts.\n\n🌐 Current language: <b>{current_lang}</b>\n🆔 Your Telegram ID: <code>{telegram_id}</code>",
+    "btn_admin": "👑 Admin Panel",
     "btn_language": "🌐 Change Language",
     "btn_help": "ℹ️ User Guide",
     "btn_contact_author": "💬 Contact Author"

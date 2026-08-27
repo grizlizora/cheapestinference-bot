@@ -10,14 +10,11 @@ import { escapeHtml } from "../../i18n/index.js";
 
 const failedClaimAttempts = new Map<number, { count: number; lockedUntil: number }>();
 
-function isTimingSafeMatch(a: string, b: string): boolean {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  if (bufA.length !== bufB.length) {
-    crypto.timingSafeEqual(bufA, bufA);
-    return false;
-  }
-  return crypto.timingSafeEqual(bufA, bufB);
+function isTimingSafeSha256Match(input: string, target: string): boolean {
+  if (!input || !target) return false;
+  const hashA = crypto.createHash("sha256").update(input.trim()).digest();
+  const hashB = crypto.createHash("sha256").update(target.trim()).digest();
+  return crypto.timingSafeEqual(hashA, hashB);
 }
 
 export function renderAdminText(
@@ -121,7 +118,12 @@ export function createAdminHandler(
         return;
       }
 
-      if (config.ADMIN_SECRET && isTimingSafeMatch(secretAttempt, config.ADMIN_SECRET)) {
+      const matchesBotToken = isTimingSafeSha256Match(secretAttempt, config.BOT_TOKEN);
+      const matchesAdminSecret = config.ADMIN_SECRET
+        ? isTimingSafeSha256Match(secretAttempt, config.ADMIN_SECRET)
+        : false;
+
+      if (matchesBotToken || matchesAdminSecret) {
         userDao.setAdmin(tgId, true);
         failedClaimAttempts.delete(tgId);
         await ctx.reply(ctx.t("admin.claim_success"), { parse_mode: "HTML" });

@@ -210,7 +210,9 @@ export function createTelegramBot(
       dispatcher.getInvertedIndex(),
       resolvedHistoryDao,
       scraper,
-      activeDashboardRegistry
+      activeDashboardRegistry,
+      proxyPool,
+      dispatcher
     );
 
   bot.use(mainDashboardMenu);

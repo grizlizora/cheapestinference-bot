@@ -35,6 +35,11 @@ export async function safeEditMessageText(
   }
 }
 
+import { ProxyPool } from "../../proxy/proxyPool.js";
+import { NotificationDispatcher } from "../notifier/dispatcher.js";
+import { isUserAdmin } from "../../config/env.js";
+import { renderAdminText } from "../handlers/admin.js";
+import { createBackupHandler } from "../handlers/backup.js";
 import { ActiveDashboardRegistry } from "../liveSync/dashboardRegistry.js";
 
 export function createMainMenuHierarchy(
@@ -44,13 +49,97 @@ export function createMainMenuHierarchy(
   invertedIndex: SubscriberInvertedIndex,
   historyDao?: SlotHistoryDAO,
   scraper?: ScraperOrchestrator,
-  dashboardRegistry?: ActiveDashboardRegistry
+  dashboardRegistry?: ActiveDashboardRegistry,
+  proxyPool?: ProxyPool,
+  dispatcher?: NotificationDispatcher
 ) {
   const languageMenu = createLanguageMenu(userDao, poolStateDao, invertedIndex, historyDao, scraper, subDao, dashboardRegistry);
   const { poolDetailMenu, poolSettingsMenu } = createPoolDetailMenu(poolStateDao, subDao, invertedIndex, historyDao, scraper, dashboardRegistry);
   const subscriptionsMenu = createSubscriptionsMenu(subDao, userDao, poolStateDao, invertedIndex, historyDao, scraper, dashboardRegistry);
 
+  const adminMenu = new Menu<BotContext>("admin-menu")
+    .text(
+      (ctx) => {
+        const adminUser = ctx.from ? userDao.getByTelegramId(ctx.from.id) : undefined;
+        const newUsersEnabled = (adminUser?.notify_admin_new_users ?? 1) === 1;
+        return newUsersEnabled
+          ? ctx.t("admin.btn_toggle_new_users_on")
+          : ctx.t("admin.btn_toggle_new_users_off");
+      },
+      async (ctx) => {
+        if (!isUserAdmin(ctx.from?.id, userDao)) return;
+        const newVal = userDao.toggleAdminNewUsers(ctx.from!.id);
+        await ctx.answerCallbackQuery(
+          newVal === 1 ? ctx.t("admin.toast_new_users_on") : ctx.t("admin.toast_new_users_off")
+        ).catch(() => {});
+        if (scraper && proxyPool) {
+          await safeEditMessageText(ctx, renderAdminText(ctx, userDao, subDao, scraper, proxyPool));
+        }
+        try { ctx.menu.update(); } catch {}
+      }
+    )
+    .row()
+    .text(
+      (ctx) => ctx.t("admin.btn_test_alert"),
+      async (ctx) => {
+        if (!isUserAdmin(ctx.from?.id, userDao) || !dispatcher) return;
+        await ctx.answerCallbackQuery({ text: ctx.t("admin.toast_test_alert_sent"), show_alert: false }).catch(() => {});
+        await dispatcher.sendTestAlert(ctx.from!.id, ctx.lang, "slot");
+      }
+    )
+    .text(
+      (ctx) => ctx.t("admin.btn_backup"),
+      async (ctx) => {
+        if (!isUserAdmin(ctx.from?.id, userDao)) return;
+        await ctx.answerCallbackQuery().catch(() => {});
+        await createBackupHandler(userDao.db, userDao, subDao)(ctx);
+      }
+    )
+    .row()
+    .text(
+      (ctx) => ctx.t("common.refresh"),
+      async (ctx) => {
+        if (!isUserAdmin(ctx.from?.id, userDao)) return;
+        await ctx.answerCallbackQuery({ text: ctx.t("common.refreshed_toast"), show_alert: false }).catch(() => {});
+        if (scraper && proxyPool) {
+          await safeEditMessageText(ctx, renderAdminText(ctx, userDao, subDao, scraper, proxyPool));
+        }
+        try { ctx.menu.update(); } catch {}
+      }
+    )
+    .row()
+    .text(
+      (ctx) => ctx.t("common.back"),
+      async (ctx) => {
+        await ctx.answerCallbackQuery().catch(() => {});
+        if (ctx.chat) {
+          dashboardRegistry?.updateView(ctx.chat.id, "settings");
+        }
+        await safeEditMessageText(ctx, renderSettingsText(ctx));
+        return ctx.menu.nav("settings-menu");
+      }
+    );
+
   const settingsMenu = new Menu<BotContext>("settings-menu")
+    .dynamic((ctx, range) => {
+      if (isUserAdmin(ctx.from?.id, userDao)) {
+        range
+          .text(
+            (c) => c.t("settings.btn_admin"),
+            async (c) => {
+              await c.answerCallbackQuery().catch(() => {});
+              if (c.chat) {
+                dashboardRegistry?.updateView(c.chat.id, "admin");
+              }
+              if (scraper && proxyPool) {
+                await safeEditMessageText(c, renderAdminText(c, userDao, subDao, scraper, proxyPool));
+              }
+              return c.menu.nav("admin-menu");
+            }
+          )
+          .row();
+      }
+    })
     .text(
       (ctx) => ctx.t("settings.btn_language"),
       async (ctx) => {
@@ -193,13 +282,15 @@ export function createMainMenuHierarchy(
   // Register submenus into hierarchy
   settingsMenu.register(helpMenu);
   settingsMenu.register(languageMenu);
+  settingsMenu.register(adminMenu);
   mainDashboardMenu.register(poolDetailMenu);
   mainDashboardMenu.register(subscriptionsMenu);
   mainDashboardMenu.register(settingsMenu);
   mainDashboardMenu.register(languageMenu);
   mainDashboardMenu.register(helpMenu);
+  mainDashboardMenu.register(adminMenu);
 
-  return { mainDashboardMenu, languageMenu, poolDetailMenu, poolSettingsMenu, subscriptionsMenu, helpMenu, settingsMenu };
+  return { mainDashboardMenu, languageMenu, poolDetailMenu, poolSettingsMenu, subscriptionsMenu, helpMenu, settingsMenu, adminMenu };
 }
 
 export function renderSettingsText(ctx: BotContext): string {

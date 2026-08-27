@@ -88,6 +88,8 @@ export class ScraperOrchestrator extends EventEmitter {
     };
   }
 
+  private lastSlotEventTimestamp = 0;
+
   public executeSingleflightPoll(bypassEtag = false): Promise<DiffEvent[]> {
     if (this.inFlightPollPromise) {
       return this.inFlightPollPromise;
@@ -100,6 +102,16 @@ export class ScraperOrchestrator extends EventEmitter {
 
   private calculateNextIntervalMs(): number {
     if (this.consecutiveFailures === 0) {
+      const now = Date.now();
+      const isVolatile = now - this.lastSlotEventTimestamp < 5 * 60 * 1000;
+      
+      if (isVolatile) {
+        // Hot / Volatile mode: fast 10s - 14s polling to capture rapid stock changes
+        const fastMin = Math.max(10, this.config.minIntervalSec * 0.6);
+        const fastMax = Math.max(14, this.config.minIntervalSec);
+        return Math.floor((fastMin + Math.random() * (fastMax - fastMin)) * 1000);
+      }
+
       const range = this.config.maxIntervalSec - this.config.minIntervalSec;
       const randomSec = this.config.minIntervalSec + Math.random() * range;
       return Math.floor(randomSec * 1000);
@@ -184,6 +196,7 @@ export class ScraperOrchestrator extends EventEmitter {
       });
 
       if (events.length > 0) {
+        this.lastSlotEventTimestamp = Date.now();
         this.emit("diff_events", events);
       }
 

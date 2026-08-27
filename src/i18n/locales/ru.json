@@ -39,6 +39,7 @@
   },
   "settings": {
     "title": "⚙️ <b>Настройки бота</b>\n\nУправляйте языком интерфейса, просматривайте справку и контакты автора.\n\n🌐 Текущий язык: <b>{current_lang}</b>\n🆔 Ваш Telegram ID: <code>{telegram_id}</code>",
+    "btn_admin": "👑 Панель администратора",
     "btn_language": "🌐 Смена языка",
     "btn_help": "ℹ️ Справка",
     "btn_contact_author": "💬 Связь с автором"

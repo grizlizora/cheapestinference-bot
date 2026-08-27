@@ -68,9 +68,10 @@ CREATE TABLE IF NOT EXISTS slot_lifecycle_history (
   price_month TEXT NOT NULL
 );
 
-    CREATE INDEX IF NOT EXISTS idx_slot_history_active ON slot_lifecycle_history(pool_slug, block_id, closed_at);
-    CREATE INDEX IF NOT EXISTS idx_slot_history_closed_at ON slot_lifecycle_history(closed_at) WHERE closed_at IS NOT NULL;
-    CREATE INDEX IF NOT EXISTS idx_slot_history_analytics_covering ON slot_lifecycle_history(pool_slug, block_id, duration_seconds, opened_at) WHERE duration_seconds IS NOT NULL;
+-- Microscopic partial index for active slots
+CREATE INDEX IF NOT EXISTS idx_slot_history_open ON slot_lifecycle_history(pool_slug, block_id) WHERE closed_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_slot_history_closed_at ON slot_lifecycle_history(closed_at) WHERE closed_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_slot_history_analytics_covering ON slot_lifecycle_history(pool_slug, block_id, duration_seconds, opened_at) WHERE duration_seconds IS NOT NULL;
 
 -- 5. Catalog & Model Upgrade History
 CREATE TABLE IF NOT EXISTS catalog_history (
@@ -89,7 +90,6 @@ CREATE TABLE IF NOT EXISTS catalog_history (
 );
 
 CREATE INDEX IF NOT EXISTS idx_catalog_hist_retention ON catalog_history(detected_at);
-CREATE INDEX IF NOT EXISTS idx_catalog_hist_slug ON catalog_history(pool_slug, detected_at);
 
 -- 6. Slot Price Changes History
 CREATE TABLE IF NOT EXISTS slot_price_history (
@@ -104,7 +104,6 @@ CREATE TABLE IF NOT EXISTS slot_price_history (
 );
 
 CREATE INDEX IF NOT EXISTS idx_slot_price_hist_retention ON slot_price_history(changed_at);
-CREATE INDEX IF NOT EXISTS idx_slot_price_hist ON slot_price_history(pool_slug, block_id, changed_at);
 
 -- 7. Notification Logs Table
 CREATE TABLE IF NOT EXISTS notification_logs (
@@ -118,7 +117,7 @@ CREATE TABLE IF NOT EXISTS notification_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_notif_logs_retention ON notification_logs(sent_at);
-CREATE INDEX IF NOT EXISTS idx_notif_logs_user_history ON notification_logs(user_id, sent_at);
+CREATE INDEX IF NOT EXISTS idx_notif_logs_user_fk ON notification_logs(user_id);
 
 -- 8. System Metadata Table (for accurate scrape heartbeat & ETag tracking)
 CREATE TABLE IF NOT EXISTS system_metadata (
