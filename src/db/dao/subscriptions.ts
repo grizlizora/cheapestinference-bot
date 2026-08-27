@@ -15,6 +15,10 @@ export class SubscriptionDAO {
   private stmtHasSub: Database.Statement;
   private stmtGetSub: Database.Statement;
   private stmtUpsertSubWithFlags: Database.Statement;
+  private stmtUpdateExistingChildren: Database.Statement;
+  private stmtGetSubsForUser: Database.Statement;
+  private stmtGetAllSubs: Database.Statement;
+  private stmtGetAnyPoolSub: Database.Statement;
 
   private txTogglePool: (userId: number, poolSlug: string, newState: boolean, blockIds: string[]) => void;
   private txToggleBlock: (userId: number, poolSlug: string, blockId: string, newBlockState: boolean, allBlockIds: string[]) => void;
@@ -23,6 +27,27 @@ export class SubscriptionDAO {
   constructor(public readonly db: Database.Database) {
     this.stmtGetSub = db.prepare(`
       SELECT * FROM subscriptions WHERE user_id = ? AND pool_slug = ? AND block_id = ?
+    `);
+
+    this.stmtGetAnyPoolSub = db.prepare(`
+      SELECT * FROM subscriptions WHERE user_id = ? AND pool_slug = ? LIMIT 1
+    `);
+
+    this.stmtGetSubsForUser = db.prepare(`
+      SELECT * FROM subscriptions WHERE user_id = ?
+    `);
+
+    this.stmtGetAllSubs = db.prepare(`
+      SELECT * FROM subscriptions
+    `);
+
+    this.stmtUpdateExistingChildren = db.prepare(`
+      UPDATE subscriptions 
+      SET notify_on_available = @avail, 
+          notify_on_sold_out = @sold, 
+          notify_on_models = @models, 
+          notify_on_prices = @prices
+      WHERE user_id = @user_id AND pool_slug = @pool_slug AND block_id != 'ALL'
     `);
 
     this.stmtUpsertSubWithFlags = db.prepare(`
@@ -187,9 +212,7 @@ export class SubscriptionDAO {
     let sub = this.getSubscription(userId, poolSlug, "ALL");
     if (!sub) {
       // Check if user is subscribed to any regional block of this pool
-      const childSub = this.db.prepare(`
-        SELECT * FROM subscriptions WHERE user_id = ? AND pool_slug = ? LIMIT 1
-      `).get(userId, poolSlug) as SubscriptionRecord | undefined;
+      const childSub = this.stmtGetAnyPoolSub.get(userId, poolSlug) as SubscriptionRecord | undefined;
       if (childSub) {
         sub = childSub;
       }
@@ -208,7 +231,7 @@ export class SubscriptionDAO {
 
   /**
    * Atomic Granular Event Filter Toggle for a specific pool:
-   * Synchronously updates SQLite in WAL mode and propagates to existing regional blocks.
+   * Synchronously updates SQLite in WAL mode and propagates only to active regional blocks.
    */
   togglePoolEventCategory(
     userId: number,
@@ -217,11 +240,10 @@ export class SubscriptionDAO {
     blockIds: string[] = ["asia", "europe", "americas"]
   ): { newState: boolean; flags: SubscriptionFlags } {
     return this.db.transaction(() => {
+      const hasAll = this.hasSubscription(userId, poolSlug, "ALL");
       let current = this.getSubscription(userId, poolSlug, "ALL");
       if (!current) {
-        const childSub = this.db.prepare(`
-          SELECT * FROM subscriptions WHERE user_id = ? AND pool_slug = ? LIMIT 1
-        `).get(userId, poolSlug) as SubscriptionRecord | undefined;
+        const childSub = this.stmtGetAnyPoolSub.get(userId, poolSlug) as SubscriptionRecord | undefined;
         if (childSub) current = childSub;
       }
 
@@ -237,24 +259,18 @@ export class SubscriptionDAO {
       if (category === "models") currentFlags.models = currentFlags.models === 1 ? 0 : 1;
       if (category === "prices") currentFlags.prices = currentFlags.prices === 1 ? 0 : 1;
 
-      // Write-through to pool master 'ALL'
-      this.stmtUpsertSubWithFlags.run({
-        user_id: userId,
-        pool_slug: poolSlug,
-        block_id: "ALL",
-        ...currentFlags,
-      });
+      // Only upsert pool master 'ALL' if user already has an active ALL subscription
+      if (hasAll) {
+        this.stmtUpsertSubWithFlags.run({
+          user_id: userId,
+          pool_slug: poolSlug,
+          block_id: "ALL",
+          ...currentFlags,
+        });
+      }
 
-      // Synchronize only EXISTING child blocks (do not insert phantom blocks for disabled regions)
-      const updateExistingChildren = this.db.prepare(`
-        UPDATE subscriptions 
-        SET notify_on_available = @avail, 
-            notify_on_sold_out = @sold, 
-            notify_on_models = @models, 
-            notify_on_prices = @prices
-        WHERE user_id = @user_id AND pool_slug = @pool_slug AND block_id != 'ALL'
-      `);
-      updateExistingChildren.run({
+      // Synchronize only EXISTING child blocks (never insert phantom blocks for disabled regions)
+      this.stmtUpdateExistingChildren.run({
         user_id: userId,
         pool_slug: poolSlug,
         ...currentFlags,
@@ -277,11 +293,11 @@ export class SubscriptionDAO {
   }
 
   getSubscriptionsForUser(userId: number): SubscriptionRecord[] {
-    return this.db.prepare("SELECT * FROM subscriptions WHERE user_id = ?").all(userId) as SubscriptionRecord[];
+    return this.stmtGetSubsForUser.all(userId) as SubscriptionRecord[];
   }
 
   getAllSubscriptions(): SubscriptionRecord[] {
-    return this.db.prepare("SELECT * FROM subscriptions").all() as SubscriptionRecord[];
+    return this.stmtGetAllSubs.all() as SubscriptionRecord[];
   }
 
   updateUserGlobalCategory(

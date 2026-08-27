@@ -35,6 +35,17 @@ export function createPoolDetailMenu(
         prices: f.notify_on_prices === 1,
       });
 
+      const syncRamFlags = (userId: number, fullFlags: any) => {
+        if (subDao.hasSubscription(userId, slug, "ALL")) {
+          invertedIndex.updateSubscription(userId, slug, "ALL", fullFlags);
+        }
+        for (const bId of blockIds) {
+          if (subDao.hasSubscription(userId, slug, bId)) {
+            invertedIndex.updateSubscription(userId, slug, bId, fullFlags);
+          }
+        }
+      };
+
       range
         .text(
           flags.available
@@ -43,10 +54,7 @@ export function createPoolDetailMenu(
           async (c) => {
             const res = subDao.togglePoolEventCategory(c.user.id, slug, "available", blockIds);
             const fullFlags = toFlags(res.flags);
-            invertedIndex.updateSubscription(c.user.id, slug, "ALL", fullFlags);
-            for (const bId of blockIds) {
-              invertedIndex.updateSubscription(c.user.id, slug, bId, fullFlags);
-            }
+            syncRamFlags(c.user.id, fullFlags);
             await c.answerCallbackQuery(c.t("pool_settings.toast_filter_updated")).catch(() => {});
             await safeEditMessageText(c, renderPoolSettingsText(c, poolStateDao, subDao));
             try { c.menu.update(); } catch {}
@@ -59,10 +67,7 @@ export function createPoolDetailMenu(
           async (c) => {
             const res = subDao.togglePoolEventCategory(c.user.id, slug, "sold_out", blockIds);
             const fullFlags = toFlags(res.flags);
-            invertedIndex.updateSubscription(c.user.id, slug, "ALL", fullFlags);
-            for (const bId of blockIds) {
-              invertedIndex.updateSubscription(c.user.id, slug, bId, fullFlags);
-            }
+            syncRamFlags(c.user.id, fullFlags);
             await c.answerCallbackQuery(c.t("pool_settings.toast_filter_updated")).catch(() => {});
             await safeEditMessageText(c, renderPoolSettingsText(c, poolStateDao, subDao));
             try { c.menu.update(); } catch {}
@@ -76,10 +81,7 @@ export function createPoolDetailMenu(
           async (c) => {
             const res = subDao.togglePoolEventCategory(c.user.id, slug, "models", blockIds);
             const fullFlags = toFlags(res.flags);
-            invertedIndex.updateSubscription(c.user.id, slug, "ALL", fullFlags);
-            for (const bId of blockIds) {
-              invertedIndex.updateSubscription(c.user.id, slug, bId, fullFlags);
-            }
+            syncRamFlags(c.user.id, fullFlags);
             await c.answerCallbackQuery(c.t("pool_settings.toast_filter_updated")).catch(() => {});
             await safeEditMessageText(c, renderPoolSettingsText(c, poolStateDao, subDao));
             try { c.menu.update(); } catch {}
@@ -92,10 +94,7 @@ export function createPoolDetailMenu(
           async (c) => {
             const res = subDao.togglePoolEventCategory(c.user.id, slug, "prices", blockIds);
             const fullFlags = toFlags(res.flags);
-            invertedIndex.updateSubscription(c.user.id, slug, "ALL", fullFlags);
-            for (const bId of blockIds) {
-              invertedIndex.updateSubscription(c.user.id, slug, bId, fullFlags);
-            }
+            syncRamFlags(c.user.id, fullFlags);
             await c.answerCallbackQuery(c.t("pool_settings.toast_filter_updated")).catch(() => {});
             await safeEditMessageText(c, renderPoolSettingsText(c, poolStateDao, subDao));
             try { c.menu.update(); } catch {}

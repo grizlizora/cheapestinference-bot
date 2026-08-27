@@ -55,6 +55,7 @@ export function createMainMenuHierarchy(
       (ctx) => ctx.t("settings.btn_language"),
       async (ctx) => {
         await ctx.answerCallbackQuery().catch(() => {});
+        (ctx.session as any).fromSettings = true;
         if (ctx.chat) {
           dashboardRegistry?.updateView(ctx.chat.id, "other");
         }

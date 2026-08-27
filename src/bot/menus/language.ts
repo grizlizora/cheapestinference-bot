@@ -51,12 +51,22 @@ export function createLanguageMenu(
       }
     }
 
-    if (ctx.chat && msgId && dashboardRegistry) {
-      dashboardRegistry.register(ctx.chat.id, msgId, ctx.user.id, lang, "settings");
+    const fromSettings = (ctx.session as any)?.fromSettings;
+    if (fromSettings) {
+      delete (ctx.session as any).fromSettings;
+      if (ctx.chat && msgId && dashboardRegistry) {
+        dashboardRegistry.register(ctx.chat.id, msgId, ctx.user.id, lang, "settings");
+      }
+      await safeEditMessageText(ctx, renderSettingsText(ctx));
+      return ctx.menu.nav("settings-menu");
     }
 
-    await safeEditMessageText(ctx, renderSettingsText(ctx));
-    return ctx.menu.nav("settings-menu");
+    if (ctx.chat && msgId && dashboardRegistry) {
+      dashboardRegistry.register(ctx.chat.id, msgId, ctx.user.id, lang, "dashboard");
+    }
+
+    await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao, scraper));
+    return ctx.menu.nav("main-dashboard-menu");
   };
 
   return new Menu<BotContext>("language-menu")
@@ -76,11 +86,21 @@ export function createLanguageMenu(
       (ctx) => ctx.t("common.back"),
       async (ctx) => {
         await ctx.answerCallbackQuery().catch(() => {});
-        if (ctx.chat) {
-          dashboardRegistry?.updateView(ctx.chat.id, "settings");
+        const fromSettings = (ctx.session as any)?.fromSettings;
+        if (fromSettings) {
+          delete (ctx.session as any).fromSettings;
+          if (ctx.chat) {
+            dashboardRegistry?.updateView(ctx.chat.id, "settings");
+          }
+          await safeEditMessageText(ctx, renderSettingsText(ctx));
+          return ctx.menu.nav("settings-menu");
         }
-        await safeEditMessageText(ctx, renderSettingsText(ctx));
-        return ctx.menu.nav("settings-menu");
+
+        if (ctx.chat) {
+          dashboardRegistry?.updateView(ctx.chat.id, "dashboard");
+        }
+        await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao, scraper));
+        return ctx.menu.nav("main-dashboard-menu");
       }
     );
 }

@@ -179,6 +179,40 @@ describe("Live Dashboard Registry & Granular Subscriptions Test Suite", () => {
       expect(ev6Recipients.map((r) => r.userId)).not.toContain(u1.id);
       expect(ev6Recipients.map((r) => r.userId)).not.toContain(u2.id);
     });
+
+    it("should strictly isolate partial block subscriptions when toggling pool event categories", () => {
+      const user = userDao.upsertUser({
+        telegram_id: 88888,
+        username: "europe_only_user",
+        first_name: "Euro",
+        language: "en",
+      });
+
+      // User subscribes ONLY to Flagship Europe (Asia and Americas are not subscribed)
+      subDao.setSubscription(user.id, "flagship", "europe", true);
+      expect(subDao.hasSubscription(user.id, "flagship", "europe")).toBe(true);
+      expect(subDao.hasSubscription(user.id, "flagship", "asia")).toBe(false);
+      expect(subDao.hasSubscription(user.id, "flagship", "americas")).toBe(false);
+      expect(subDao.hasSubscription(user.id, "flagship", "ALL")).toBe(false);
+
+      // Now user toggles 'prices' for Flagship
+      subDao.togglePoolEventCategory(user.id, "flagship", "prices", ["asia", "europe", "americas"]);
+
+      // Verify that NO phantom subscriptions were created for asia, americas, or ALL!
+      expect(subDao.hasSubscription(user.id, "flagship", "europe")).toBe(true);
+      expect(subDao.hasSubscription(user.id, "flagship", "asia")).toBe(false);
+      expect(subDao.hasSubscription(user.id, "flagship", "americas")).toBe(false);
+      expect(subDao.hasSubscription(user.id, "flagship", "ALL")).toBe(false);
+
+      // Verify Europe has updated price flag
+      const sub = subDao.getSubscription(user.id, "flagship", "europe");
+      expect(sub?.notify_on_prices).toBe(0); // toggled from 1 to 0
+
+      // Only 1 record in SQLite for this user!
+      const allUserSubs = subDao.getSubscriptionsForUser(user.id);
+      expect(allUserSubs).toHaveLength(1);
+      expect(allUserSubs[0].block_id).toBe("europe");
+    });
   });
 
   describe("2. ActiveDashboardRegistry & FNV-1a Hash Diffing", () => {
