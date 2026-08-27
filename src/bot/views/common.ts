@@ -4,24 +4,23 @@
  */
 
 import { BotContext } from "../../types/context.js";
+import { truncateToTelegramLimit } from "../notifier/htmlTagBalancer.js";
 
 /**
  * Hard limit safety threshold for Telegram message text (Limit: 4096 chars).
- * We reserve 150 chars buffer for safe footer / formatting overhead.
+ * We reserve 196 chars buffer for safe footer / formatting overhead.
  */
-export const TELEGRAM_MAX_TEXT_LENGTH = 3950;
+export const TELEGRAM_MAX_TEXT_LENGTH = 3900;
 
 /**
- * Safely clamps message text to prevent Telegram 400 Bad Request errors.
+ * Safely clamps message text to prevent Telegram 400 Bad Request errors,
+ * balancing all unclosed HTML tags and entities in strict LIFO order.
  */
 export function clampMessageText(text: string, maxLength: number = TELEGRAM_MAX_TEXT_LENGTH): string {
-  if (!text || text.length <= maxLength) return text;
-  const truncated = text.slice(0, maxLength);
-  // Ensure we do not cut in the middle of an HTML tag or entity
-  const lastTagOpen = truncated.lastIndexOf("<");
-  const lastTagClose = truncated.lastIndexOf(">");
-  const safeCut = lastTagOpen > lastTagClose ? truncated.slice(0, lastTagOpen) : truncated;
-  return safeCut + "\n\n<i>... [text truncated for display limit]</i>";
+  return truncateToTelegramLimit(text, maxLength, {
+    ellipsis: "\n\n<i>... [text truncated for display limit]</i>",
+    reserveLength: 45,
+  });
 }
 
 /**

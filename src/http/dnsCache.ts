@@ -94,6 +94,9 @@ export class InMemoryDnsCache {
       });
       return records;
     } catch (err) {
+      if (entry) {
+        entry.inFlight = undefined;
+      }
       // Fallback: If network lookup fails, return stale entry if available
       if (entry && entry.addresses.length > 0) {
         return entry.addresses;

@@ -12,44 +12,25 @@ export interface TruncateOptions {
 const VOID_TAGS = new Set(["br", "hr", "img", "input", "meta", "link"]);
 
 /**
- * Truncates text to Telegram message length limits and balances unclosed HTML tags using a LIFO stack.
+ * Balances unclosed HTML tags in a string using a strict LIFO stack.
  */
-export function truncateToTelegramLimit(
-  text: string,
-  maxLen: number = 3900,
-  options?: TruncateOptions
-): string {
-  if (!text || text.length <= maxLen) {
-    return text || "";
-  }
+export function balanceHtmlTags(html: string): string {
+  if (!html) return "";
 
-  const reserve = options?.reserveLength ?? 30;
-  const ellipsis = options?.ellipsis ?? "\n\n<i>...[truncated]</i>";
-
-  let truncated = text.substring(0, maxLen - reserve);
-  const lastNewline = truncated.lastIndexOf("\n");
-  if (lastNewline > maxLen / 2) {
-    truncated = truncated.substring(0, lastNewline);
-  }
-
-  // Strip broken opening tag truncated mid-attribute
-  truncated = truncated.replace(/<[^>]*$/, "");
-
-  // Strict LIFO tag stack for 100% valid HTML closing
   const stack: string[] = [];
   const tagRegex = /<\/?([a-z0-9_-]+)[^>]*>/gi;
 
-  for (const match of truncated.matchAll(tagRegex)) {
+  for (const match of html.matchAll(tagRegex)) {
     const fullTag = match[0];
     const tagName = match[1].toLowerCase();
 
-    if (VOID_TAGS.has(tagName)) continue;
+    if (VOID_TAGS.has(tagName) || fullTag.endsWith("/>")) continue;
 
     if (fullTag.startsWith("</")) {
-      // Closing tag: pop matching tag from top of stack if present
-      const lastIndex = stack.lastIndexOf(tagName);
-      if (lastIndex !== -1) {
-        stack.splice(lastIndex, 1);
+      // Closing tag: pop matching tag or unwind stack to matching tag
+      const idx = stack.lastIndexOf(tagName);
+      if (idx !== -1) {
+        stack.splice(idx);
       }
     } else {
       // Opening tag: push onto LIFO stack
@@ -57,11 +38,41 @@ export function truncateToTelegramLimit(
     }
   }
 
-  // Close all lingering open tags in reverse LIFO order
+  let result = html;
   while (stack.length > 0) {
     const tagToClose = stack.pop();
-    truncated += `</${tagToClose}>`;
+    result += `</${tagToClose}>`;
+  }
+  return result;
+}
+
+/**
+ * Truncates text to Telegram message length limits and balances unclosed HTML tags using a LIFO stack.
+ */
+export function truncateToTelegramLimit(
+  text: string,
+  maxLen: number = 3900,
+  options?: TruncateOptions
+): string {
+  if (!text) return "";
+
+  if (text.length <= maxLen) {
+    return balanceHtmlTags(text);
   }
 
-  return truncated + ellipsis;
+  const reserve = options?.reserveLength ?? 30;
+  const ellipsis = options?.ellipsis ?? "\n\n<i>...[truncated]</i>";
+
+  let truncated = text.substring(0, maxLen - reserve);
+  const lastNewline = truncated.lastIndexOf("\n");
+  const minCutoff = maxLen - reserve - 400;
+  if (lastNewline > minCutoff && lastNewline > 0) {
+    truncated = truncated.substring(0, lastNewline);
+  }
+
+  // Strip broken opening tag truncated mid-attribute and cut entities
+  truncated = truncated.replace(/<[^>]*$/, "").replace(/&[a-zA-Z0-9#]*$/, "");
+
+  const balanced = balanceHtmlTags(truncated);
+  return balanced + ellipsis;
 }

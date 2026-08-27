@@ -22,7 +22,7 @@ export class NotificationRateLimiter {
   private isPaused: boolean = false;
   private pauseUntil: number = 0;
 
-  // Telegram ID -> Timestamp of last dispatched message
+  // Telegram ID -> performance.now() timestamp of last dispatched message
   private lastUserDispatchTime = new Map<number, number>();
 
   constructor(config?: RateLimiterConfig) {
@@ -44,7 +44,7 @@ export class NotificationRateLimiter {
     if (elapsed >= this.tokenIntervalMs) {
       const newTokens = Math.floor(elapsed / this.tokenIntervalMs);
       this.tokens = Math.min(this.maxTokens, this.tokens + newTokens);
-      this.lastTokenRefill += newTokens * this.tokenIntervalMs;
+      this.lastTokenRefill = Math.min(now, this.lastTokenRefill + newTokens * this.tokenIntervalMs);
     }
   }
 
@@ -83,12 +83,12 @@ export class NotificationRateLimiter {
     this.pauseUntil = performance.now() + (retryAfterSec + 0.5) * 1000;
   }
 
-  public canDispatchToUser(telegramId: number, now: number = Date.now()): boolean {
+  public canDispatchToUser(telegramId: number, now: number = performance.now()): boolean {
     const lastSent = this.lastUserDispatchTime.get(telegramId) || 0;
     return now - lastSent >= this.userDispatchGapMs;
   }
 
-  public recordUserDispatch(telegramId: number, now: number = Date.now()): void {
+  public recordUserDispatch(telegramId: number, now: number = performance.now()): void {
     this.lastUserDispatchTime.set(telegramId, now);
   }
 
@@ -101,7 +101,7 @@ export class NotificationRateLimiter {
    * Prunes user timestamps older than TTL to prevent memory leaks in continuous runtime.
    */
   public pruneStaleUserTimestamps(): number {
-    const cutoff = Date.now() - this.staleTimestampTtlMs;
+    const cutoff = performance.now() - this.staleTimestampTtlMs;
     let pruned = 0;
     for (const [tgId, lastSent] of this.lastUserDispatchTime.entries()) {
       if (lastSent < cutoff) {

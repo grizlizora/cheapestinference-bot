@@ -260,10 +260,9 @@ export class RobustHttpClient {
           continue;
         }
 
-        if (redirectsCount > 0 && err.message.includes("Redirect")) {
-          throw err;
+        if (!opts.signal?.aborted) {
+          await this.proxyPool.reportFailure(proxy.url, 500);
         }
-        await this.proxyPool.reportFailure(proxy.url, 500);
         throw err;
       }
     }

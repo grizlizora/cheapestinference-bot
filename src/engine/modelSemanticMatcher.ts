@@ -24,20 +24,22 @@ export interface ModelCatalogDiff {
 
 export class ModelSemanticMatcher {
   private static readonly FAMILY_PATTERNS: Array<{ family: string; regex: RegExp }> = [
-    { family: "glm", regex: /\b(glm|chatglm)[-_ ]*(\d+(?:\.\d+)*)?/i },
-    { family: "qwen", regex: /\b(qwen)[-_ ]*(\d+(?:\.\d+)*)?/i },
-    { family: "kimi", regex: /\b(kimi|moonshot)[-_ ]*(k?\d+(?:\.\d+)*)?/i },
-    { family: "deepseek", regex: /\b(deepseek)[-_ ]*(v?\d+(?:\.\d+)*|r\d+)?/i },
-    { family: "mimo", regex: /\b(mimo)[-_ ]*(v?\d+(?:\.\d+)*)?/i },
-    { family: "minimax", regex: /\b(minimax)[-_ ]*(m?\d+(?:\.\d+)*)?/i },
-    { family: "llama", regex: /\b(llama)[-_ ]*(\d+(?:\.\d+)*)?/i },
-    { family: "claude", regex: /\b(claude)[-_ ]*(\d+(?:\.\d+)*)?/i },
-    { family: "mistral", regex: /\b(mistral|mixtral)[-_ ]*(\d+(?:\.\d+)*)?/i },
-    { family: "gpt", regex: /\b(gpt)[-_ ]*(\d+(?:\.\d+)*)?/i },
-    { family: "gemma", regex: /\b(gemma)[-_ ]*(\d+(?:\.\d+)*)?/i },
-    { family: "phi", regex: /\b(phi)[-_ ]*(\d+(?:\.\d+)*)?/i },
-    { family: "yi", regex: /\b(yi)[-_ ]*(\d+(?:\.\d+)*)?/i },
-    { family: "command", regex: /\b(command)[-_ ]*(r?\d+(?:\.\d+)*)?/i },
+    { family: "glm", regex: /\b(glm|chatglm)[-_ ]*(\d+(?:[._-]\d+)*)?/i },
+    { family: "qwen", regex: /\b(qwen)[-_ ]*(\d+(?:[._-]\d+)*)?/i },
+    { family: "kimi", regex: /\b(kimi|moonshot)[-_ ]*(k?\d+(?:[._-]\d+)*)?/i },
+    { family: "deepseek", regex: /\b(deepseek)[-_ ]*(v?\d+(?:[._-]\d+)*|r\d+)?/i },
+    { family: "mimo", regex: /\b(mimo)[-_ ]*(v?\d+(?:[._-]\d+)*)?/i },
+    { family: "minimax", regex: /\b(minimax)[-_ ]*(m?\d+(?:[._-]\d+)*)?/i },
+    { family: "llama", regex: /\b(llama)[-_ ]*(\d+(?:[._-]\d+)*)?/i },
+    { family: "claude", regex: /\b(claude)[-_ ]*(\d+(?:[._-]\d+)*)?/i },
+    { family: "mistral", regex: /\b(mistral|mixtral)[-_ ]*(\d+(?:[._-]\d+)*)?/i },
+    { family: "gpt", regex: /\b(gpt)[-_ ]*(\d+(?:[._-]\d+)*)?/i },
+    { family: "openai-o", regex: /\b(o[1-9])[-_ ]*(\d+(?:[._-]\d+)*)?/i },
+    { family: "gemini", regex: /\b(gemini)[-_ ]*(\d+(?:[._-]\d+)*)?/i },
+    { family: "gemma", regex: /\b(gemma)[-_ ]*(\d+(?:[._-]\d+)*)?/i },
+    { family: "phi", regex: /\b(phi)[-_ ]*(\d+(?:[._-]\d+)*)?/i },
+    { family: "yi", regex: /\b(yi)[-_ ]*(\d+(?:[._-]\d+)*)?/i },
+    { family: "command", regex: /\b(command)[-_ ]*(r?\d+(?:[._-]\d+)*)?/i },
   ];
 
   public static parseModel(raw: string): ParsedModelToken {
@@ -57,6 +59,12 @@ export class ModelSemanticMatcher {
       }
     }
 
+    let paramSize: string | undefined;
+    const paramMatch = clean.match(/\b(\d+x\d+b|\d+b)\b/i);
+    if (paramMatch) {
+      paramSize = paramMatch[1].toLowerCase();
+    }
+
     if (bestMatch) {
       family = bestMatch.family;
       if (bestMatch.match[2]) {
@@ -71,7 +79,16 @@ export class ModelSemanticMatcher {
         versionMajor = parseInt(verMatch[1], 10) || 0;
         versionMinor = parseInt(verMatch[2] || "0", 10) || 0;
       }
-    } else {
+    }
+
+    if (paramSize && versionStr) {
+      const paramNum = paramSize.replace("b", "");
+      if (versionStr.endsWith(`.${paramNum}`)) {
+        versionStr = versionStr.substring(0, versionStr.length - paramNum.length - 1);
+      }
+    }
+
+    if (versionStr) {
       const parts = versionStr.split(".");
       versionMajor = parseInt(parts[0], 10) || 0;
       versionMinor = parseInt(parts[1] || "0", 10) || 0;
@@ -81,12 +98,6 @@ export class ModelSemanticMatcher {
     const variantMatch = clean.match(/\b(max|flash|turbo|plus|pro|coder|reasoner|chat|instruct|lite|ultra|base|large|small|medium|mini|haiku|sonnet|opus)\b/i);
     if (variantMatch) {
       variant = variantMatch[1].toLowerCase();
-    }
-
-    let paramSize: string | undefined;
-    const paramMatch = clean.match(/\b(\d+x\d+b|\d+b)\b/i);
-    if (paramMatch) {
-      paramSize = paramMatch[1].toLowerCase();
     }
 
     return {

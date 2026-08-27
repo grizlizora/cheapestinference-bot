@@ -10,6 +10,7 @@
     "block_asia": "Asia",
     "block_europe": "Europe",
     "block_americas": "Americas",
+    "block_ALL": "All Blocks",
     "hours_suffix": "UTC",
     "currency_month": "mo",
     "currency_day": "day",
@@ -51,7 +52,7 @@
     "block_row": "{block_icon} <b>{block_name}</b> ({hours_utc}):\n   {status_badge} — <b>${price}/mo</b>",
     "btn_subscribe_pool": "🔔 Subscribe to {pool_name}",
     "btn_unsubscribe_pool": "🔕 Unsubscribe from {pool_name}",
-    "btn_pool_filters": "⚙️ Alert Settings ({pool_name})",
+    "btn_pool_filters": "🔔 Notification Filters ({pool_name})",
     "btn_open_site": "🛒 Order on website"
   },
   "pool_settings": {

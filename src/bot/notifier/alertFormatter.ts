@@ -28,7 +28,7 @@ export interface OutgoingAlertMessage {
 
 export function cleanPriceString(val: string | number | undefined | null): string {
   if (val === undefined || val === null || val === "") return "0";
-  const cleaned = String(val).replace(/[^0-9.-]/g, "");
+  const cleaned = String(val).replace(/,/g, "").replace(/[^0-9.-]/g, "");
   const num = parseFloat(cleaned);
   if (isNaN(num) || Object.is(num, -0) || num === 0) return "0";
   return num % 1 === 0 ? num.toFixed(0) : num.toFixed(2);
@@ -39,6 +39,7 @@ export function formatPriceDeltaBadge(
   pct: number,
   lang: SupportedLanguage
 ): string {
+  if (!Number.isFinite(delta) || !Number.isFinite(pct)) return "";
   const roundedDelta = Math.round(Math.abs(delta) * 100) / 100;
   if (roundedDelta === 0) return "";
   const currencyMonth = translate(lang, "common.currency_month") || "mo";
@@ -74,22 +75,33 @@ export function formatPriceRatingBadge(
   if (pa.rating === "all_time_low") {
     return translate(lang, "alerts.price_all_time_low") || `🔥 <b>Історичний мінімум! Найнижча ціна ($${currStr})</b>`;
   }
-  if (pa.rating === "below_average" && pa.avgPrice) {
+  if (pa.rating === "below_average" && pa.avgPrice != null) {
     return (
       translate(lang, "alerts.price_below_average", { current: currStr, avg: avgStr }) ||
       `🟢 <b>Нижче середнього ($${currStr} vs сер. $${avgStr})</b>`
     );
   }
-  if (pa.rating === "above_average" && pa.avgPrice) {
+  if (pa.rating === "above_average" && pa.avgPrice != null) {
     return (
       translate(lang, "alerts.price_above_average", { current: currStr, avg: avgStr }) ||
       `🔴 <b>Вище середнього ($${currStr} vs сер. $${avgStr})</b>`
     );
   }
-  if (pa.rating === "fair" && pa.avgPrice) {
+  if (pa.rating === "fair" && pa.avgPrice != null) {
     return translate(lang, "alerts.price_fair_value") || "⚖️ <b>Стандартна ціна (в межах норми)</b>";
   }
   return "";
+}
+
+function resolveBlockName(eventBlock: string, lang: SupportedLanguage): string {
+  const translated = translate(lang, `common.block_${eventBlock}`);
+  if (translated && translated !== `common.block_${eventBlock}`) {
+    return translated;
+  }
+  if (eventBlock === "ALL") {
+    return translate(lang, "common.block_ALL") || "All Blocks";
+  }
+  return eventBlock;
 }
 
 export function formatAlertMessage(
@@ -99,7 +111,7 @@ export function formatAlertMessage(
   cachedDurationFormatted?: string
 ): OutgoingAlertMessage {
   const lang = user.language;
-  const blockName = translate(lang, `common.block_${event.block}`) || event.block;
+  const blockName = resolveBlockName(event.block, lang);
   const timeFormatted = new Date(event.timestamp).toISOString().replace("T", " ").substring(0, 19);
   const currencyMonth = translate(lang, "common.currency_month") || "mo";
 
@@ -177,8 +189,10 @@ export function formatAlertMessage(
         } else if (eta.confidence === "MEDIUM") {
           confBadge = translate(lang, "intelligence.conf_medium") || "🟡 Середня точність";
         }
-        const cadence = eta.detectedCadenceHours
+        const cadence = eta.detectedCadenceHours === 24
           ? translate(lang, "intelligence.cadence_daily") || "добовий цикл ~24h"
+          : eta.detectedCadenceHours
+          ? `~${eta.detectedCadenceHours}h cycle`
           : eta.formattedEtaWindow;
         body += `\n\n🔮 <b>${translate(lang, "intelligence.eta_title") || "Очікувана поява"}:</b> <code>${escapeHtml(cadence)}</code> [${confBadge}]`;
       } else {
@@ -317,11 +331,11 @@ export function formatAlertMessage(
         })
       );
     }
-    if (event.tierUpdate?.newAnnualDiscount) {
+    if (event.tierUpdate?.newAnnualDiscount !== undefined) {
       diffLines.push(
         translate(lang, "alerts.tier_discount_change", {
-          old_discount: ((event.tierUpdate.previousAnnualDiscount || 0.15) * 100).toFixed(0),
-          new_discount: (event.tierUpdate.newAnnualDiscount * 100).toFixed(0),
+          old_discount: (((event.tierUpdate.previousAnnualDiscount ?? 0.15)) * 100).toFixed(0),
+          new_discount: ((event.tierUpdate.newAnnualDiscount * 100)).toFixed(0),
         })
       );
     }
@@ -416,15 +430,17 @@ export function formatBundledAlertMessage(
   const keyboard = new InlineKeyboard();
 
   let highestPriority: BroadcastPriority = "P3";
+  const pRank: Record<BroadcastPriority, number> = { P0: 4, P1: 3, P2: 2, P3: 1 };
   for (const item of matchedEvents) {
-    if (item.priority === "P1") highestPriority = "P1";
-    else if (item.priority === "P2" && highestPriority !== "P1") highestPriority = "P2";
+    if (pRank[item.priority] > pRank[highestPriority]) {
+      highestPriority = item.priority;
+    }
   }
 
   let buttonCount = 0;
 
   for (const { event } of matchedEvents) {
-    const blockName = translate(lang, `common.block_${event.block}`) || event.block;
+    const blockName = resolveBlockName(event.block, lang);
     const blockHash = event.block && event.block !== "ALL" ? `#${event.block}` : "";
     const checkoutUrl = `https://cheapestinference.com/pools/${event.poolSlug}${blockHash}`;
 

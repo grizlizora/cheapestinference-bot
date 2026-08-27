@@ -1,12 +1,11 @@
 /**
  * src/http/undiciAgent.ts
- * Low-Level Undici Agent Factory, SOCKS5+TLS Connector & TLS Session Ticket Cache
+ * Low-Level Undici Agent Factory, SOCKS5+TLS Connector & Hardened TLS Session Ticket Cache
  */
 
 import { Dispatcher, Agent, ProxyAgent } from "undici";
 import { SocksClient, SocksClientOptions } from "socks";
 import tls from "node:tls";
-import net from "node:net";
 import { defaultDnsCache } from "./dnsCache.js";
 
 export interface UndiciPoolConfig {
@@ -17,11 +16,27 @@ export interface UndiciPoolConfig {
   maxCachedDispatchers?: number;
 }
 
+interface CachedTicket {
+  ticket: Buffer;
+  expiresAt: number;
+}
+
 export class TlsSessionTicketCache {
-  private cache = new Map<string, Buffer>();
+  private cache = new Map<string, CachedTicket>();
+  private readonly ttlMs: number;
+
+  constructor(ttlHours = 2) {
+    this.ttlMs = ttlHours * 60 * 60 * 1000;
+  }
 
   public get(host: string): Buffer | undefined {
-    return this.cache.get(host);
+    const entry = this.cache.get(host);
+    if (!entry) return undefined;
+    if (Date.now() > entry.expiresAt) {
+      this.cache.delete(host);
+      return undefined;
+    }
+    return entry.ticket;
   }
 
   public set(host: string, ticket: Buffer): void {
@@ -29,7 +44,14 @@ export class TlsSessionTicketCache {
       const oldest = this.cache.keys().next().value;
       if (oldest) this.cache.delete(oldest);
     }
-    this.cache.set(host, ticket);
+    this.cache.set(host, {
+      ticket,
+      expiresAt: Date.now() + this.ttlMs,
+    });
+  }
+
+  public invalidate(host: string): void {
+    this.cache.delete(host);
   }
 
   public clear(): void {
@@ -106,6 +128,7 @@ export function createSocksDispatcher(
 
     client.on("established", (info) => {
       info.socket.setNoDelay(true);
+      info.socket.setKeepAlive(true, 1000);
 
       if (opts.protocol === "https:" || destPort === 443) {
         const cachedSession = tlsCache.get(destHost);
@@ -126,6 +149,7 @@ export function createSocksDispatcher(
         tlsSocket.setTimeout(tlsTimeout, () => {
           if (!isHandshakeComplete) {
             isHandshakeComplete = true;
+            tlsCache.invalidate(destHost);
             info.socket.destroy();
             tlsSocket.destroy(new Error("TLS Handshake Timeout over SOCKS5"));
             callback(new Error("TLS Handshake Timeout over SOCKS5"), null);
@@ -143,7 +167,9 @@ export function createSocksDispatcher(
         tlsSocket.on("error", (err) => {
           if (!isHandshakeComplete) {
             isHandshakeComplete = true;
+            tlsCache.invalidate(destHost);
             info.socket.destroy();
+            tlsSocket.destroy(err);
             callback(err, null);
           }
         });
@@ -151,7 +177,9 @@ export function createSocksDispatcher(
         info.socket.on("error", (err) => {
           if (!isHandshakeComplete) {
             isHandshakeComplete = true;
-            tlsSocket.destroy();
+            tlsCache.invalidate(destHost);
+            info.socket.destroy();
+            tlsSocket.destroy(err);
             callback(err, null);
           }
         });

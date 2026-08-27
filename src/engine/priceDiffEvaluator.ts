@@ -31,10 +31,13 @@ export class PriceDiffEvaluator {
    */
   public static parseCleanPrice(val: string | undefined | null): number {
     if (!val) return 0;
-    const match = String(val).match(/[-+]?\d+(?:\.\d+)?/);
+    const sanitized = String(val)
+      .replace(/[^\d.,+-]/g, "")
+      .replace(/,/g, "");
+    const match = sanitized.match(/[-+]?(?:\d+(?:\.\d+)?|\.\d+)/);
     if (!match) return 0;
     const num = parseFloat(match[0]);
-    if (isNaN(num)) return 0;
+    if (isNaN(num) || !Number.isFinite(num)) return 0;
     return Math.round(num * 100) / 100;
   }
 
@@ -42,6 +45,7 @@ export class PriceDiffEvaluator {
    * Floating-point sanitizer eliminating IEEE 754 precision artifacts and -0
    */
   public static cleanDelta(val: number): number {
+    if (!Number.isFinite(val)) return 0;
     const rounded = Math.round(val * 100) / 100;
     return Object.is(rounded, -0) || rounded === 0 ? 0 : rounded;
   }

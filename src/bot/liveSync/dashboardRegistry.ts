@@ -61,12 +61,13 @@ export class ActiveDashboardRegistry {
     });
   }
 
-  public updateView(chatId: number, viewType: LiveViewType, poolSlug?: string, lang?: SupportedLanguage): void {
+  public updateView(chatId: number, viewType: LiveViewType, poolSlug?: string, lang?: SupportedLanguage, messageId?: number): void {
     const session = this.activeSessions.get(chatId);
     if (session) {
       session.viewType = viewType;
       if (poolSlug !== undefined) session.poolSlug = poolSlug;
       if (lang !== undefined) session.lang = lang;
+      if (messageId !== undefined && messageId > 0) session.messageId = messageId;
       session.lastUserInteractionAt = Date.now();
     }
   }

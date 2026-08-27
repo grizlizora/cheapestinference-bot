@@ -270,7 +270,9 @@ export class SlotStateTracker {
                 ? PriceDiffEvaluator.cleanDelta((priceDelta / prevPriceNum) * 100)
                 : 0;
 
-            if (priceDelta !== 0 && prevPriceNum > 0 && newPriceNum > 0) {
+            const isValidPrev = prevSlot.pricePerMonth !== undefined && prevSlot.pricePerMonth !== "" && !isNaN(prevPriceNum);
+            const isValidNew = block.pricePerMonth !== undefined && block.pricePerMonth !== "" && !isNaN(newPriceNum);
+            if (priceDelta !== 0 && isValidPrev && isValidNew && prevPriceNum >= 0 && newPriceNum >= 0) {
               if (!stagedPriceChanges.has(pool.slug)) {
                 stagedPriceChanges.set(pool.slug, []);
               }

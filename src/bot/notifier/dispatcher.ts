@@ -247,10 +247,13 @@ export class NotificationDispatcher {
 
   private popValidCandidate(q: CircularRingBuffer<OutgoingAlertMessage>): OutgoingAlertMessage | undefined {
     const now = Date.now();
-    const skipped: OutgoingAlertMessage[] = [];
+    const deferred: OutgoingAlertMessage[] = [];
     let chosen: OutgoingAlertMessage | undefined;
+    let scanCount = 0;
+    const maxScan = Math.min(q.size(), 50);
 
-    while (!q.isEmpty()) {
+    while (!q.isEmpty() && scanCount < maxScan) {
+      scanCount++;
       const candidate = q.pop()!;
 
       // 1. Drop stale alerts (> 10 min old)
@@ -265,9 +268,8 @@ export class NotificationDispatcher {
       }
 
       // 3. Check per-user rate limit (1.05s gap)
-      if (!this.rateLimiter.canDispatchToUser(candidate.telegramId, now)) {
-        skipped.push(candidate);
-        if (skipped.length > 20) break; // Avoid deep scan on high burst
+      if (!this.rateLimiter.canDispatchToUser(candidate.telegramId)) {
+        deferred.push(candidate);
         continue;
       }
 
@@ -275,9 +277,9 @@ export class NotificationDispatcher {
       break;
     }
 
-    // Re-queue skipped candidates back to the front
-    for (let i = skipped.length - 1; i >= 0; i--) {
-      q.unshift(skipped[i]);
+    // Re-queue rate-limited candidates to the tail so ready subscribers behind them are processed
+    for (const d of deferred) {
+      q.push(d);
     }
     return chosen;
   }
@@ -418,10 +420,10 @@ export class NotificationDispatcher {
 
     if (this.blockedUsersBatch.length === 0) return;
     const uniqueIds = Array.from(new Set(this.blockedUsersBatch));
-    this.blockedUsersBatch = [];
 
     try {
       this.userDao.deactivateUsersBatch(uniqueIds);
+      this.blockedUsersBatch = [];
       console.log(`🧹 [NotificationDispatcher] Deactivated ${uniqueIds.length} unique blocked users in DB transaction.`);
     } catch (e: any) {
       console.error("[NotificationDispatcher] Error persisting blocked users to DB:", e.message);

@@ -10,6 +10,7 @@
     "block_asia": "Азия",
     "block_europe": "Европа",
     "block_americas": "Америка",
+    "block_ALL": "Все блоки",
     "hours_suffix": "UTC",
     "currency_month": "мес",
     "currency_day": "день",
@@ -51,7 +52,7 @@
     "block_row": "{block_icon} <b>{block_name}</b> ({hours_utc}):\n   {status_badge} — <b>${price}/мес</b>",
     "btn_subscribe_pool": "🔔 Подписаться на пул {pool_name}",
     "btn_unsubscribe_pool": "🔕 Отписаться от {pool_name}",
-    "btn_pool_filters": "⚙️ Фильтры тарифа {pool_name}",
+    "btn_pool_filters": "🔔 Фильтры уведомлений {pool_name}",
     "btn_open_site": "🛒 Заказать на сайте"
   },
   "pool_settings": {
