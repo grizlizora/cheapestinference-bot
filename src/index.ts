@@ -19,6 +19,14 @@ import { DatabaseMaintenanceManager } from "./db/maintenance.js";
 import { createTelegramBot } from "./bot/index.js";
 import { createHealthServer } from "./server/health.js";
 
+process.on("unhandledRejection", (reason) => {
+  console.error("⚠️ [Resilience] Unhandled Promise Rejection:", reason);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("❌ [Resilience] Uncaught Exception caught safely:", err);
+});
+
 async function bootstrap() {
   console.log("==================================================");
   console.log("🚀 Starting CheapestInference Telegram Monitor Bot");
@@ -161,14 +169,6 @@ async function bootstrap() {
 
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("SIGINT", () => shutdown("SIGINT"));
-
-  process.on("unhandledRejection", (reason) => {
-    console.error("⚠️ [Resilience] Unhandled Promise Rejection:", reason);
-  });
-
-  process.on("uncaughtException", (err) => {
-    console.error("❌ [Resilience] Uncaught Exception:", err);
-  });
 }
 
 bootstrap().catch((err) => {

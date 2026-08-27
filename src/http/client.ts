@@ -123,7 +123,7 @@ export class RobustHttpClient {
               ? 80
               : 443;
 
-          SocksClient.createConnection({
+          const client = new SocksClient({
             proxy: {
               host,
               port,
@@ -137,59 +137,75 @@ export class RobustHttpClient {
               port: destPort,
             },
             timeout: Math.min(timeoutMs, 6_000),
-          })
-            .then((info) => {
-              info.socket.setNoDelay(true);
-              let isHandshakeComplete = false;
+          });
 
-              if (opts.protocol === "https:" || destPort === 443) {
-                const cachedSession = this.tlsSessionCache.get(destHost);
-                const tlsSocket = tls.connect({
-                  socket: info.socket,
-                  servername: opts.servername || destHost,
-                  rejectUnauthorized: true,
-                  ALPNProtocols: ["http/1.1"],
-                  session: cachedSession,
-                });
-                tlsSocket.setNoDelay(true);
+          let isHandshakeComplete = false;
 
-                // Capture TLS session ticket for 1-RTT / 0-RTT resumption
-                tlsSocket.on("session", (sessionBuffer: Buffer) => {
-                  this.tlsSessionCache.set(destHost, sessionBuffer);
-                });
+          // Always listen to error on client to prevent unhandled EventEmitter exception on timeout
+          client.on("error", (err: any) => {
+            if (!isHandshakeComplete) {
+              isHandshakeComplete = true;
+              callback(err, null);
+            }
+          });
 
-                const tlsTimeout = Math.min(timeoutMs, 5_000);
-                tlsSocket.setTimeout(tlsTimeout, () => {
-                  if (!isHandshakeComplete) {
-                    info.socket.destroy();
-                    tlsSocket.destroy(new Error("TLS Handshake Timeout over SOCKS5"));
-                  }
-                });
+          client.on("established", (info) => {
+            info.socket.setNoDelay(true);
 
-                tlsSocket.once("secureConnect", () => {
+            if (opts.protocol === "https:" || destPort === 443) {
+              const cachedSession = this.tlsSessionCache.get(destHost);
+              const tlsSocket = tls.connect({
+                socket: info.socket,
+                servername: opts.servername || destHost,
+                rejectUnauthorized: true,
+                ALPNProtocols: ["http/1.1"],
+                session: cachedSession,
+              });
+              tlsSocket.setNoDelay(true);
+
+              // Capture TLS session ticket for 1-RTT / 0-RTT resumption
+              tlsSocket.on("session", (sessionBuffer: Buffer) => {
+                this.tlsSessionCache.set(destHost, sessionBuffer);
+              });
+
+              const tlsTimeout = Math.min(timeoutMs, 5_000);
+              tlsSocket.setTimeout(tlsTimeout, () => {
+                if (!isHandshakeComplete) {
+                  isHandshakeComplete = true;
+                  info.socket.destroy();
+                  tlsSocket.destroy(new Error("TLS Handshake Timeout over SOCKS5"));
+                  callback(new Error("TLS Handshake Timeout over SOCKS5"), null);
+                }
+              });
+
+              tlsSocket.once("secureConnect", () => {
+                if (!isHandshakeComplete) {
                   isHandshakeComplete = true;
                   tlsSocket.setTimeout(0);
                   callback(null, tlsSocket);
-                });
-                tlsSocket.once("error", (err) => {
-                  if (!isHandshakeComplete) {
-                    isHandshakeComplete = true;
-                    info.socket.destroy();
-                    callback(err, null);
-                  }
-                });
-                info.socket.once("error", (err) => {
-                  if (!isHandshakeComplete) {
-                    isHandshakeComplete = true;
-                    tlsSocket.destroy();
-                    callback(err, null);
-                  }
-                });
-              } else {
-                callback(null, info.socket);
-              }
-            })
-            .catch((err) => callback(err, null));
+                }
+              });
+              tlsSocket.on("error", (err) => {
+                if (!isHandshakeComplete) {
+                  isHandshakeComplete = true;
+                  info.socket.destroy();
+                  callback(err, null);
+                }
+              });
+              info.socket.on("error", (err) => {
+                if (!isHandshakeComplete) {
+                  isHandshakeComplete = true;
+                  tlsSocket.destroy();
+                  callback(err, null);
+                }
+              });
+            } else {
+              isHandshakeComplete = true;
+              callback(null, info.socket);
+            }
+          });
+
+          client.connect();
         },
         keepAliveTimeout: 45_000,
         keepAliveMaxTimeout: 55_000,
