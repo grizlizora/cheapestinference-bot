@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { TierUpdatedPayload, PoolBasePricePayload } from "../../types/domain.js";
+import { TierUpdatedPayload, PoolBasePricePayload, PriceAnalyticsPayload, PriceRating } from "../../types/domain.js";
 import { ModelCatalogDiff } from "../../engine/modelSemanticMatcher.js";
 import { tursoCloudSync } from "../tursoSync.js";
 
@@ -144,5 +144,70 @@ export class CatalogHistoryDAO {
       ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
       [poolSlug, blockId, oldPrice, newPrice, priceDelta, percentDelta]
     );
+  }
+
+  /**
+   * Computes historical price benchmarks (min, max, avg) and rates the current price
+   * with sample size gating (requires >= 3 records).
+   */
+  public getPriceAnalytics(poolSlug: string, blockId?: string, currentPrice?: number): PriceAnalyticsPayload {
+    let row: any;
+    if (blockId && blockId !== "ALL") {
+      row = this.db
+        .prepare(`
+          SELECT 
+            COUNT(*) as count,
+            MIN(CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL)) as min_p,
+            MAX(CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL)) as max_p,
+            AVG(CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL)) as avg_p
+          FROM slot_price_history
+          WHERE pool_slug = ? AND block_id = ?
+        `)
+        .get(poolSlug, blockId);
+    } else {
+      row = this.db
+        .prepare(`
+          SELECT 
+            COUNT(*) as count,
+            MIN(CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL)) as min_p,
+            MAX(CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL)) as max_p,
+            AVG(CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL)) as avg_p
+          FROM slot_price_history
+          WHERE pool_slug = ?
+        `)
+        .get(poolSlug);
+    }
+
+    const count = Number(row?.count || 0);
+    const minP = row?.min_p != null ? Math.round(Number(row.min_p) * 100) / 100 : null;
+    const maxP = row?.max_p != null ? Math.round(Number(row.max_p) * 100) / 100 : null;
+    const avgP = row?.avg_p != null ? Math.round(Number(row.avg_p) * 100) / 100 : null;
+
+    if (count < 3 || currentPrice == null || isNaN(currentPrice) || avgP == null) {
+      return {
+        rating: "insufficient_data",
+        minPrice: minP,
+        avgPrice: avgP,
+        maxPrice: maxP,
+        sampleCount: count,
+      };
+    }
+
+    let rating: PriceRating = "fair";
+    if (minP !== null && currentPrice <= minP) {
+      rating = "all_time_low";
+    } else if (currentPrice < avgP * 0.95) {
+      rating = "below_average";
+    } else if (currentPrice > avgP * 1.05) {
+      rating = "above_average";
+    }
+
+    return {
+      rating,
+      minPrice: minP,
+      avgPrice: avgP,
+      maxPrice: maxP,
+      sampleCount: count,
+    };
   }
 }

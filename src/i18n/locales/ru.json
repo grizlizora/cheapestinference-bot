@@ -151,7 +151,11 @@
     "btn_open_pool": "🔎 Посмотреть тариф в боте",
     "price_drop_badge": "Снижение цены! 🔥",
     "tag_hot_slot_drop": "🔥 <i>Горячий слот (разбирают за {duration})</i>",
-    "tag_multi_region_drop": "🆕 <i>Новый дроп мощностей ({count} региона открыто)</i>"
+    "tag_multi_region_drop": "🆕 <i>Новый дроп мощностей ({count} региона открыто)</i>",
+    "price_all_time_low": "🔥 <b>Исторический минимум (ATL)! Самая низкая цена за всё время</b>",
+    "price_below_average": "🟢 <b>Ниже среднего (${current} vs сред. ${avg})</b>",
+    "price_above_average": "🔴 <b>Выше среднего (${current} vs сред. ${avg})</b>",
+    "price_fair_value": "⚖️ <b>Стандартная рыночная цена (в пределах нормы)</b>"
   },
   "intelligence": {
     "tag_high_demand": "🔥 Высокий спрос (5-30 мин)",

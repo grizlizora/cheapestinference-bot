@@ -39,6 +39,16 @@ export interface TierUpdatedPayload {
   manualProvisioningChanged?: boolean;
 }
 
+export type PriceRating = "all_time_low" | "below_average" | "fair" | "above_average" | "insufficient_data";
+
+export interface PriceAnalyticsPayload {
+  rating: PriceRating;
+  minPrice: number | null;
+  avgPrice: number | null;
+  maxPrice: number | null;
+  sampleCount: number;
+}
+
 export interface SlotPricePayload {
   block: string;
   hoursUtc: string;
@@ -47,6 +57,7 @@ export interface SlotPricePayload {
   priceDelta: number;
   percentageDelta: number;
   isDiscount: boolean;
+  priceAnalytics?: PriceAnalyticsPayload;
 }
 
 export interface PoolBasePricePayload {
@@ -54,6 +65,7 @@ export interface PoolBasePricePayload {
   newMinPrice: string;
   priceDelta: number;
   percentageDelta: number;
+  priceAnalytics?: PriceAnalyticsPayload;
 }
 
 export type DemandCategory = "flash" | "hot" | "moderate" | "stable" | "unknown";
@@ -93,6 +105,7 @@ export interface SlotAnalyticsPayload {
   dropPattern: DropPatternType;
   totalOpenings: number;
   lastOpenedAt?: string | null;
+  eta?: EtaPrediction;
 }
 
 export interface DiffEvent {

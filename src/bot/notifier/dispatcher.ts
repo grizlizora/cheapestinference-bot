@@ -1,6 +1,6 @@
 import { Bot, InlineKeyboard } from "grammy";
 import { BotContext } from "../../types/context.js";
-import { DiffEvent } from "../../types/domain.js";
+import { DiffEvent, PriceAnalyticsPayload } from "../../types/domain.js";
 import { UserDAO } from "../../db/dao/users.js";
 import { NotificationLogDAO } from "../../db/dao/notificationLogs.js";
 import { SlotHistoryDAO } from "../../db/dao/slotHistory.js";
@@ -428,6 +428,37 @@ export class NotificationDispatcher {
     }
   }
 
+  private formatPriceRatingBadge(
+    pa: PriceAnalyticsPayload | undefined,
+    currentPrice: number,
+    lang: SupportedLanguage
+  ): string {
+    if (!pa || pa.rating === "insufficient_data" || pa.sampleCount < 3) return "";
+    const currStr = currentPrice % 1 === 0 ? currentPrice.toFixed(0) : currentPrice.toFixed(2);
+    const avgStr =
+      pa.avgPrice != null ? (pa.avgPrice % 1 === 0 ? pa.avgPrice.toFixed(0) : pa.avgPrice.toFixed(2)) : "";
+
+    if (pa.rating === "all_time_low") {
+      return translate(lang, "alerts.price_all_time_low") || `🔥 <b>Історичний мінімум! Найнижча ціна ($${currStr})</b>`;
+    }
+    if (pa.rating === "below_average" && pa.avgPrice) {
+      return (
+        translate(lang, "alerts.price_below_average", { current: currStr, avg: avgStr }) ||
+        `🟢 <b>Нижче середнього ($${currStr} vs сер. $${avgStr})</b>`
+      );
+    }
+    if (pa.rating === "above_average" && pa.avgPrice) {
+      return (
+        translate(lang, "alerts.price_above_average", { current: currStr, avg: avgStr }) ||
+        `🔴 <b>Вище середнього ($${currStr} vs сер. $${avgStr})</b>`
+      );
+    }
+    if (pa.rating === "fair" && pa.avgPrice) {
+      return translate(lang, "alerts.price_fair_value") || "⚖️ <b>Стандартна ціна (в межах норми)</b>";
+    }
+    return "";
+  }
+
   private truncateToTelegramLimit(text: string, maxLen = 3900): string {
     if (text.length <= maxLen) return text;
     let truncated = text.substring(0, maxLen - 30);
@@ -529,11 +560,35 @@ export class NotificationDispatcher {
       const header = translate(lang, "alerts.slot_disappeared_header", {
         pool_name: escapeHtml(event.poolName),
       });
-      const body = translate(lang, "alerts.slot_disappeared_body", {
+      let body = translate(lang, "alerts.slot_disappeared_body", {
         pool_name: escapeHtml(event.poolName),
         block_name: escapeHtml(blockName),
         timestamp: timeFormatted,
       });
+
+      const eta = event.analytics?.eta;
+      if (eta) {
+        if (eta.isPredictable) {
+          let confBadge = translate(lang, "intelligence.conf_low") || "⚪";
+          if (eta.confidence === "HIGH") {
+            confBadge = translate(lang, "intelligence.conf_high") || "🟢 Висока точність";
+          } else if (eta.confidence === "MEDIUM") {
+            confBadge = translate(lang, "intelligence.conf_medium") || "🟡 Середня точність";
+          }
+          const cadence = eta.detectedCadenceHours
+            ? translate(lang, "intelligence.cadence_daily") || "добовий цикл ~24h"
+            : eta.formattedEtaWindow;
+          body += `\n\n🔮 <b>${translate(lang, "intelligence.eta_title") || "Очікувана поява"}:</b> <code>${escapeHtml(cadence)}</code> [${confBadge}]`;
+        } else {
+          body += `\n\n🔮 <b>${translate(lang, "intelligence.eta_title") || "Прогноз"}:</b> <i>${
+            translate(lang, "intelligence.eta_gathering_data", {
+              count: eta.sampleCount,
+              min: eta.minRequired,
+            }) || `Збір статистики (${eta.sampleCount}/${eta.minRequired})`
+          }</i>`;
+        }
+      }
+
       text = `${header}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${body}`;
     } else if (event.type === "MODEL_UPGRADE_EVENT") {
       const header = translate(lang, "alerts.model_upgrade_header", {
@@ -595,13 +650,17 @@ export class NotificationDispatcher {
         ? this.formatPriceDeltaBadge(event.slotPrice.priceDelta, event.slotPrice.percentageDelta, lang)
         : "";
 
+      const cleanNewPrice = this.cleanPriceString(event.newPrice);
+      const newPriceNum = parseFloat(cleanNewPrice) || 0;
+      const ratingBadge = this.formatPriceRatingBadge(event.slotPrice?.priceAnalytics, newPriceNum, lang);
+
       const body = translate(lang, "alerts.slot_price_changed_body", {
         pool_name: escapeHtml(event.poolName),
         block_name: escapeHtml(blockName),
         old_price: escapeHtml(this.cleanPriceString(event.previousPrice)),
-        new_price: escapeHtml(this.cleanPriceString(event.newPrice)),
+        new_price: escapeHtml(cleanNewPrice),
         currency_month: currencyMonth,
-        delta_badge: deltaBadge,
+        delta_badge: deltaBadge + (ratingBadge ? `\n${ratingBadge}` : ""),
         hours_utc: escapeHtml(event.hoursUtc),
       });
 
@@ -609,7 +668,7 @@ export class NotificationDispatcher {
 
       const btnLabel = translate(lang, "alerts.btn_claim_slot_block", {
         block_name: blockName,
-        price: escapeHtml(this.cleanPriceString(event.newPrice)),
+        price: escapeHtml(cleanNewPrice),
         currency_month: currencyMonth,
       });
 
@@ -626,12 +685,16 @@ export class NotificationDispatcher {
         ? this.formatPriceDeltaBadge(event.basePrice.priceDelta, event.basePrice.percentageDelta, lang)
         : "";
 
+      const cleanNewPrice = this.cleanPriceString(event.newPrice);
+      const newPriceNum = parseFloat(cleanNewPrice) || 0;
+      const ratingBadge = this.formatPriceRatingBadge(event.basePrice?.priceAnalytics, newPriceNum, lang);
+
       const body = translate(lang, "alerts.pool_base_price_body", {
         pool_name: escapeHtml(event.poolName),
         old_price: escapeHtml(this.cleanPriceString(event.previousPrice)),
-        new_price: escapeHtml(this.cleanPriceString(event.newPrice)),
+        new_price: escapeHtml(cleanNewPrice),
         currency_month: currencyMonth,
-        delta_badge: deltaBadge,
+        delta_badge: deltaBadge + (ratingBadge ? `\n${ratingBadge}` : ""),
         models: (event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", "),
       });
 

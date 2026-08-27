@@ -151,7 +151,11 @@
     "btn_open_pool": "🔎 Переглянути пул у боті",
     "price_drop_badge": "Знижка ціни! 🔥",
     "tag_hot_slot_drop": "🔥 <i>Гарячий слот (розбирають за {duration})</i>",
-    "tag_multi_region_drop": "🆕 <i>Новий дроп потужностей ({count} регіони відкрито)</i>"
+    "tag_multi_region_drop": "🆕 <i>Новий дроп потужностей ({count} регіони відкрито)</i>",
+    "price_all_time_low": "🔥 <b>Історичний мінімум (ATL)! Найнижча ціна за весь час</b>",
+    "price_below_average": "🟢 <b>Нижче середнього (${current} vs сер. ${avg})</b>",
+    "price_above_average": "🔴 <b>Вище середнього (${current} vs сер. ${avg})</b>",
+    "price_fair_value": "⚖️ <b>Стандартна ринкова ціна (в межах норми)</b>"
   },
   "intelligence": {
     "tag_high_demand": "🔥 Високий попит (5-30 хв)",

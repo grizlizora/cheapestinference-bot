@@ -151,7 +151,11 @@
     "btn_open_pool": "🔎 View Pool in Bot",
     "price_drop_badge": "Price Drop! 🔥",
     "tag_hot_slot_drop": "🔥 <i>Hot slot (sells out in {duration})</i>",
-    "tag_multi_region_drop": "🆕 <i>Capacity Drop ({count} regions opened)</i>"
+    "tag_multi_region_drop": "🆕 <i>Capacity Drop ({count} regions opened)</i>",
+    "price_all_time_low": "🔥 <b>All-Time Low (ATL)! Lowest price recorded</b>",
+    "price_below_average": "🟢 <b>Below average (${current} vs avg ${avg})</b>",
+    "price_above_average": "🔴 <b>Above average (${current} vs avg ${avg})</b>",
+    "price_fair_value": "⚖️ <b>Standard market price (fair value)</b>"
   },
   "intelligence": {
     "tag_high_demand": "🔥 High Demand (5-30 min)",
