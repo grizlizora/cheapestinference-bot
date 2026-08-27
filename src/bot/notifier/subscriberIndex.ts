@@ -172,16 +172,11 @@ export class SubscriberInvertedIndex {
       }
     }
 
-    // Filter active users and respect user-level master category filters
+    // Filter active users (granular per-pool index keys are authoritative)
     const results: PackedUserProfile[] = [];
     for (const userId of matchedUserIds) {
       const profile = this.profiles.get(userId);
       if (!profile || !profile.isActive) continue;
-
-      if (eventType === "available" && profile.notifyAvailableGlobal === false) continue;
-      if (eventType === "sold_out" && profile.notifySoldOutGlobal === false) continue;
-      if (eventType === "models" && profile.notifyModelsGlobal === false) continue;
-      if (eventType === "prices" && profile.notifyPricesGlobal === false) continue;
 
       results.push(profile);
     }

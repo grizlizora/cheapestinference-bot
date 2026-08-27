@@ -147,6 +147,13 @@ export class DatabaseMaintenanceManager {
       }
     }, 60_000).unref();
 
+    // Periodic non-blocking WAL flush every 10 minutes to guarantee persistent disk safety
+    setInterval(() => {
+      try {
+        this.db.pragma("wal_checkpoint(PASSIVE)");
+      } catch {}
+    }, 10 * 60 * 1000).unref();
+
     const timer = setInterval(() => {
       try {
         const res = this.pruneOldLogs();

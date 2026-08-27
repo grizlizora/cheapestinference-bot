@@ -99,7 +99,7 @@ export function createPoolDetailMenu(
         .row();
 
       for (const blockId of blockIds) {
-        const isBlockActive = subDao.hasSubscription(ctx.user.id, slug, blockId);
+        const isBlockActive = subDao.isBlockSubscribed(ctx.user.id, slug, blockId);
         const blockName = translate(ctx.lang, `common.block_${blockId}`) || blockId;
         const blockRow = blocks.find((b) => b.block_id === blockId);
         const blockHours = blockRow?.hours_utc || "";
@@ -114,22 +114,26 @@ export function createPoolDetailMenu(
                 subDao.toggleBlockAndUpdatePool(c.user.id, slug, blockId, blockIds);
               const currentFlags = subDao.getPoolFlags(c.user.id, slug);
               const fullFlags = toFlags(currentFlags);
+              const disabledFlags = { available: false, soldOut: false, models: false, prices: false };
 
-              const blockFlags = {
-                available: active ? fullFlags.available : false,
-                soldOut: active ? fullFlags.soldOut : false,
-                models: active ? fullFlags.models : false,
-                prices: active ? fullFlags.prices : false,
-              };
-              const poolFlags = {
-                available: parentPoolActive ? fullFlags.available : false,
-                soldOut: parentPoolActive ? fullFlags.soldOut : false,
-                models: parentPoolActive ? fullFlags.models : false,
-                prices: parentPoolActive ? fullFlags.prices : false,
-              };
+              // Sync Pool Master in RAM
+              invertedIndex.updateSubscription(
+                c.user.id,
+                slug,
+                "ALL",
+                parentPoolActive ? fullFlags : disabledFlags
+              );
 
-              invertedIndex.updateSubscription(c.user.id, slug, blockId, blockFlags);
-              invertedIndex.updateSubscription(c.user.id, slug, "ALL", poolFlags);
+              // Sync all regional blocks in RAM
+              for (const b of blockIds) {
+                const bActive = subDao.isBlockSubscribed(c.user.id, slug, b);
+                invertedIndex.updateSubscription(
+                  c.user.id,
+                  slug,
+                  b,
+                  bActive ? fullFlags : disabledFlags
+                );
+              }
 
               const toast = active
                 ? c.t("subscriptions.toast_slot_on", { pool: slug.toUpperCase(), block: blockName })
@@ -157,7 +161,8 @@ export function createPoolDetailMenu(
     .dynamic((ctx, range) => {
       const slug = ctx.session.tempPoolSlug || "flagship";
       const blocks = poolStateDao.getPoolBlocks(slug);
-      const isSubscribedToPool = subDao.hasSubscription(ctx.user.id, slug, "ALL") || subDao.getPoolFlags(ctx.user.id, slug).isSubscribed;
+      const blockIds = blocks.length > 0 ? blocks.map((b) => b.block_id) : DEFAULT_BLOCK_IDS;
+      const isSubscribedToPool = subDao.isPoolSubscribed(ctx.user.id, slug, blockIds) || subDao.getPoolFlags(ctx.user.id, slug).isSubscribed;
 
       const availableBlocks = blocks.filter(
         (b) => b.status === "available" || b.status === "limited"
@@ -179,8 +184,6 @@ export function createPoolDetailMenu(
       }
 
       // Toggle subscription for this pool (Cascading to all its regional blocks)
-      const blockIds = blocks.length > 0 ? blocks.map((b) => b.block_id) : DEFAULT_BLOCK_IDS;
-
       range.text(
         isSubscribedToPool
           ? ctx.t("pool_detail.btn_unsubscribe_pool", { pool_name: slug.toUpperCase() })

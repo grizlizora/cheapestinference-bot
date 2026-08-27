@@ -138,14 +138,31 @@ export function createTelegramBot(
           lastActiveAt: now,
         });
       } else {
+        // Self-healing: if user exists in DB but not in RAM index (e.g. edge-case cache miss or re-hydration)
+        let inMemoryProfile = dispatcher.getInvertedIndex().getProfileByTgId(ctx.from.id);
+        if (!inMemoryProfile) {
+          dispatcher.getInvertedIndex().upsertUserProfile({
+            userId: user.id,
+            telegramId: user.telegram_id,
+            language: (user.language as SupportedLanguage) || "en",
+            isMuted: (user.is_muted ?? 0) === 1,
+            isActive: (user.is_active ?? 1) === 1,
+            notifyAvailableGlobal: (user.notify_available_global ?? 1) === 1,
+            notifySoldOutGlobal: (user.notify_sold_out_global ?? 0) === 1,
+            notifyModelsGlobal: (user.notify_models_global ?? 1) === 1,
+            notifyPricesGlobal: (user.notify_prices_global ?? 1) === 1,
+            lastActiveAt: now,
+          });
+          inMemoryProfile = dispatcher.getInvertedIndex().getProfileByTgId(ctx.from.id);
+        }
+
         // Throttled DB disk touch (every 5 mins) to eliminate SQLite write serialization
-        const inMemoryProfile = dispatcher.getInvertedIndex().getProfileByTgId(ctx.from.id);
         const lastTouch = inMemoryProfile?.lastDbTouchAt || 0;
         if (now - lastTouch > 5 * 60 * 1000) {
           userDao.touchLastActive(ctx.from.id);
           if (inMemoryProfile) inMemoryProfile.lastDbTouchAt = now;
         }
-        dispatcher.getInvertedIndex().updateUserPreferences(ctx.from.id, { lastActiveAt: now });
+        dispatcher.getInvertedIndex().updateUserPreferences(ctx.from.id, { lastActiveAt: now, language: user.language as any });
 
         if (user.is_active === 0) {
           userDao.reactivateUser(ctx.from.id);

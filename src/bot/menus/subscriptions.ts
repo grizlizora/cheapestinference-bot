@@ -203,7 +203,7 @@ export function createSubscriptionsMenu(
 
       for (const pool of pools) {
         const poolBlocks = poolStateDao.getPoolBlocks(pool.slug);
-        const isPoolSub = subDao.hasSubscription(ctx.user.id, pool.slug, "ALL");
+        const isPoolSub = subDao.isPoolSubscribed(ctx.user.id, pool.slug, blockIds);
         range
           .text(
             isPoolSub
@@ -212,21 +212,17 @@ export function createSubscriptionsMenu(
             async (c) => {
               // Cascading Master Toggle: Toggling the pool synchronizes all regional blocks!
               const active = subDao.togglePoolWithBlocks(c.user.id, pool.slug, blockIds);
+              const currentFlags = subDao.getPoolFlags(c.user.id, pool.slug);
+              const flags = {
+                available: active ? currentFlags.available : false,
+                soldOut: active ? currentFlags.soldOut : false,
+                models: active ? currentFlags.models : false,
+                prices: active ? currentFlags.prices : false,
+              };
 
-              invertedIndex.updateSubscription(c.user.id, pool.slug, "ALL", {
-                available: active,
-                soldOut: active,
-                models: active,
-                prices: active,
-              });
-
+              invertedIndex.updateSubscription(c.user.id, pool.slug, "ALL", flags);
               for (const bId of blockIds) {
-                invertedIndex.updateSubscription(c.user.id, pool.slug, bId, {
-                  available: active,
-                  soldOut: active,
-                  models: active,
-                  prices: active,
-                });
+                invertedIndex.updateSubscription(c.user.id, pool.slug, bId, flags);
               }
 
               if (!active) {
@@ -248,7 +244,7 @@ export function createSubscriptionsMenu(
           .row();
 
         for (const block of blocks) {
-          const isSlotSub = subDao.hasSubscription(ctx.user.id, pool.slug, block.id);
+          const isSlotSub = subDao.isBlockSubscribed(ctx.user.id, pool.slug, block.id);
           const blockTitle = ctx.t(block.nameKey);
           const blockHours = poolBlocks.find((b) => b.block_id === block.id)?.hours_utc || block.hours;
 
@@ -262,28 +258,33 @@ export function createSubscriptionsMenu(
                 const { isBlockSubscribed: active, isPoolSubscribed: parentPoolActive } =
                   subDao.toggleBlockAndUpdatePool(c.user.id, pool.slug, block.id, blockIds);
                 const currentFlags = subDao.getPoolFlags(c.user.id, pool.slug);
+                const fullFlags = {
+                  available: currentFlags.available,
+                  soldOut: currentFlags.soldOut,
+                  models: currentFlags.models,
+                  prices: currentFlags.prices,
+                };
+                const disabledFlags = { available: false, soldOut: false, models: false, prices: false };
 
-                invertedIndex.updateSubscription(c.user.id, pool.slug, block.id, {
-                  available: active ? currentFlags.available : false,
-                  soldOut: active ? currentFlags.soldOut : false,
-                  models: active ? currentFlags.models : false,
-                  prices: active ? currentFlags.prices : false,
-                });
+                invertedIndex.updateSubscription(
+                  c.user.id,
+                  pool.slug,
+                  "ALL",
+                  parentPoolActive ? fullFlags : disabledFlags
+                );
 
-                invertedIndex.updateSubscription(c.user.id, pool.slug, "ALL", {
-                  available: parentPoolActive ? currentFlags.available : false,
-                  soldOut: parentPoolActive ? currentFlags.soldOut : false,
-                  models: parentPoolActive ? currentFlags.models : false,
-                  prices: parentPoolActive ? currentFlags.prices : false,
-                });
+                for (const bId of blockIds) {
+                  const bActive = subDao.isBlockSubscribed(c.user.id, pool.slug, bId);
+                  invertedIndex.updateSubscription(
+                    c.user.id,
+                    pool.slug,
+                    bId,
+                    bActive ? fullFlags : disabledFlags
+                  );
+                }
 
                 if (!active) {
-                  invertedIndex.updateSubscription(c.user.id, "ALL", "ALL", {
-                    available: false,
-                    soldOut: false,
-                    models: false,
-                    prices: false,
-                  });
+                  invertedIndex.updateSubscription(c.user.id, "ALL", "ALL", disabledFlags);
                 }
 
                 const toast = active

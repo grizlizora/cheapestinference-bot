@@ -25,7 +25,7 @@ export class SubscriptionDAO {
   private stmtUpdateGlobalPrices: Database.Statement;
 
   private txTogglePool: (userId: number, poolSlug: string, newState: boolean, blockIds: string[]) => void;
-  private txToggleBlock: (userId: number, poolSlug: string, blockId: string, newBlockState: boolean, allBlockIds: string[]) => void;
+  private txToggleBlock: (userId: number, poolSlug: string, blockId: string, allBlockIds: string[], allPools?: Array<{ slug: string; blocks: string[] }>) => { isBlockSubscribed: boolean; isPoolSubscribed: boolean };
   private txToggleGlobal: (userId: number, newState: boolean, pools: Array<{ slug: string; blocks: string[] }>) => void;
   private txTogglePoolCategory: (userId: number, poolSlug: string, category: "available" | "sold_out" | "models" | "prices") => { newState: boolean; flags: SubscriptionFlags };
 
@@ -63,7 +63,7 @@ export class SubscriptionDAO {
     this.stmtUpsertSubWithFlags = db.prepare(`
       INSERT INTO subscriptions (
         user_id, pool_slug, block_id, notify_on_available, notify_on_sold_out, notify_on_models, notify_on_prices
-      ) VALUES (@user_id, @pool_slug, @block_id, @avail, @sold, @models, @prices)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(user_id, pool_slug, block_id) DO UPDATE SET
         notify_on_available = excluded.notify_on_available,
         notify_on_sold_out = excluded.notify_on_sold_out,
@@ -94,8 +94,14 @@ export class SubscriptionDAO {
     `);
 
     this.txTogglePool = db.transaction((userId: number, poolSlug: string, newState: boolean, blockIds: string[]) => {
+      const poolFlags = this.getPoolFlags(userId, poolSlug);
+      const avail = poolFlags.available ? 1 : 1;
+      const sold = poolFlags.soldOut ? 1 : 0;
+      const models = poolFlags.models ? 1 : 1;
+      const prices = poolFlags.prices ? 1 : 1;
+
       if (newState) {
-        this.stmtAddSub.run(userId, poolSlug, "ALL");
+        this.stmtUpsertSubWithFlags.run(userId, poolSlug, "ALL", avail, sold, models, prices);
         for (const b of blockIds) {
           this.stmtRemoveSub.run(userId, poolSlug, b);
         }
@@ -107,24 +113,78 @@ export class SubscriptionDAO {
       }
     });
 
-    this.txToggleBlock = db.transaction((userId: number, poolSlug: string, blockId: string, newBlockState: boolean, allBlockIds: string[]) => {
-      const hasAll = this.hasSubscription(userId, poolSlug, "ALL");
-      if (hasAll) {
-        this.stmtRemoveSub.run(userId, poolSlug, "ALL");
-        for (const b of allBlockIds) {
-          if (b === blockId) {
-            if (newBlockState) this.stmtAddSub.run(userId, poolSlug, b);
-          } else {
-            this.stmtAddSub.run(userId, poolSlug, b);
+    this.txToggleBlock = db.transaction((
+      userId: number,
+      poolSlug: string,
+      blockId: string,
+      allBlockIds: string[],
+      allPools?: Array<{ slug: string; blocks: string[] }>
+    ) => {
+      const isCurrentlyBlockSubscribed = this.isBlockSubscribed(userId, poolSlug, blockId);
+      const targetBlockState = !isCurrentlyBlockSubscribed;
+
+      const hasGlobal = this.hasSubscription(userId, "ALL", "ALL");
+      const hasPoolAll = this.hasSubscription(userId, poolSlug, "ALL");
+
+      const poolFlags = this.getPoolFlags(userId, poolSlug);
+      const avail = poolFlags.available ? 1 : 1;
+      const sold = poolFlags.soldOut ? 1 : 0;
+      const models = poolFlags.models ? 1 : 1;
+      const prices = poolFlags.prices ? 1 : 1;
+
+      if (hasGlobal) {
+        this.stmtRemoveSub.run(userId, "ALL", "ALL");
+        const defaultPools = allPools || [
+          { slug: "flagship", blocks: ["asia", "europe", "americas"] },
+          { slug: "frontier", blocks: ["asia", "europe", "americas"] },
+          { slug: "core", blocks: ["asia", "europe", "americas"] },
+        ];
+        for (const p of defaultPools) {
+          if (p.slug !== poolSlug) {
+            this.stmtUpsertSubWithFlags.run(userId, p.slug, "ALL", avail, sold, models, prices);
           }
         }
-        return;
+        for (const b of allBlockIds) {
+          if (b !== blockId) {
+            this.stmtUpsertSubWithFlags.run(userId, poolSlug, b, avail, sold, models, prices);
+          }
+        }
+        return { isBlockSubscribed: false, isPoolSubscribed: false };
       }
 
-      if (newBlockState) {
-        this.stmtAddSub.run(userId, poolSlug, blockId);
+      if (hasPoolAll) {
+        this.stmtRemoveSub.run(userId, poolSlug, "ALL");
+        if (!targetBlockState) {
+          // Disabling block: insert all other sibling blocks
+          for (const b of allBlockIds) {
+            if (b !== blockId) {
+              this.stmtUpsertSubWithFlags.run(userId, poolSlug, b, avail, sold, models, prices);
+            }
+          }
+          return { isBlockSubscribed: false, isPoolSubscribed: false };
+        } else {
+          // Re-enable (all active) -> keep ALL
+          this.stmtUpsertSubWithFlags.run(userId, poolSlug, "ALL", avail, sold, models, prices);
+          return { isBlockSubscribed: true, isPoolSubscribed: true };
+        }
+      }
+
+      // Individual block toggling
+      if (targetBlockState) {
+        this.stmtUpsertSubWithFlags.run(userId, poolSlug, blockId, avail, sold, models, prices);
+        // Check auto-promotion if all blocks are now active
+        const activeCount = allBlockIds.filter((b) => b === blockId || this.hasSubscription(userId, poolSlug, b)).length;
+        if (activeCount >= allBlockIds.length) {
+          for (const b of allBlockIds) {
+            this.stmtRemoveSub.run(userId, poolSlug, b);
+          }
+          this.stmtUpsertSubWithFlags.run(userId, poolSlug, "ALL", avail, sold, models, prices);
+          return { isBlockSubscribed: true, isPoolSubscribed: true };
+        }
+        return { isBlockSubscribed: true, isPoolSubscribed: false };
       } else {
         this.stmtRemoveSub.run(userId, poolSlug, blockId);
+        return { isBlockSubscribed: false, isPoolSubscribed: false };
       }
     });
 
@@ -170,12 +230,15 @@ export class SubscriptionDAO {
 
       // Upsert pool master 'ALL' with custom flags to persist preferences even before subscribing
       if (hasAll || !current) {
-        this.stmtUpsertSubWithFlags.run({
-          user_id: userId,
-          pool_slug: poolSlug,
-          block_id: "ALL",
-          ...currentFlags,
-        });
+        this.stmtUpsertSubWithFlags.run(
+          userId,
+          poolSlug,
+          "ALL",
+          currentFlags.avail,
+          currentFlags.sold,
+          currentFlags.models,
+          currentFlags.prices
+        );
       }
 
       // Synchronize only EXISTING child blocks (never insert phantom blocks for disabled regions)
@@ -238,10 +301,21 @@ export class SubscriptionDAO {
     };
   }
 
+  isBlockSubscribed(userId: number, poolSlug: string, blockId: string): boolean {
+    if (this.hasSubscription(userId, "ALL", "ALL")) return true;
+    if (this.hasSubscription(userId, poolSlug, "ALL")) return true;
+    return this.hasSubscription(userId, poolSlug, blockId);
+  }
+
+  isPoolSubscribed(userId: number, poolSlug: string, allBlockIds: string[] = ["asia", "europe", "americas"]): boolean {
+    if (this.hasSubscription(userId, "ALL", "ALL")) return true;
+    if (this.hasSubscription(userId, poolSlug, "ALL")) return true;
+    if (allBlockIds.length === 0) return false;
+    return allBlockIds.every((b) => this.hasSubscription(userId, poolSlug, b));
+  }
+
   togglePoolWithBlocks(userId: number, poolSlug: string, blockIds: string[] = ["asia", "europe", "americas"]): boolean {
-    const hasAll = this.hasSubscription(userId, poolSlug, "ALL");
-    const hasAny = this.getPoolFlags(userId, poolSlug).isSubscribed;
-    const isCurrentlySubscribed = hasAll || hasAny;
+    const isCurrentlySubscribed = this.isPoolSubscribed(userId, poolSlug, blockIds) || this.getPoolFlags(userId, poolSlug).isSubscribed;
     const newState = !isCurrentlySubscribed;
     this.txTogglePool(userId, poolSlug, newState, blockIds);
     return newState;
@@ -251,15 +325,13 @@ export class SubscriptionDAO {
     userId: number,
     poolSlug: string,
     blockId: string,
-    allBlockIds: string[] = ["asia", "europe", "americas"]
+    allBlockIds: string[] = ["asia", "europe", "americas"],
+    allPools?: Array<{ slug: string; blocks: string[] }>
   ): { isBlockSubscribed: boolean; isPoolSubscribed: boolean } {
-    const isBlockSubscribed = this.hasSubscription(userId, poolSlug, blockId);
-    const newBlockState = !isBlockSubscribed;
-    this.txToggleBlock(userId, poolSlug, blockId, newBlockState, allBlockIds);
-
+    const result = this.txToggleBlock(userId, poolSlug, blockId, allBlockIds, allPools) as any;
     return {
-      isBlockSubscribed: newBlockState,
-      isPoolSubscribed: this.hasSubscription(userId, poolSlug, "ALL"),
+      isBlockSubscribed: result?.isBlockSubscribed ?? this.isBlockSubscribed(userId, poolSlug, blockId),
+      isPoolSubscribed: result?.isPoolSubscribed ?? this.isPoolSubscribed(userId, poolSlug, allBlockIds),
     };
   }
 
