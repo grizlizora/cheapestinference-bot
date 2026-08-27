@@ -106,6 +106,79 @@ describe("Live Dashboard Registry & Granular Subscriptions Test Suite", () => {
       const flagshipModelSubscribers = invertedIndex.resolveSubscribers("flagship", "asia", "models");
       expect(flagshipModelSubscribers.map((s) => s.userId)).not.toContain(user.id);
     });
+
+    it("should accurately route 100% realistic multi-tariff, multi-event, and per-block variations", () => {
+      // User 1: Wants Flagship [Available + Models] ONLY on [Asia + Europe] (Americas disabled)
+      const u1 = userDao.upsertUser({ telegram_id: 111, first_name: "Trader1" });
+      invertedIndex.upsertUserProfile({
+        userId: u1.id,
+        telegramId: u1.telegram_id,
+        language: "uk",
+        isMuted: false,
+        isActive: true,
+        notifyAvailableGlobal: true,
+        notifySoldOutGlobal: true,
+        notifyModelsGlobal: true,
+        notifyPricesGlobal: true,
+      });
+
+      // Configure User 1 in DB & Inverted Index: Subscribed to Asia & Europe, but NOT entire pool ALL
+      const u1Flags = { available: true, soldOut: false, models: true, prices: false };
+      invertedIndex.updateSubscription(u1.id, "flagship", "ALL", false);
+      invertedIndex.updateSubscription(u1.id, "flagship", "asia", u1Flags);
+      invertedIndex.updateSubscription(u1.id, "flagship", "europe", u1Flags);
+      invertedIndex.updateSubscription(u1.id, "flagship", "americas", false); // Americas disabled
+
+      // User 2: Wants Core [Sold Out + Prices] ONLY
+      const u2 = userDao.upsertUser({ telegram_id: 222, first_name: "Trader2" });
+      invertedIndex.upsertUserProfile({
+        userId: u2.id,
+        telegramId: u2.telegram_id,
+        language: "uk",
+        isMuted: false,
+        isActive: true,
+        notifyAvailableGlobal: true,
+        notifySoldOutGlobal: true,
+        notifyModelsGlobal: true,
+        notifyPricesGlobal: true,
+      });
+
+      const u2CoreFlags = { available: false, soldOut: true, models: false, prices: true };
+      invertedIndex.updateSubscription(u2.id, "core", "ALL", u2CoreFlags);
+      for (const b of ["asia", "europe", "americas"]) {
+        invertedIndex.updateSubscription(u2.id, "core", b, u2CoreFlags);
+      }
+
+      // Event 1: Flagship Asia becomes Available (Slot Drop)
+      const ev1Recipients = invertedIndex.resolveSubscribers("flagship", "asia", "available");
+      expect(ev1Recipients.map((r) => r.userId)).toContain(u1.id);
+      expect(ev1Recipients.map((r) => r.userId)).not.toContain(u2.id);
+
+      // Event 2: Flagship Americas becomes Available (U1 disabled Americas!)
+      const ev2Recipients = invertedIndex.resolveSubscribers("flagship", "americas", "available");
+      expect(ev2Recipients.map((r) => r.userId)).not.toContain(u1.id);
+      expect(ev2Recipients.map((r) => r.userId)).not.toContain(u2.id);
+
+      // Event 3: Flagship Price Changed (U1 disabled Prices on Flagship)
+      const ev3Recipients = invertedIndex.resolveSubscribers("flagship", "europe", "prices");
+      expect(ev3Recipients.map((r) => r.userId)).not.toContain(u1.id);
+      expect(ev3Recipients.map((r) => r.userId)).not.toContain(u2.id);
+
+      // Event 4: Core Americas Sold Out (U2 enabled Sold Out on Core)
+      const ev4Recipients = invertedIndex.resolveSubscribers("core", "americas", "sold_out");
+      expect(ev4Recipients.map((r) => r.userId)).not.toContain(u1.id);
+      expect(ev4Recipients.map((r) => r.userId)).toContain(u2.id);
+
+      // Event 5: Core Europe Price Changed (U2 enabled Prices on Core)
+      const ev5Recipients = invertedIndex.resolveSubscribers("core", "europe", "prices");
+      expect(ev5Recipients.map((r) => r.userId)).not.toContain(u1.id);
+      expect(ev5Recipients.map((r) => r.userId)).toContain(u2.id);
+
+      // Event 6: Core Available (U2 disabled Available on Core)
+      const ev6Recipients = invertedIndex.resolveSubscribers("core", "asia", "available");
+      expect(ev6Recipients.map((r) => r.userId)).not.toContain(u1.id);
+      expect(ev6Recipients.map((r) => r.userId)).not.toContain(u2.id);
+    });
   });
 
   describe("2. ActiveDashboardRegistry & FNV-1a Hash Diffing", () => {
