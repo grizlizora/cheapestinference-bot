@@ -107,9 +107,17 @@ export class ScraperOrchestrator extends EventEmitter {
       const isVolatile = now - this.lastSlotEventTimestamp < 5 * 60 * 1000;
       
       if (isVolatile) {
-        // Hot / Volatile mode: fast 3s - 4.5s polling to capture rapid stock changes
-        const fastMin = Math.max(3, this.config.minIntervalSec * 0.75);
-        const fastMax = Math.max(4.5, this.config.minIntervalSec);
+        const timeSinceEvent = now - this.lastSlotEventTimestamp;
+        // Stepped volatility decay: 3.0s (0-1m) -> 3.6s (1-3m) -> 4.2s (3-5m) -> baseline (5s+)
+        let fastMin = 3.0;
+        let fastMax = 4.0;
+        if (timeSinceEvent > 3 * 60 * 1000) {
+          fastMin = 4.2;
+          fastMax = 5.0;
+        } else if (timeSinceEvent > 1 * 60 * 1000) {
+          fastMin = 3.6;
+          fastMax = 4.4;
+        }
         return Math.floor((fastMin + Math.random() * (fastMax - fastMin)) * 1000);
       }
 

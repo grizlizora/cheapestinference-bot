@@ -5,8 +5,12 @@
  * 100,000 requests/day 100% Free Tier on Cloudflare
  */
 
+export interface Env {
+  PROXY_SECRET?: string;
+}
+
 export default {
-  async fetch(request, env, ctx) {
+  async fetch(request: Request, env: Env, _ctx?: unknown): Promise<Response> {
     // 1. Method verification
     if (request.method !== "GET" && request.method !== "HEAD" && request.method !== "OPTIONS") {
       return new Response("Method Not Allowed", { status: 405 });
@@ -105,6 +109,8 @@ export default {
         cf: {
           cacheTtl: 0, // Bypass edge cache to guarantee live GPU stock
           cacheEverything: false,
+          polish: "off",
+          minify: { javascript: false, css: false, html: false },
         },
       });
 

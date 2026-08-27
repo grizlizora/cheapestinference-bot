@@ -55,7 +55,7 @@ export function createPoolDetailMenu(
             const res = subDao.togglePoolEventCategory(c.user.id, slug, "available", blockIds);
             const fullFlags = toFlags(res.flags);
             syncRamFlags(c.user.id, fullFlags);
-            await c.answerCallbackQuery(c.t("pool_settings.toast_filter_updated")).catch(() => {});
+            c.answerCallbackQuery(c.t("pool_settings.toast_filter_updated")).catch(() => {});
             await safeEditMessageText(c, renderPoolSettingsText(c, poolStateDao, subDao));
           }
         )
@@ -67,7 +67,7 @@ export function createPoolDetailMenu(
             const res = subDao.togglePoolEventCategory(c.user.id, slug, "sold_out", blockIds);
             const fullFlags = toFlags(res.flags);
             syncRamFlags(c.user.id, fullFlags);
-            await c.answerCallbackQuery(c.t("pool_settings.toast_filter_updated")).catch(() => {});
+            c.answerCallbackQuery(c.t("pool_settings.toast_filter_updated")).catch(() => {});
             await safeEditMessageText(c, renderPoolSettingsText(c, poolStateDao, subDao));
           }
         )
@@ -80,7 +80,7 @@ export function createPoolDetailMenu(
             const res = subDao.togglePoolEventCategory(c.user.id, slug, "models", blockIds);
             const fullFlags = toFlags(res.flags);
             syncRamFlags(c.user.id, fullFlags);
-            await c.answerCallbackQuery(c.t("pool_settings.toast_filter_updated")).catch(() => {});
+            c.answerCallbackQuery(c.t("pool_settings.toast_filter_updated")).catch(() => {});
             await safeEditMessageText(c, renderPoolSettingsText(c, poolStateDao, subDao));
           }
         )
@@ -92,7 +92,7 @@ export function createPoolDetailMenu(
             const res = subDao.togglePoolEventCategory(c.user.id, slug, "prices", blockIds);
             const fullFlags = toFlags(res.flags);
             syncRamFlags(c.user.id, fullFlags);
-            await c.answerCallbackQuery(c.t("pool_settings.toast_filter_updated")).catch(() => {});
+            c.answerCallbackQuery(c.t("pool_settings.toast_filter_updated")).catch(() => {});
             await safeEditMessageText(c, renderPoolSettingsText(c, poolStateDao, subDao));
           }
         )
@@ -134,7 +134,7 @@ export function createPoolDetailMenu(
               const toast = active
                 ? c.t("subscriptions.toast_slot_on", { pool: slug.toUpperCase(), block: blockName })
                 : c.t("subscriptions.toast_slot_off", { pool: slug.toUpperCase(), block: blockName });
-              await c.answerCallbackQuery(toast).catch(() => {});
+              c.answerCallbackQuery(toast).catch(() => {});
               await safeEditMessageText(c, renderPoolSettingsText(c, poolStateDao, subDao));
             }
           )
@@ -203,7 +203,7 @@ export function createPoolDetailMenu(
           const toast = newSubState
             ? c.t("subscriptions.toast_pool_on", { pool: slug.toUpperCase() })
             : c.t("subscriptions.toast_pool_off", { pool: slug.toUpperCase() });
-          await c.answerCallbackQuery(toast).catch(() => {});
+          c.answerCallbackQuery(toast).catch(() => {});
           await safeEditMessageText(c, renderPoolDetailText(c, poolStateDao, historyDao, scraper));
         }
       ).row();

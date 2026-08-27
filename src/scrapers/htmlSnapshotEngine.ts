@@ -134,7 +134,7 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
   }
 
   public extractRscPayload(html: string): PoolData[] | null {
-    let combinedFlight = "";
+    const flightChunks: string[] = [];
     const pushPrefixRegex = /(?:(?:self|window|globalThis)\.__next_f|(?:\((?:self|window|globalThis)\.__next_f=(?:self|window|globalThis)\.__next_f\|\|\[\]\)))\.push\(\[\d+,\s*/g;
     let match: RegExpExecArray | null;
 
@@ -164,26 +164,29 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
           try {
             const decoded = JSON.parse(stringLiteral);
             if (typeof decoded === "string") {
-              combinedFlight += decoded;
+              flightChunks.push(decoded);
             }
           } catch {
             const raw = stringLiteral.slice(1, -1);
-            combinedFlight += raw.replace(/\\([\\"/nrtbf])/g, (_, char) => {
-              switch (char) {
-                case "n": return "\n";
-                case "r": return "\r";
-                case "t": return "\t";
-                case '"': return '"';
-                case "\\": return "\\";
-                default: return char;
-              }
-            });
+            flightChunks.push(
+              raw.replace(/\\([\\"/nrtbf])/g, (_, char) => {
+                switch (char) {
+                  case "n": return "\n";
+                  case "r": return "\r";
+                  case "t": return "\t";
+                  case '"': return '"';
+                  case "\\": return "\\";
+                  default: return char;
+                }
+              })
+            );
           }
         }
       }
     }
 
-    if (!combinedFlight) return null;
+    if (flightChunks.length === 0) return null;
+    const combinedFlight = flightChunks.join("");
 
     const pools: PoolData[] = [];
     const slugRegex = /"slug"\s*:\s*"(flagship|frontier|core|[\w-]+)"/g;

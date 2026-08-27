@@ -160,11 +160,8 @@ export function createMainMenuHierarchy(
           val === 1
             ? ctx.t("subscriptions.toast_sound_muted")
             : ctx.t("subscriptions.toast_sound_enabled");
-        await ctx.answerCallbackQuery(toast).catch(() => {});
+        ctx.answerCallbackQuery(toast).catch(() => {});
         await safeEditMessageText(ctx, renderSettingsText(ctx));
-        try {
-          ctx.menu.update();
-        } catch {}
       }
     )
     .row()
