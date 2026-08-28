@@ -75,4 +75,18 @@ describe("ModelSemanticMatcher", () => {
     expect(diff.upgraded).toHaveLength(0);
     expect(diff.removed).toHaveLength(0);
   });
+
+  it("should auto-resolve 3D custom emojis for all recognized model families", async () => {
+    const { getModel3DIcon } = await import("../src/bot/views/iconTheme.js");
+
+    expect(getModel3DIcon("DeepSeek-R1-Distill-Qwen-32B")).toContain("5222292529533167322");
+    expect(getModel3DIcon("Qwen2.5-Coder-32B-Instruct")).toContain("5361837567463399422");
+    expect(getModel3DIcon("GLM-4-Plus")).toContain("5217444336089714383");
+    expect(getModel3DIcon("Kimi-K1.5-LongContext")).toContain("5451959871257713464");
+    expect(getModel3DIcon("Moonshot-v1-32k")).toContain("5451959871257713464");
+    expect(getModel3DIcon("Meta-Llama-3.3-70B-Instruct")).toContain("5343553685525899318");
+    expect(getModel3DIcon("Mistral-Large-2407")).toContain("6332347924063717264");
+    expect(getModel3DIcon("Claude-3.5-Sonnet")).toContain("5325547803936572038");
+    expect(getModel3DIcon("Unknown-Custom-Model-v1")).toContain("5372981976804366741");
+  });
 });

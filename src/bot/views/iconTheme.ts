@@ -46,6 +46,7 @@ export type IconKey =
   | "ai_claude"
   | "ai_qwen"
   | "ai_glm"
+  | "ai_kimi"
   | "ai_llama"
   | "ai_mistral"
   // Navigation, Controls & Settings
@@ -249,6 +250,11 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     customEmojiId: "5217444336089714383",
     unicodeFallback: "😖",
     name: "3D GLM Neural",
+  },
+  ai_kimi: {
+    customEmojiId: "5451959871257713464",
+    unicodeFallback: "🌙",
+    name: "3D Kimi Moon",
   },
   ai_llama: {
     customEmojiId: "5343553685525899318",
@@ -543,6 +549,8 @@ export function getModel3DIcon(modelName: string): string {
       return icon("ai_qwen");
     case "glm":
       return icon("ai_glm");
+    case "kimi":
+      return icon("ai_kimi");
     case "llama":
       return icon("ai_llama");
     case "mistral":
