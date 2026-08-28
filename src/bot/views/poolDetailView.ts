@@ -36,6 +36,31 @@ export function renderPoolSettingsText(
   const slug = ctx.session?.tempPoolSlug || "flagship";
   const flags = subDao.getPoolFlags(ctx.user.id, slug);
   const blocks = poolStateDao.getPoolBlocks(slug);
+  const totalBlocks = blocks.length || 3;
+
+  let subscribedCount = 0;
+  if (subDao.hasSubscription(ctx.user.id, "ALL", "ALL") || subDao.hasSubscription(ctx.user.id, slug, "ALL")) {
+    subscribedCount = totalBlocks;
+  } else {
+    for (const b of blocks) {
+      if (subDao.hasSubscription(ctx.user.id, slug, b.block_id)) {
+        subscribedCount++;
+      }
+    }
+  }
+
+  const capacityBar = renderCapacityBar(subscribedCount, totalBlocks, "html");
+
+  let statusWord = "";
+  if (subscribedCount === totalBlocks) {
+    statusWord = ctx.lang === "uk" ? "Увімкнено" : ctx.lang === "ru" ? "Включено" : "Enabled";
+  } else if (subscribedCount > 0) {
+    statusWord = ctx.lang === "uk" ? "Частково" : ctx.lang === "ru" ? "Частично" : "Partial";
+  } else {
+    statusWord = ctx.lang === "uk" ? "Вимкнено" : ctx.lang === "ru" ? "Выключено" : "Disabled";
+  }
+
+  const blocksUnit = ctx.lang === "uk" ? "блоків" : ctx.lang === "ru" ? "блоков" : "blocks";
   const rank = POOL_RANKS[slug];
   const poolTitle = rank?.tierName[ctx.lang] || blocks[0]?.pool_name || slug.toUpperCase();
 
@@ -49,7 +74,6 @@ export function renderPoolSettingsText(
     : `<b>Notification Filters • ${escapeHtml(poolTitle)}</b>`;
 
   const subStatusLabel = ctx.lang === "uk" ? "Підписка на кластер" : ctx.lang === "ru" ? "Подписка на кластер" : "Cluster Subscription";
-  const poolStatus = flags.isSubscribed ? onText : offText;
 
   const categoriesHeader = ctx.lang === "uk" ? "Категорії сповіщень:" : ctx.lang === "ru" ? "Категории уведомлений:" : "Event Categories:";
   const dropsLabel = ctx.lang === "uk" ? "Вільні слоти (Drops)" : ctx.lang === "ru" ? "Свободные слоты (Drops)" : "Available Slots (Drops)";
@@ -58,7 +82,7 @@ export function renderPoolSettingsText(
   const pricesLabel = ctx.lang === "uk" ? "Зміна цін та знижок" : ctx.lang === "ru" ? "Изменение цен и скидок" : "Price & Discount Changes";
 
   return `${icon("nav_settings")} ${headerTitle}\n\n` +
-    `${icon("notify_bell_on")} <b>${subStatusLabel}:</b> ${poolStatus}\n\n` +
+    `${icon("notify_bell_on")} <b>${subStatusLabel}:</b> [ ${capacityBar} ] <b>${statusWord}</b> <i>(${subscribedCount}/${totalBlocks} ${blocksUnit})</i>\n\n` +
     `<b>${categoriesHeader}</b>\n` +
     `• ${icon("event_slot_drop")} ${dropsLabel}: ${flags.available ? onText : offText}\n` +
     `• ${icon("event_slot_sold")} ${soldLabel}: ${flags.soldOut ? onText : offText}\n` +
