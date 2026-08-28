@@ -351,13 +351,14 @@ export class SubscriptionDAO {
         `INSERT INTO subscriptions (user_id, pool_slug, block_id, notify_on_available, notify_on_sold_out, notify_on_models, notify_on_prices)
          VALUES (?, ?, 'ALL', 1, 0, 1, 1)
          ON CONFLICT(user_id, pool_slug, block_id) DO UPDATE SET notify_on_available=1, notify_on_models=1, notify_on_prices=1`,
-        [userId, poolSlug]
+        [userId, poolSlug],
+        true
       );
       for (const b of blockIds) {
-        tursoCloudSync.pushMutation(`DELETE FROM subscriptions WHERE user_id = ? AND pool_slug = ? AND block_id = ?`, [userId, poolSlug, b]);
+        tursoCloudSync.pushMutation(`DELETE FROM subscriptions WHERE user_id = ? AND pool_slug = ? AND block_id = ?`, [userId, poolSlug, b], true);
       }
     } else {
-      tursoCloudSync.pushMutation(`DELETE FROM subscriptions WHERE user_id = ? AND pool_slug = ?`, [userId, poolSlug]);
+      tursoCloudSync.pushMutation(`DELETE FROM subscriptions WHERE user_id = ? AND pool_slug = ?`, [userId, poolSlug], true);
     }
 
     return newState;
@@ -379,22 +380,24 @@ export class SubscriptionDAO {
         `INSERT INTO subscriptions (user_id, pool_slug, block_id, notify_on_available, notify_on_sold_out, notify_on_models, notify_on_prices)
          VALUES (?, ?, 'ALL', 1, 0, 1, 1)
          ON CONFLICT(user_id, pool_slug, block_id) DO UPDATE SET notify_on_available=1, notify_on_models=1, notify_on_prices=1`,
-        [userId, poolSlug]
+        [userId, poolSlug],
+        true
       );
       for (const b of allBlockIds) {
-        tursoCloudSync.pushMutation(`DELETE FROM subscriptions WHERE user_id = ? AND pool_slug = ? AND block_id = ?`, [userId, poolSlug, b]);
+        tursoCloudSync.pushMutation(`DELETE FROM subscriptions WHERE user_id = ? AND pool_slug = ? AND block_id = ?`, [userId, poolSlug, b], true);
       }
     } else {
-      tursoCloudSync.pushMutation(`DELETE FROM subscriptions WHERE user_id = ? AND pool_slug = ? AND block_id = 'ALL'`, [userId, poolSlug]);
+      tursoCloudSync.pushMutation(`DELETE FROM subscriptions WHERE user_id = ? AND pool_slug = ? AND block_id = 'ALL'`, [userId, poolSlug], true);
       if (isBlockSubscribed) {
         tursoCloudSync.pushMutation(
           `INSERT INTO subscriptions (user_id, pool_slug, block_id, notify_on_available, notify_on_sold_out, notify_on_models, notify_on_prices)
            VALUES (?, ?, ?, 1, 0, 1, 1)
            ON CONFLICT(user_id, pool_slug, block_id) DO UPDATE SET notify_on_available=1, notify_on_models=1, notify_on_prices=1`,
-          [userId, poolSlug, blockId]
+          [userId, poolSlug, blockId],
+          true
         );
       } else {
-        tursoCloudSync.pushMutation(`DELETE FROM subscriptions WHERE user_id = ? AND pool_slug = ? AND block_id = ?`, [userId, poolSlug, blockId]);
+        tursoCloudSync.pushMutation(`DELETE FROM subscriptions WHERE user_id = ? AND pool_slug = ? AND block_id = ?`, [userId, poolSlug, blockId], true);
       }
     }
 
@@ -417,13 +420,14 @@ export class SubscriptionDAO {
         `INSERT INTO subscriptions (user_id, pool_slug, block_id, notify_on_available, notify_on_sold_out, notify_on_models, notify_on_prices)
          VALUES (?, 'ALL', 'ALL', 1, 0, 1, 1)
          ON CONFLICT(user_id, pool_slug, block_id) DO UPDATE SET notify_on_available=1, notify_on_models=1, notify_on_prices=1`,
-        [userId]
+        [userId],
+        true
       );
       for (const p of pools) {
-        tursoCloudSync.pushMutation(`DELETE FROM subscriptions WHERE user_id = ? AND pool_slug = ?`, [userId, p.slug]);
+        tursoCloudSync.pushMutation(`DELETE FROM subscriptions WHERE user_id = ? AND pool_slug = ?`, [userId, p.slug], true);
       }
     } else {
-      tursoCloudSync.pushMutation(`DELETE FROM subscriptions WHERE user_id = ?`, [userId]);
+      tursoCloudSync.pushMutation(`DELETE FROM subscriptions WHERE user_id = ?`, [userId], true);
     }
 
     return newState;
@@ -483,7 +487,8 @@ export class SubscriptionDAO {
     tursoCloudSync.pushMutation(
       `UPDATE subscriptions SET notify_on_available = ?, notify_on_sold_out = ?, notify_on_models = ?, notify_on_prices = ?
        WHERE user_id = ? AND pool_slug = ?`,
-      [res.flags.notify_on_available, res.flags.notify_on_sold_out, res.flags.notify_on_models, res.flags.notify_on_prices, userId, poolSlug]
+      [res.flags.notify_on_available, res.flags.notify_on_sold_out, res.flags.notify_on_models, res.flags.notify_on_prices, userId, poolSlug],
+      true
     );
     return res;
   }
@@ -513,7 +518,8 @@ export class SubscriptionDAO {
         category === "sold_out" ? "notify_on_sold_out" :
         category === "models" ? "notify_on_models" : "notify_on_prices"
       } = ? WHERE user_id = ?`,
-      [val, userId]
+      [val, userId],
+      true
     );
   }
 }

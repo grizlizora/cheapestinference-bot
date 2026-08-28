@@ -268,14 +268,16 @@ export class TursoCloudSync {
       const results = await this.executePipeline([
         { type: "execute", stmt: { sql: "SELECT * FROM users" } },
         { type: "execute", stmt: { sql: "SELECT * FROM subscriptions" } },
+        { type: "execute", stmt: { sql: "SELECT * FROM donations" } },
         { type: "execute", stmt: { sql: "SELECT * FROM pool_state" } },
       ]);
 
       const usersResult = results[0]?.response?.result;
       const subsResult = results[1]?.response?.result;
-      const poolStateResult = results[2]?.response?.result;
+      const donationsResult = results[2]?.response?.result;
+      const poolStateResult = results[3]?.response?.result;
 
-      if (!usersResult && !subsResult && !poolStateResult) {
+      if (!usersResult && !subsResult && !poolStateResult && !donationsResult) {
         console.log("☁️ [TursoSync] No remote state found in Turso.");
         return;
       }
@@ -319,6 +321,15 @@ export class TursoCloudSync {
           notify_on_prices = excluded.notify_on_prices
       `);
 
+      const upsertDonationStmt = db.prepare(`
+        INSERT INTO donations (
+          id, user_id, telegram_id, amount_stars, currency, telegram_payment_charge_id, provider_payment_charge_id, created_at
+        ) VALUES (
+          @id, @user_id, @telegram_id, @amount_stars, @currency, @telegram_payment_charge_id, @provider_payment_charge_id, @created_at
+        )
+        ON CONFLICT(telegram_payment_charge_id) DO NOTHING
+      `);
+
       const upsertPoolStateStmt = db.prepare(`
         INSERT INTO pool_state (
           pool_slug, pool_name, models_json, block_id, status, 
@@ -346,6 +357,7 @@ export class TursoCloudSync {
 
       let loadedUsers = 0;
       let loadedSubs = 0;
+      let loadedDonations = 0;
       let loadedPools = 0;
 
       const hydrateTx = db.transaction(() => {
@@ -371,12 +383,15 @@ export class TursoCloudSync {
                 notify_prices_global: Number(userObj.notify_prices_global ?? 1),
                 notify_admin_new_users: Number(userObj.notify_admin_new_users ?? 1),
                 is_admin: Number(userObj.is_admin || 0),
+                total_donated_stars: Number(userObj.total_donated_stars || 0),
                 last_active_at: userObj.last_active_at || new Date().toISOString(),
                 created_at: userObj.created_at || new Date().toISOString(),
                 updated_at: userObj.updated_at || new Date().toISOString(),
               });
               loadedUsers++;
-            } catch {}
+            } catch (err: any) {
+              console.warn("⚠️ [TursoSync] User row hydration error:", err?.message || err);
+            }
           }
         }
 
@@ -398,7 +413,34 @@ export class TursoCloudSync {
                 Number(subObj.notify_on_prices ?? 1)
               );
               loadedSubs++;
-            } catch {}
+            } catch (err: any) {
+              console.warn("⚠️ [TursoSync] Subscription row hydration error:", err?.message || err);
+            }
+          }
+        }
+
+        if (donationsResult?.rows) {
+          const cols: string[] = donationsResult.cols.map((c: any) => c.name);
+          for (const row of donationsResult.rows) {
+            const donObj: any = {};
+            cols.forEach((colName, idx) => {
+              donObj[colName] = row[idx]?.value !== undefined ? row[idx].value : null;
+            });
+            try {
+              upsertDonationStmt.run({
+                id: Number(donObj.id),
+                user_id: Number(donObj.user_id),
+                telegram_id: Number(donObj.telegram_id),
+                amount_stars: Number(donObj.amount_stars || 0),
+                currency: String(donObj.currency || "XTR"),
+                telegram_payment_charge_id: String(donObj.telegram_payment_charge_id),
+                provider_payment_charge_id: donObj.provider_payment_charge_id ? String(donObj.provider_payment_charge_id) : null,
+                created_at: String(donObj.created_at || new Date().toISOString()),
+              });
+              loadedDonations++;
+            } catch (err: any) {
+              console.warn("⚠️ [TursoSync] Donation row hydration error:", err?.message || err);
+            }
           }
         }
 
@@ -427,14 +469,16 @@ export class TursoCloudSync {
                 updated_at: String(poolObj.updated_at || new Date().toISOString()),
               });
               loadedPools++;
-            } catch {}
+            } catch (err: any) {
+              console.warn("⚠️ [TursoSync] Pool state row hydration error:", err?.message || err);
+            }
           }
         }
       });
 
       hydrateTx();
       const elapsed = (performance.now() - startTime).toFixed(2);
-      console.log(`✅ [TursoSync] Hydrated ${loadedUsers} users, ${loadedSubs} subscriptions, ${loadedPools} pool states from Turso in ${elapsed}ms`);
+      console.log(`✅ [TursoSync] Hydrated ${loadedUsers} users, ${loadedSubs} subscriptions, ${loadedDonations} donations, ${loadedPools} pool states from Turso in ${elapsed}ms`);
     } catch (err: any) {
       console.error("❌ [TursoSync] Failed to pull state from Turso:", err?.message || err);
     }
@@ -445,7 +489,7 @@ export class TursoCloudSync {
   /**
    * Enqueues a write mutation to be asynchronously pushed to Turso in the background
    */
-  public pushMutation(sql: string, args: any[] = []): void {
+  public pushMutation(sql: string, args: any[] = [], immediate = false): void {
     if (!this.isEnabled()) return;
 
     if (this.pendingMutations.length >= TursoCloudSync.MAX_PENDING_MUTATIONS) {
@@ -454,8 +498,8 @@ export class TursoCloudSync {
 
     this.pendingMutations.push({ sql, args });
 
-    // High-watermark: flush immediately if >= 100 mutations accumulated
-    if (this.pendingMutations.length >= 100) {
+    // High-watermark or immediate flush requested
+    if (immediate || this.pendingMutations.length >= 50) {
       this.flush().catch(() => {});
       return;
     }
@@ -463,7 +507,7 @@ export class TursoCloudSync {
     if (!this.flushTimer) {
       this.flushTimer = setTimeout(() => {
         this.flush().catch(() => {});
-      }, 1500);
+      }, 1000);
     }
   }
 

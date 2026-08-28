@@ -124,11 +124,12 @@ export class UserDAO {
     }) as UserRecord;
 
     tursoCloudSync.pushMutation(
-      `INSERT INTO users (telegram_id, username, first_name, language) 
-       VALUES (?, ?, ?, ?) 
+      `INSERT INTO users (id, telegram_id, username, first_name, language) 
+       VALUES (?, ?, ?, ?, ?) 
        ON CONFLICT(telegram_id) DO UPDATE SET 
-         username=excluded.username, first_name=excluded.first_name, updated_at=CURRENT_TIMESTAMP`,
-      [params.telegram_id, params.username, params.first_name, params.language || "en"]
+         id=excluded.id, username=excluded.username, first_name=excluded.first_name, updated_at=CURRENT_TIMESTAMP`,
+      [user.id, params.telegram_id, params.username, params.first_name, params.language || "en"],
+      true
     );
 
     return user;
@@ -138,7 +139,8 @@ export class UserDAO {
     this.stmtUpdateLang.run(lang, tgId);
     tursoCloudSync.pushMutation(
       `UPDATE users SET language = ?, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?`,
-      [lang, tgId]
+      [lang, tgId],
+      true
     );
   }
 
@@ -153,7 +155,8 @@ export class UserDAO {
     const res = row ? row.is_muted : 0;
     tursoCloudSync.pushMutation(
       `UPDATE users SET is_muted = ?, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?`,
-      [res, tgId]
+      [res, tgId],
+      true
     );
     return res;
   }
@@ -163,7 +166,8 @@ export class UserDAO {
     const res = row ? row.notify_available_global : 1;
     tursoCloudSync.pushMutation(
       `UPDATE users SET notify_available_global = ?, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?`,
-      [res, tgId]
+      [res, tgId],
+      true
     );
     return res;
   }
@@ -173,7 +177,8 @@ export class UserDAO {
     const res = row ? row.notify_sold_out_global : 0;
     tursoCloudSync.pushMutation(
       `UPDATE users SET notify_sold_out_global = ?, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?`,
-      [res, tgId]
+      [res, tgId],
+      true
     );
     return res;
   }
@@ -183,7 +188,8 @@ export class UserDAO {
     const res = row ? row.notify_models_global : 1;
     tursoCloudSync.pushMutation(
       `UPDATE users SET notify_models_global = ?, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?`,
-      [res, tgId]
+      [res, tgId],
+      true
     );
     return res;
   }
@@ -193,7 +199,8 @@ export class UserDAO {
     const res = row ? row.notify_prices_global : 1;
     tursoCloudSync.pushMutation(
       `UPDATE users SET notify_prices_global = ?, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?`,
-      [res, tgId]
+      [res, tgId],
+      true
     );
     return res;
   }
@@ -203,7 +210,8 @@ export class UserDAO {
     const res = row ? row.notify_admin_new_users : 1;
     tursoCloudSync.pushMutation(
       `UPDATE users SET notify_admin_new_users = ?, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?`,
-      [res, tgId]
+      [res, tgId],
+      true
     );
     return res;
   }
@@ -212,7 +220,8 @@ export class UserDAO {
     this.stmtDeactivate.run(tgId);
     tursoCloudSync.pushMutation(
       `UPDATE users SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?`,
-      [tgId]
+      [tgId],
+      true
     );
   }
 
