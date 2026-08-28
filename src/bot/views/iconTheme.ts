@@ -112,7 +112,7 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     name: "Live Radar Ping",
   },
   status_standby: {
-    customEmojiId: "5370575678452270082",
+    customEmojiId: "5451959871257713464",
     unicodeFallback: "💤",
     name: "Floating Slumber Zzz",
   },
@@ -124,7 +124,7 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
 
   // Pools
   pool_flagship: {
-    customEmojiId: "5431445009029706647",
+    customEmojiId: "5445284980978621387",
     unicodeFallback: "🚀",
     name: "Hyperdrive Rocket",
   },
@@ -134,7 +134,7 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     name: "Electric Cyan Bolt",
   },
   pool_core: {
-    customEmojiId: "5431445009029706649",
+    customEmojiId: "5237799019329105246",
     unicodeFallback: "🧠",
     name: "Cyber Neural Core",
   },
@@ -146,17 +146,17 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
 
   // Regions
   region_asia: {
-    customEmojiId: "5447410659074028441",
+    customEmojiId: "5397753673130463064",
     unicodeFallback: "🌏",
     name: "3D Asia-Pacific Globe",
   },
   region_europe: {
-    customEmojiId: "5447410659074028442",
+    customEmojiId: "5399898266265475100",
     unicodeFallback: "🌍",
     name: "3D Europe-EMEA Globe",
   },
   region_americas: {
-    customEmojiId: "5447410659074028443",
+    customEmojiId: "5397575638146110953",
     unicodeFallback: "🌎",
     name: "3D Americas Globe",
   },
@@ -178,59 +178,59 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     name: "Cyber Padlock Shut",
   },
   event_price_drop: {
-    customEmojiId: "5382173167232230003",
+    customEmojiId: "5361748661640372834",
     unicodeFallback: "📉",
     name: "Laser Green Trend Down",
   },
   event_price_hike: {
-    customEmojiId: "5382173167232230004",
+    customEmojiId: "5373001317042101552",
     unicodeFallback: "📈",
     name: "Laser Red Trend Up",
   },
   event_model_upgrade: {
-    customEmojiId: "5382173167232230005",
+    customEmojiId: "5445284980978621387",
     unicodeFallback: "🚀",
     name: "AI Model Ascension",
   },
   event_tier_update: {
-    customEmojiId: "5382173167232230006",
+    customEmojiId: "5334882760735598374",
     unicodeFallback: "📝",
     name: "Holographic Spec Blueprint",
   },
   event_new_pool: {
-    customEmojiId: "5382173167232230007",
+    customEmojiId: "5472164874886846699",
     unicodeFallback: "✨",
     name: "Quantum Launch Sparkle",
   },
   event_batch_drop: {
-    customEmojiId: "5382173167232230008",
+    customEmojiId: "5361979468887893611",
     unicodeFallback: "🆕",
     name: "Multi-Region Batch Drop",
   },
   event_hot_slot: {
-    customEmojiId: "5382173167232230009",
+    customEmojiId: "5420315771991497307",
     unicodeFallback: "🔥",
     name: "Blazing Plasma Flame",
   },
 
   // AI Models
   ai_robot: {
-    customEmojiId: "5285430309720966085",
+    customEmojiId: "5372981976804366741",
     unicodeFallback: "🤖",
     name: "Android Sensor Head",
   },
   ai_deepseek: {
-    customEmojiId: "5285430309720966086",
+    customEmojiId: "5222292529533167322",
     unicodeFallback: "🐋",
     name: "DeepSeek Oceanic Whale",
   },
   ai_claude: {
-    customEmojiId: "5285430309720966087",
+    customEmojiId: "5472164874886846699",
     unicodeFallback: "✨",
     name: "Claude Radiant Star",
   },
   ai_qwen: {
-    customEmojiId: "5285430309720966088",
+    customEmojiId: "5361837567463399422",
     unicodeFallback: "🔮",
     name: "Qwen Quantum Crystal",
   },
@@ -240,7 +240,7 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     name: "GLM Neural Helix",
   },
   ai_llama: {
-    customEmojiId: "5285430309720966090",
+    customEmojiId: "5343553685525899318",
     unicodeFallback: "🦙",
     name: "Cyber Llama",
   },
@@ -257,7 +257,7 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     name: "Cyber Back Arrow",
   },
   nav_refresh: {
-    customEmojiId: "5420123456789012002",
+    customEmojiId: "5264727218734524899",
     unicodeFallback: "🔄",
     name: "Dual-Ring Sync Vortex",
   },
@@ -267,37 +267,37 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     name: "Spinning Gear",
   },
   nav_admin: {
-    customEmojiId: "5420123456789012004",
+    customEmojiId: "5467406098367521267",
     unicodeFallback: "👑",
     name: "Star-Glint Crown",
   },
   nav_guide: {
-    customEmojiId: "5420123456789012005",
-    unicodeFallback: "ℹ️",
+    customEmojiId: "5226512880362332956",
+    unicodeFallback: "📖",
     name: "Holographic Datapad",
   },
   nav_author: {
-    customEmojiId: "5420123456789012006",
+    customEmojiId: "5190498849440931467",
     unicodeFallback: "👨‍💻",
     name: "Cyber Hacker Badge",
   },
   nav_language: {
-    customEmojiId: "5420123456789012007",
+    customEmojiId: "5447410659074028444",
     unicodeFallback: "🌐",
     name: "Matrix Polyglot Globe",
   },
   nav_chart: {
-    customEmojiId: "5420123456789012008",
+    customEmojiId: "5431577498364158238",
     unicodeFallback: "📊",
     name: "Holographic 3D Chart",
   },
   nav_cart: {
-    customEmojiId: "5420123456789012009",
+    customEmojiId: "5431499171045581032",
     unicodeFallback: "🛒",
     name: "Checkout Pod",
   },
   nav_link: {
-    customEmojiId: "5420123456789012010",
+    customEmojiId: "5375129357373165375",
     unicodeFallback: "🔗",
     name: "Neon Cyber Link",
   },
@@ -309,12 +309,12 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
 
   // Notifications & Toggles
   notify_bell_on: {
-    customEmojiId: "5433998877665544001",
+    customEmojiId: "5242628160297641831",
     unicodeFallback: "🔔",
     name: "Golden Alert Bell",
   },
   notify_bell_off: {
-    customEmojiId: "5433998877665544002",
+    customEmojiId: "5244807637157029775",
     unicodeFallback: "🔕",
     name: "Muted Slashed Bell",
   },
@@ -329,12 +329,12 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     name: "Silent Speaker",
   },
   toggle_on: {
-    customEmojiId: "5433998877665544005",
+    customEmojiId: "5427009714745517609",
     unicodeFallback: "✅",
     name: "Laser Emerald Checkmark",
   },
   toggle_off: {
-    customEmojiId: "5433998877665544006",
+    customEmojiId: "5465665476971471368",
     unicodeFallback: "❌",
     name: "Laser Crimson Cross",
   },
@@ -346,7 +346,7 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     name: "Glowing Discount Tag",
   },
   price_money: {
-    customEmojiId: "5455112233445566002",
+    customEmojiId: "5375296873982604963",
     unicodeFallback: "💰",
     name: "Cyber Gold Tokens",
   },
@@ -356,7 +356,7 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     name: "Digital Dollar Voucher",
   },
   price_all_time_low: {
-    customEmojiId: "5455112233445566004",
+    customEmojiId: "5420315771991497307",
     unicodeFallback: "🔥",
     name: "Supernova ATL Starburst",
   },
@@ -366,7 +366,7 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     name: "Balanced Scales",
   },
   prediction_crystal: {
-    customEmojiId: "5455112233445566006",
+    customEmojiId: "5361837567463399422",
     unicodeFallback: "🔮",
     name: "Oracle Crystal Ball",
   },
