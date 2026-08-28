@@ -82,8 +82,8 @@ describe("ModelSemanticMatcher", () => {
     expect(getModel3DIcon("DeepSeek-R1-Distill-Qwen-32B")).toContain("5222292529533167322");
     expect(getModel3DIcon("Qwen2.5-Coder-32B-Instruct")).toContain("5361837567463399422");
     expect(getModel3DIcon("GLM-4-Plus")).toContain("5217444336089714383");
-    expect(getModel3DIcon("Kimi-K1.5-LongContext")).toContain("5451959871257713464");
-    expect(getModel3DIcon("Moonshot-v1-32k")).toContain("5451959871257713464");
+    expect(getModel3DIcon("Kimi-K1.5-LongContext")).toContain("5449569374065152798");
+    expect(getModel3DIcon("Moonshot-v1-32k")).toContain("5449569374065152798");
     expect(getModel3DIcon("mimo-v2.5")).toContain("5407025283456835913");
     expect(getModel3DIcon("minimax-m3")).toContain("5397575638146110953");
     expect(getModel3DIcon("Meta-Llama-3.3-70B-Instruct")).toContain("5343553685525899318");

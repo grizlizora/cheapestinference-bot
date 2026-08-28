@@ -137,7 +137,7 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     name: "Animated Warning Orb",
   },
   onboarding_wave: {
-    customEmojiId: "5385627258385966459",
+    customEmojiId: "5199885118214255386",
     unicodeFallback: "👋",
     name: "3D Waving Hand",
   },
@@ -260,7 +260,7 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     name: "3D GLM Neural",
   },
   ai_kimi: {
-    customEmojiId: "5451959871257713464",
+    customEmojiId: "5449569374065152798",
     unicodeFallback: "🌙",
     name: "3D Kimi Moon",
   },
