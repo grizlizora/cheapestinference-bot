@@ -9,6 +9,7 @@ import { renderDashboardText, safeEditMessageText } from "./mainDashboard.js";
 
 import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
 import { ActiveDashboardRegistry } from "../liveSync/dashboardRegistry.js";
+import { icon } from "../views/iconTheme.js";
 
 const DEFAULT_BLOCK_IDS = ["asia", "europe", "americas"];
 
@@ -329,40 +330,40 @@ export function createSubscriptionsMenu(
 
 export function renderSubscriptionsText(ctx: BotContext, subDao: SubscriptionDAO): string {
   const isGlobal = subDao.hasSubscription(ctx.user.id, "ALL", "ALL");
-  const globalStatus = isGlobal
-    ? ctx.t("subscriptions.global_enabled")
-    : ctx.t("subscriptions.global_disabled");
-  const soundStatus =
-    ctx.user.is_muted === 1
-      ? ctx.t("subscriptions.sound_muted")
-      : ctx.t("subscriptions.sound_enabled");
 
-  const availStatus =
-    (ctx.user.notify_available_global ?? 1) === 1
-      ? ctx.t("subscriptions.filter_on")
-      : ctx.t("subscriptions.filter_off");
+  const onText = ctx.lang === "uk" ? `УВІМКНЕНО ${icon("toggle_on")}` : ctx.lang === "ru" ? `ВКЛЮЧЕНО ${icon("toggle_on")}` : `ENABLED ${icon("toggle_on")}`;
+  const offText = ctx.lang === "uk" ? `ВИМКНЕНО ${icon("toggle_off")}` : ctx.lang === "ru" ? `ВЫКЛЮЧЕНО ${icon("toggle_off")}` : `DISABLED ${icon("toggle_off")}`;
 
-  const soldStatus =
-    (ctx.user.notify_sold_out_global ?? 0) === 1
-      ? ctx.t("subscriptions.filter_on")
-      : ctx.t("subscriptions.filter_off");
+  const titleText = ctx.lang === "uk"
+    ? `<b>Керування сповіщеннями</b>\n\nНалаштуйте категорії подій, тарифи та регіональні блоки.`
+    : ctx.lang === "ru"
+    ? `<b>Управление уведомлениями</b>\n\nНастройте категории событий, тарифы и региональные блоки.`
+    : `<b>Notification Management</b>\n\nConfigure event categories, tiers, and regional blocks.`;
 
-  const modelStatus =
-    (ctx.user.notify_models_global ?? 1) === 1
-      ? ctx.t("subscriptions.filter_on")
-      : ctx.t("subscriptions.filter_off");
+  const globalFiltersHeader = ctx.lang === "uk" ? "Глобальні фільтри за замовчуванням:" : ctx.lang === "ru" ? "Глобальные фильтры по умолчанию:" : "Default Global Filters:";
+  const dropsLabel = ctx.lang === "uk" ? "Вільні слоти" : ctx.lang === "ru" ? "Свободные слоты" : "Available Slots";
+  const soldLabel = ctx.lang === "uk" ? "Розпродано (Sold Out)" : ctx.lang === "ru" ? "Распродано (Sold Out)" : "Sold Out";
+  const modelsLabel = ctx.lang === "uk" ? "Оновлення моделей" : ctx.lang === "ru" ? "Обновления моделей" : "Model Updates";
+  const pricesLabel = ctx.lang === "uk" ? "Зміни цін та тарифів" : ctx.lang === "ru" ? "Изменения цен и тарифов" : "Price & Tariff Changes";
+  const globalAlertsLabel = ctx.lang === "uk" ? "Глобальні сповіщення" : ctx.lang === "ru" ? "Глобальные уведомления" : "Global Notifications";
+  const soundLabel = ctx.lang === "uk" ? "Режим звуку" : ctx.lang === "ru" ? "Режим звука" : "Sound Mode";
 
-  const priceStatus =
-    (ctx.user.notify_prices_global ?? 1) === 1
-      ? ctx.t("subscriptions.filter_on")
-      : ctx.t("subscriptions.filter_off");
+  const soundStatus = ctx.user.is_muted === 1
+    ? (ctx.lang === "uk" ? `Без звуку ${icon("notify_mute")}` : ctx.lang === "ru" ? `Без звука ${icon("notify_mute")}` : `Muted ${icon("notify_mute")}`)
+    : (ctx.lang === "uk" ? `Звук увімкнено ${icon("notify_loud")}` : ctx.lang === "ru" ? `Звук включен ${icon("notify_loud")}` : `Sound on ${icon("notify_loud")}`);
 
-  return ctx.t("subscriptions.title", {
-    global_status: globalStatus,
-    sound_status: soundStatus,
-    avail_status: availStatus,
-    sold_status: soldStatus,
-    model_status: modelStatus,
-    price_status: priceStatus,
-  });
+  const availStatus = (ctx.user.notify_available_global ?? 1) === 1 ? onText : offText;
+  const soldStatus = (ctx.user.notify_sold_out_global ?? 0) === 1 ? onText : offText;
+  const modelStatus = (ctx.user.notify_models_global ?? 1) === 1 ? onText : offText;
+  const priceStatus = (ctx.user.notify_prices_global ?? 1) === 1 ? onText : offText;
+  const globalStatus = isGlobal ? onText : offText;
+
+  return `${icon("notify_bell_on")} ${titleText}\n\n` +
+    `${icon("nav_settings")} <b>${globalFiltersHeader}</b>\n` +
+    `• ${icon("event_slot_drop")} ${dropsLabel}: ${availStatus}\n` +
+    `• ${icon("event_slot_sold")} ${soldLabel}: ${soldStatus}\n` +
+    `• ${icon("event_batch_drop")} ${modelsLabel}: ${modelStatus}\n` +
+    `• ${icon("price_tag")} ${pricesLabel}: ${priceStatus}\n\n` +
+    `${icon("nav_language")} <b>${globalAlertsLabel}:</b> ${globalStatus}\n` +
+    `🔊 <b>${soundLabel}:</b> ${soundStatus}`;
 }

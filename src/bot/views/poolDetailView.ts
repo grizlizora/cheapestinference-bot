@@ -35,19 +35,34 @@ export function renderPoolSettingsText(
   const blocks = poolStateDao.getPoolBlocks(slug);
   const poolName = blocks[0]?.pool_name || slug.toUpperCase();
 
-  const onText = ctx.t("subscriptions.filter_on");
-  const offText = ctx.t("subscriptions.filter_off");
+  const onText = ctx.lang === "uk" ? `УВІМКНЕНО ${icon("toggle_on")}` : ctx.lang === "ru" ? `ВКЛЮЧЕНО ${icon("toggle_on")}` : `ENABLED ${icon("toggle_on")}`;
+  const offText = ctx.lang === "uk" ? `ВИМКНЕНО ${icon("toggle_off")}` : ctx.lang === "ru" ? `ВЫКЛЮЧЕНО ${icon("toggle_off")}` : `DISABLED ${icon("toggle_off")}`;
 
-  return ctx.t("pool_settings.title", {
-    pool_name: escapeHtml(poolName),
-    avail_status: flags.available ? onText : offText,
-    sold_status: flags.soldOut ? onText : offText,
-    model_status: flags.models ? onText : offText,
-    price_status: flags.prices ? onText : offText,
-    pool_status: flags.isSubscribed
-      ? ctx.t("subscriptions.global_enabled")
-      : ctx.t("subscriptions.global_disabled"),
-  });
+  const headerTitle = ctx.lang === "uk"
+    ? `<b>Фільтри сповіщень • ${escapeHtml(poolName)}</b>\n\nНалаштуйте, які саме події ви хочете отримувати для тарифу <b>${escapeHtml(poolName)}</b>:`
+    : ctx.lang === "ru"
+    ? `<b>Фильтры уведомлений • ${escapeHtml(poolName)}</b>\n\nНастройте, какие именно события вы хотите получать для тарифа <b>${escapeHtml(poolName)}</b>:`
+    : `<b>Notification Filters • ${escapeHtml(poolName)}</b>\n\nConfigure which events you want to receive for <b>${escapeHtml(poolName)}</b>:`;
+
+  const dropsLabel = ctx.lang === "uk" ? "Вільні слоти (Drops)" : ctx.lang === "ru" ? "Свободные слоты (Drops)" : "Available Slots (Drops)";
+  const soldLabel = ctx.lang === "uk" ? "Розпродано (Sold Out)" : ctx.lang === "ru" ? "Распродано (Sold Out)" : "Sold Out";
+  const modelsLabel = ctx.lang === "uk" ? "Оновлення моделей" : ctx.lang === "ru" ? "Обновления моделей" : "Model Updates";
+  const pricesLabel = ctx.lang === "uk" ? "Зміна цін та знижок" : ctx.lang === "ru" ? "Изменение цен и скидок" : "Price & Discount Changes";
+  const subStatusLabel = ctx.lang === "uk" ? "Статус підписки на пул" : ctx.lang === "ru" ? "Статус подписки на пул" : "Pool Subscription Status";
+
+  let poolIcon = icon("pool_generic");
+  if (slug.includes("flagship")) poolIcon = icon("pool_flagship");
+  else if (slug.includes("core")) poolIcon = icon("pool_core");
+  else if (slug.includes("frontier")) poolIcon = icon("pool_frontier");
+
+  const poolStatus = flags.isSubscribed ? onText : offText;
+
+  return `${icon("nav_settings")} ${headerTitle}\n\n` +
+    `• ${icon("event_slot_drop")} ${dropsLabel}: ${flags.available ? onText : offText}\n` +
+    `• ${icon("event_slot_sold")} ${soldLabel}: ${flags.soldOut ? onText : offText}\n` +
+    `• ${icon("event_batch_drop")} ${modelsLabel}: ${flags.models ? onText : offText}\n` +
+    `• ${icon("price_tag")} ${pricesLabel}: ${flags.prices ? onText : offText}\n\n` +
+    `${poolIcon} <b>${subStatusLabel}:</b> ${poolStatus}`;
 }
 
 export function renderPoolDetailText(
