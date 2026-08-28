@@ -84,6 +84,8 @@ describe("ModelSemanticMatcher", () => {
     expect(getModel3DIcon("GLM-4-Plus")).toContain("5217444336089714383");
     expect(getModel3DIcon("Kimi-K1.5-LongContext")).toContain("5451959871257713464");
     expect(getModel3DIcon("Moonshot-v1-32k")).toContain("5451959871257713464");
+    expect(getModel3DIcon("mimo-v2.5")).toContain("5407025283456835913");
+    expect(getModel3DIcon("minimax-m3")).toContain("5397575638146110953");
     expect(getModel3DIcon("Meta-Llama-3.3-70B-Instruct")).toContain("5343553685525899318");
     expect(getModel3DIcon("Mistral-Large-2407")).toContain("6332347924063717264");
     expect(getModel3DIcon("Claude-3.5-Sonnet")).toContain("5325547803936572038");

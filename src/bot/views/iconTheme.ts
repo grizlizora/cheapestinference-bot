@@ -48,6 +48,8 @@ export type IconKey =
   | "ai_qwen"
   | "ai_glm"
   | "ai_kimi"
+  | "ai_mimo"
+  | "ai_minimax"
   | "ai_llama"
   | "ai_mistral"
   // Navigation, Controls & Settings
@@ -261,6 +263,16 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     customEmojiId: "5451959871257713464",
     unicodeFallback: "🌙",
     name: "3D Kimi Moon",
+  },
+  ai_mimo: {
+    customEmojiId: "5407025283456835913",
+    unicodeFallback: "📱",
+    name: "3D Xiaomi Phone",
+  },
+  ai_minimax: {
+    customEmojiId: "5397575638146110953",
+    unicodeFallback: "🌊",
+    name: "3D Ocean Wave",
   },
   ai_llama: {
     customEmojiId: "5343553685525899318",
@@ -557,6 +569,10 @@ export function getModel3DIcon(modelName: string): string {
       return icon("ai_glm");
     case "kimi":
       return icon("ai_kimi");
+    case "mimo":
+      return icon("ai_mimo");
+    case "minimax":
+      return icon("ai_minimax");
     case "llama":
       return icon("ai_llama");
     case "mistral":
