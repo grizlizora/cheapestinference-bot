@@ -94,10 +94,16 @@ export function renderDashboardText(
     })
     .join("\n\n");
 
-  const rendered = ctx.t("menu.dashboard_title", {
-    pool_summaries: poolSummariesText,
-    updated_at: updatedAtStr,
-  });
+  const dashboardHeader = ctx.lang === "uk"
+    ? "<b>CheapestInference — Моніторинг слотів</b>\n\nАктуальний стан тарифів та регіональних блоків:"
+    : ctx.lang === "ru"
+    ? "<b>CheapestInference — Мониторинг слотов</b>\n\nАктуальное состояние тарифов и региональных блоков:"
+    : "<b>CheapestInference — Slot Monitoring</b>\n\nActual status of compute pools and regional blocks:";
+  const updatedLabel = ctx.lang === "uk" ? "Останнє оновлення" : ctx.lang === "ru" ? "Последнее обновление" : "Last updated";
+
+  const rendered = `${icon("nav_chart")} ${dashboardHeader}\n\n` +
+    `${poolSummariesText}\n\n` +
+    `${icon("nav_clock")} <i>${updatedLabel}: ${updatedAtStr}</i>`;
 
   return clampMessageText(rendered);
 }

@@ -165,7 +165,7 @@ export function renderPoolDetailText(
     `${icon("price_money")} <b>${costLabel}</b>\n` +
     `• ${baseLabel} <b>$${minPrice}/міс</b> (~$${minPriceDay}/${dayLabel})\n` +
     `• ${discountLabel} <b>${annualDiscountPct}%</b>\n\n` +
-    `🕒 <b>${blocksLabel}</b>\n` +
+    `${icon("nav_clock")} <b>${blocksLabel}</b>\n` +
     `${blocksList}\n\n` +
     `${icon("nav_link")} <b>${linkLabel}</b> <a href="https://cheapestinference.com/pools/${slug}">https://cheapestinference.com/pools/${slug}</a>`;
 

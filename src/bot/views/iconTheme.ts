@@ -302,9 +302,9 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     name: "3D Chain Link",
   },
   nav_clock: {
-    customEmojiId: "5264727218734524899",
-    unicodeFallback: "🕒",
-    name: "3D Chronometer",
+    customEmojiId: "5451732530048802485",
+    unicodeFallback: "⏳",
+    name: "3D Animated Hourglass",
   },
 
   // Notifications & Toggles
