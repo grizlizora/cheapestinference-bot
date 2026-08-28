@@ -1,3 +1,8 @@
+/**
+ * src/bot/liveSync/liveDashboardManager.ts
+ * Real-time In-Place Message LiveSync Manager with Multi-Tier Heartbeat Routing
+ */
+
 import { Bot } from "grammy";
 import { Menu } from "@grammyjs/menu";
 import { BotContext } from "../../types/context.js";
@@ -11,7 +16,6 @@ import { renderPoolDetailText } from "../views/poolDetailView.js";
 import { translate } from "../../i18n/index.js";
 
 export interface LiveDashboardManagerOptions {
-  heartbeatSyncThrottleMs?: number; // Throttle timestamp updates during heartbeat (default 45s)
   maxEditsPerSecond?: number; // Token bucket dispatch capacity (default 20/s)
   registry?: ActiveDashboardRegistry;
 }
@@ -29,7 +33,6 @@ export class LiveDashboardManager {
   private readonly maxTokens = 20;
   private lastTokenRefill = performance.now();
 
-  private readonly heartbeatSyncThrottleMs: number;
   private readonly USER_EDIT_GAP_MS = 1050; // 1.05s per-chat edit rate limit
   private lastChatEditTime = new Map<number, number>();
 
@@ -48,7 +51,6 @@ export class LiveDashboardManager {
     options: LiveDashboardManagerOptions = {}
   ) {
     this.registry = options.registry || new ActiveDashboardRegistry();
-    this.heartbeatSyncThrottleMs = options.heartbeatSyncThrottleMs ?? 10_000;
     this.targetRatePerSec = options.maxEditsPerSecond ?? 20;
     this.tokenIntervalMs = 1000 / this.targetRatePerSec;
 
@@ -62,27 +64,28 @@ export class LiveDashboardManager {
   }
 
   /**
-   * Fast Path: Invoked immediately when DiffEngine detects catalog or slot changes
+   * Fast Path: Invoked immediately when DiffEngine detects catalog or slot changes.
+   * Updates all active and eco-tier dashboards in real-time (<1s).
    */
   public handleDataChanged(): void {
-    const activeSessions = this.registry.getActiveSessions();
-    for (const session of activeSessions) {
+    const sessions = this.registry.getSessionsForDataChange();
+    for (const session of sessions) {
       this.enqueueUpdate(session);
     }
   }
 
   /**
-   * Invoked on routine heartbeat polls and scrape cycles
+   * Invoked on routine heartbeat polls and scrape cycles.
+   * Heartbeat routing: Tier 1 (Active <30m) every 15s; Tier 2 (Eco 30m-24h) every 60s.
    */
   public handleScraperHeartbeat(isModified: boolean): void {
-    const now = Date.now();
-    const activeSessions = this.registry.getActiveSessions();
-
-    for (const session of activeSessions) {
-      // If data modified or throttle time elapsed (>=10s), sync live dashboard message
-      if (isModified || (now - session.lastTelegramEditAt >= this.heartbeatSyncThrottleMs)) {
-        this.enqueueUpdate(session);
-      }
+    if (isModified) {
+      this.handleDataChanged();
+      return;
+    }
+    const sessions = this.registry.getSessionsForHeartbeat();
+    for (const session of sessions) {
+      this.enqueueUpdate(session);
     }
   }
 
@@ -156,10 +159,10 @@ export class LiveDashboardManager {
       let targetMenu: Menu<BotContext>;
 
       if (session.viewType === "dashboard") {
-        text = renderDashboardText(syntheticCtx, this.poolStateDao, this.historyDao, this.scraper);
+        text = renderDashboardText(syntheticCtx, this.poolStateDao, this.historyDao, this.scraper, session.lastUserInteractionAt);
         targetMenu = this.mainDashboardMenu;
       } else if (session.viewType === "pool_detail") {
-        text = renderPoolDetailText(syntheticCtx, this.poolStateDao, this.historyDao, this.scraper);
+        text = renderPoolDetailText(syntheticCtx, this.poolStateDao, this.historyDao, this.scraper, session.lastUserInteractionAt);
         targetMenu = this.poolDetailMenu;
       } else {
         return;
@@ -188,9 +191,7 @@ export class LiveDashboardManager {
       await this.bot.api.editMessageText(session.chatId, session.messageId, text, payload as any);
       const tgEditLatency = Date.now() - editStartTime;
 
-      session.lastRenderedTextHash = textHash;
-      session.lastTelegramEditAt = Date.now();
-      session.consecutiveErrors = 0;
+      this.registry.recordEditSuccess(session.chatId, textHash);
       console.log(`📡 [LiveSync] In-place updated view '${session.viewType}' for chat ${session.chatId} in ${tgEditLatency}ms (TG API)`);
     } catch (err: any) {
       this.handleEditError(err, session);
@@ -203,7 +204,6 @@ export class LiveDashboardManager {
 
     // 1. Message not modified (normal Telegram response when text is identical)
     if (desc.includes("message is not modified")) {
-      session.lastTelegramEditAt = Date.now();
       return;
     }
 
@@ -236,27 +236,30 @@ export class LiveDashboardManager {
       return;
     }
 
-    // 5. General Error (increment retry count)
-    session.consecutiveErrors++;
-    if (session.consecutiveErrors >= 3) {
-      this.lastChatEditTime.delete(session.chatId);
-      this.registry.remove(session.chatId);
-    }
+    // Generic error: record error count
+    this.registry.recordEditError(session.chatId);
   }
 
   private createSyntheticContext(session: ActiveDashboardEntry): BotContext {
     return {
       chat: { id: session.chatId, type: "private" },
-      from: { id: session.chatId, is_bot: false, first_name: "User" },
+      from: { id: session.userId, first_name: "User", is_bot: false },
+      lang: session.lang,
       user: {
         id: session.userId,
-        telegram_id: session.chatId,
+        telegramId: session.userId,
         language: session.lang,
-      } as any,
-      lang: session.lang,
-      session: { tempPoolSlug: session.poolSlug } as any,
-      t: (key: string, params?: Record<string, string | number>) =>
-        translate(session.lang, key, params),
+        isMuted: false,
+        isActive: true,
+      },
+      session: {
+        lang: session.lang,
+        tempPoolSlug: session.poolSlug,
+      },
+      t: (key: string, params?: Record<string, string | number>) => {
+        return translate(session.lang, key, params);
+      },
+      match: session.poolSlug || "",
     } as unknown as BotContext;
   }
 }

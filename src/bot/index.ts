@@ -27,6 +27,7 @@ import {
   SupportedLanguage,
 } from "../i18n/index.js";
 
+import { ActiveDashboardDAO } from "../db/dao/activeDashboards.js";
 import { LiveDashboardManager } from "./liveSync/liveDashboardManager.js";
 import { ActiveDashboardRegistry } from "./liveSync/dashboardRegistry.js";
 
@@ -38,7 +39,8 @@ export function createTelegramBot(
   logDao: NotificationLogDAO,
   scraper: ScraperOrchestrator,
   proxyPool: ProxyPool,
-  historyDao?: SlotHistoryDAO
+  historyDao?: SlotHistoryDAO,
+  activeDashboardDao?: ActiveDashboardDAO
 ): { bot: Bot<BotContext>; dispatcher: NotificationDispatcher; liveDashboardManager: LiveDashboardManager } {
   const bot = new Bot<BotContext>(token, {
     client: config.TELEGRAM_API_ROOT
@@ -208,7 +210,7 @@ export function createTelegramBot(
   });
 
   // 7. i18n Translation helper attached to context & interaction touch
-  const activeDashboardRegistry = new ActiveDashboardRegistry();
+  const activeDashboardRegistry = new ActiveDashboardRegistry(activeDashboardDao);
 
   bot.use(async (ctx, next) => {
     ctx.t = (key: string, params?: Record<string, string | number>) => {

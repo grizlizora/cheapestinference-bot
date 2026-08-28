@@ -1,11 +1,16 @@
+/**
+ * src/server/health.ts
+ * High-Availability Health Check, Prometheus Metrics & Render Always-On Keep-Alive Server
+ */
+
 import http from "node:http";
 import { ScraperOrchestrator } from "../engine/scraperOrchestrator.js";
 import { ProxyPool } from "../proxy/proxyPool.js";
 
 export function createHealthServer(
   port: number,
-  scraper: ScraperOrchestrator,
-  proxyPool: ProxyPool
+  scraper?: ScraperOrchestrator,
+  proxyPool?: ProxyPool
 ): http.Server {
   const server = http.createServer((req, res) => {
     const rawUrl = req.url || "/";
@@ -33,7 +38,7 @@ export function createHealthServer(
 
     if (pathname === "/metrics") {
       try {
-        const telemetry = scraper.getTelemetry();
+        const telemetry = scraper ? scraper.getTelemetry() : { totalScrapes: 0, lastScrapeLatencyMs: 0, consecutiveFailures: 0 };
         const mem = process.memoryUsage();
         const metrics = [
           "# HELP bot_uptime_seconds Bot process uptime in seconds",
@@ -73,13 +78,18 @@ export function createHealthServer(
       pathname === "/healthz" ||
       pathname === "/" ||
       pathname === "/ping" ||
-      pathname === "/live"
+      pathname === "/live" ||
+      pathname === "/status" ||
+      pathname === "/ready" ||
+      pathname === "/readyz" ||
+      pathname === "/api/health"
     ) {
       try {
-        const telemetry = scraper.getTelemetry();
-        const proxyStatus = proxyPool.getStatus();
+        const telemetry = scraper
+          ? scraper.getTelemetry()
+          : { lastScrapeTimestamp: 0, lastScrapeLatencyMs: 0, lastSource: "init", consecutiveFailures: 0, totalScrapes: 0 };
+        const proxyStatus = proxyPool ? proxyPool.getStatus() : { activeMode: "direct", directOk: true };
 
-        // Return HTTP 200 for process liveness to prevent destructive restart loops on Render / HF Spaces
         const isDegraded = telemetry.consecutiveFailures > 0;
         const statusCode = 200;
 
@@ -135,4 +145,41 @@ export function createHealthServer(
   });
 
   return server;
+}
+
+/**
+ * Autonomous Internal Keep-Alive Self-Ping Timer
+ * Periodically pings the bot's own public HTTP endpoint to guarantee Render / container stay awake 24/7.
+ */
+export function startKeepAliveSelfPing(healthPort: number): NodeJS.Timeout | undefined {
+  const externalUrl = process.env.RENDER_EXTERNAL_URL || process.env.KEEP_ALIVE_URL;
+  if (!externalUrl && process.env.NODE_ENV !== "production") return undefined;
+
+  const targetUrl = externalUrl
+    ? `${externalUrl.replace(/\/+$/, "")}/ping`
+    : `http://127.0.0.1:${healthPort}/ping`;
+
+  console.log(`🛡️ [KeepAlive] Redundant self-ping initialized targeting: ${targetUrl}`);
+
+  // Ping every 9 minutes (well below Render's 15m idle sleep threshold)
+  const timer = setInterval(async () => {
+    try {
+      const res = await fetch(targetUrl, {
+        method: "HEAD",
+        headers: {
+          "User-Agent": "CheapestInference-Internal-KeepAlive/1.0",
+          "Cache-Control": "no-cache",
+        },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (res.ok) {
+        console.log(`💓 [KeepAlive] Internal keep-alive ping succeeded (${res.status})`);
+      }
+    } catch (err: any) {
+      console.warn(`⚠️ [KeepAlive] Internal keep-alive probe warning: ${err.message}`);
+    }
+  }, 9 * 60 * 1000);
+
+  timer.unref();
+  return timer;
 }

@@ -8,7 +8,7 @@ import { PoolStateDAO } from "../../db/dao/poolState.js";
 import { SlotHistoryDAO } from "../../db/dao/slotHistory.js";
 import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
 import { escapeHtml, formatRelativeTime } from "../../i18n/index.js";
-import { clampMessageText } from "./common.js";
+import { clampMessageText, formatMonitoringFooter } from "./common.js";
 
 export interface PoolBadgeInfo {
   icon: "🟢" | "🟡" | "🔴";
@@ -31,30 +31,20 @@ export function renderDashboardText(
   ctx: BotContext,
   poolStateDao: PoolStateDAO,
   historyDao?: SlotHistoryDAO,
-  scraper?: ScraperOrchestrator
+  scraper?: ScraperOrchestrator,
+  lastUserInteractionAt?: number
 ): string {
   const summaries = poolStateDao.getPoolSummaries();
   const telemetry = scraper?.getTelemetry();
   const lastVerified = poolStateDao.getLastVerified();
   const lastVerifiedTs = telemetry?.lastScrapeTimestamp || lastVerified?.timestamp;
 
-  let updatedAtStr = "";
-  if (lastVerifiedTs && lastVerifiedTs > 0) {
-    const utcDateStr = new Date(lastVerifiedTs).toISOString().replace("T", " ").substring(0, 19) + " UTC";
-    const elapsedText = formatRelativeTime(lastVerifiedTs, ctx.lang);
-    updatedAtStr = `${utcDateStr} (${elapsedText})`;
-  } else {
-    updatedAtStr = new Date().toISOString().replace("T", " ").substring(0, 19) + " UTC";
-  }
-
-  if (telemetry && telemetry.consecutiveFailures > 0) {
-    updatedAtStr +=
-      ctx.lang === "uk"
-        ? ` ⚠️ [затримка мережі, спроба ${telemetry.consecutiveFailures}]`
-        : ctx.lang === "ru"
-        ? ` ⚠️ [задержка сети, попытка ${telemetry.consecutiveFailures}]`
-        : ` ⚠️ [network delay, retry ${telemetry.consecutiveFailures}]`;
-  }
+  const updatedAtStr = formatMonitoringFooter(
+    lastVerifiedTs,
+    ctx.lang,
+    lastUserInteractionAt,
+    telemetry?.consecutiveFailures || 0
+  );
 
   if (summaries.length === 0) {
     return ctx.t("menu.dashboard_title", {

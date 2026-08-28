@@ -63,3 +63,19 @@ export interface NotificationLogRecord {
   event_type: string;
   sent_at: string;
 }
+
+export interface ActiveDashboardRecord {
+  chat_id: number;
+  message_id: number;
+  user_id: number;
+  view_type: "dashboard" | "pool_detail" | "subscriptions" | "settings" | "admin" | "other";
+  pool_slug: string | null;
+  language: SupportedLanguage;
+  last_rendered_text_hash: number;
+  last_rendered_keyboard_hash: number;
+  last_telegram_edit_at: string;
+  last_interaction_at: string;
+  consecutive_errors: number;
+  created_at: string;
+  updated_at: string;
+}

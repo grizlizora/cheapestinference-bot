@@ -10,7 +10,7 @@ import { SlotHistoryDAO } from "../../db/dao/slotHistory.js";
 import { AvailabilityIntelligenceEngine } from "../../engine/intelligenceEngine.js";
 import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
 import { escapeHtml, formatRelativeTime } from "../../i18n/index.js";
-import { clampMessageText } from "./common.js";
+import { clampMessageText, formatMonitoringFooter } from "./common.js";
 
 export const DEFAULT_BLOCK_IDS = ["asia", "europe", "americas"];
 export const DEFAULT_BLOCK_HOURS: Record<string, string> = {
@@ -61,7 +61,8 @@ export function renderPoolDetailText(
   ctx: BotContext,
   poolStateDao: PoolStateDAO,
   historyDao?: SlotHistoryDAO,
-  scraper?: ScraperOrchestrator
+  scraper?: ScraperOrchestrator,
+  lastUserInteractionAt?: number
 ): string {
   const slug = ctx.session?.tempPoolSlug || "flagship";
   const blocks = poolStateDao.getPoolBlocks(slug);
@@ -136,12 +137,13 @@ export function renderPoolDetailText(
   const lastVerified = poolStateDao.getLastVerified();
   const lastVerifiedTs = telemetry?.lastScrapeTimestamp || lastVerified?.timestamp;
 
-  let timeFooter = "";
-  if (lastVerifiedTs && lastVerifiedTs > 0) {
-    const utcDateStr = new Date(lastVerifiedTs).toISOString().replace("T", " ").substring(0, 19) + " UTC";
-    const elapsedText = formatRelativeTime(lastVerifiedTs, ctx.lang);
-    timeFooter = `\n\n🕒 <i>${ctx.lang === "uk" ? "Оновлено" : ctx.lang === "ru" ? "Обновлено" : "Updated"}: ${utcDateStr} (${elapsedText})</i>`;
-  }
+  const monitoringText = formatMonitoringFooter(
+    lastVerifiedTs,
+    ctx.lang,
+    lastUserInteractionAt,
+    telemetry?.consecutiveFailures || 0
+  );
+  const timeFooter = `\n\n🕒 <i>${ctx.lang === "uk" ? "Дані перевірено" : ctx.lang === "ru" ? "Данные проверены" : "Verified at"}: ${monitoringText}</i>`;
 
   const baseTitle = ctx.t("pool_detail.title", {
     pool_name: escapeHtml(first.pool_name),

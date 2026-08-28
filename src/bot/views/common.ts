@@ -47,3 +47,39 @@ export async function safeEditMessageText(
     console.warn("⚠️ [View/Menu] Safe editMessageText warning:", desc);
   }
 }
+
+/**
+ * Formats a clear, dynamic telemetry timestamp footer showing live verification and state.
+ */
+export function formatMonitoringFooter(
+  lastVerifiedTs: number | undefined,
+  lang: string,
+  lastUserInteractionAt?: number,
+  consecutiveFailures = 0
+): string {
+  const ts = lastVerifiedTs && lastVerifiedTs > 0 ? lastVerifiedTs : Date.now();
+  const utcDateStr = new Date(ts).toISOString().replace("T", " ").substring(0, 19) + " UTC";
+  
+  const now = Date.now();
+  const idleMs = lastUserInteractionAt ? Math.max(0, now - lastUserInteractionAt) : 0;
+  
+  let modeTag = "";
+  if (idleMs <= 30 * 60 * 1000) {
+    modeTag = "🟢 Live 5s";
+  } else if (idleMs <= 24 * 60 * 60 * 1000) {
+    modeTag = lang === "uk" ? "🟢 Моніторинг активний" : lang === "ru" ? "🟢 Мониторинг активен" : "🟢 Monitoring active";
+  } else {
+    modeTag = lang === "uk" ? "💤 Режим очікування" : lang === "ru" ? "💤 Режим ожидания" : "💤 Standby";
+  }
+
+  let delayTag = "";
+  if (consecutiveFailures > 0) {
+    delayTag = lang === "uk" 
+      ? ` ⚠️ [затримка мережі, спроба ${consecutiveFailures}]`
+      : lang === "ru"
+      ? ` ⚠️ [задержка сети, попытка ${consecutiveFailures}]`
+      : ` ⚠️ [network delay, retry ${consecutiveFailures}]`;
+  }
+
+  return `${utcDateStr} (${modeTag})${delayTag}`;
+}

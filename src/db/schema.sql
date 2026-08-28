@@ -128,3 +128,24 @@ CREATE TABLE IF NOT EXISTS system_metadata (
   value TEXT NOT NULL,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 9. Active Dashboards Table (Container Reboot & LiveSync Persistence)
+CREATE TABLE IF NOT EXISTS active_dashboards (
+  chat_id INTEGER PRIMARY KEY,
+  message_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  view_type TEXT NOT NULL DEFAULT 'dashboard',
+  pool_slug TEXT,
+  language TEXT NOT NULL DEFAULT 'en',
+  last_rendered_text_hash INTEGER NOT NULL DEFAULT 0,
+  last_rendered_keyboard_hash INTEGER NOT NULL DEFAULT 0,
+  last_telegram_edit_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_interaction_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  consecutive_errors INTEGER NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_active_dashboards_user ON active_dashboards(user_id);
+CREATE INDEX IF NOT EXISTS idx_active_dashboards_interaction ON active_dashboards(last_interaction_at);
