@@ -251,7 +251,7 @@ export function createTelegramBot(
   });
 
   // 8. Register Menus
-  const { mainDashboardMenu, poolDetailMenu, subscriptionsMenu, languageMenu } =
+  const { mainDashboardMenu, poolDetailMenu, subscriptionsMenu, languageMenu, settingsMenu, donateMenu } =
     createMainMenuHierarchy(
       poolStateDao,
       userDao,
@@ -622,15 +622,13 @@ export function createTelegramBot(
     ctx.session.waitingForCustomStars = false;
     ctx.session.pendingCustomStars = undefined;
 
+    if (ctx.chat) {
+      activeDashboardRegistry.updateView(ctx.chat.id, "other");
+    }
+
     const profile = dispatcher.getInvertedIndex().getProfileByTgId(ctx.from.id);
     const totalStars = profile?.totalDonatedStars || 0;
-    try {
-      if (ctx.menu && typeof ctx.menu.nav === "function") {
-        await safeEditMessageText(ctx, renderDonateText(ctx, totalStars));
-        return await ctx.menu.nav("donate-menu");
-      }
-    } catch {}
-    await safeEditMessageText(ctx, renderDonateText(ctx, totalStars), { reply_markup: mainDashboardMenu });
+    await safeEditMessageText(ctx, renderDonateText(ctx, totalStars), donateMenu);
   });
 
   // Wire Scraper diff_events to dispatcher
