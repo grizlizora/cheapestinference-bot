@@ -397,10 +397,11 @@ export function createTelegramBot(
   });
 
   bot.command("help", async (ctx) => {
-    const keyboard = new InlineKeyboard().url(
-      ctx.t("common.btn_contact_author"),
-      "https://t.me/grizlizora"
-    );
+    const keyboard = new InlineKeyboard()
+      .url("🐙 GitHub", "https://github.com/grizlizora/cheapestinference-bot")
+      .url("🌐 CheapestInference", "https://cheapestinference.com/pools")
+      .row()
+      .url("👨‍💻 @grizlizora", "https://t.me/grizlizora");
     await ctx.reply(
       renderHelpText(ctx),
       {

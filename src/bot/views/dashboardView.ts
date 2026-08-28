@@ -171,9 +171,7 @@ export function renderHelpText(ctx: BotContext): string {
       `5. Щойно слот з'являється — ви миттєво отримуєте повідомлення з кнопкою швидкого бронювання!\n\n` +
       `💡 <b>Open-Source проект:</b>\n` +
       `Проект є повністю відкритим, надійним та прозорим під ліцензією MIT.\n` +
-      `🐙 <a href="https://github.com/grizlizora/cheapestinference-bot">Відкритий вихідний код на GitHub</a>\n\n` +
-      `🌐 <a href="https://cheapestinference.com/pools">Офіційна сторінка тарифів платформи</a>\n` +
-      `👨‍💻 <b>Зв'язок з автором / Підтримка:</b> <a href="https://t.me/grizlizora">@grizlizora</a>`;
+      `🐙 <a href="https://github.com/grizlizora/cheapestinference-bot">Відкритий вихідний код на GitHub</a>`;
   } else if (ctx.lang === "ru") {
     return `${guideIcon} <b>Как работает этот бот?</b>\n\n` +
       `1. Бот круглосуточно проверяет <a href="https://cheapestinference.com/pools">официальный сайт CheapestInference</a> через защищенный высокоскоростной канал.\n` +
@@ -183,9 +181,7 @@ export function renderHelpText(ctx: BotContext): string {
       `5. Как только слот появляется — вы моментально получаете сообщение с кнопкой бронирования!\n\n` +
       `💡 <b>Open-Source проект:</b>\n` +
       `Проект имеет полностью открытый, надежный и прозрачный исходный код под лицензией MIT.\n` +
-      `🐙 <a href="https://github.com/grizlizora/cheapestinference-bot">Исходный код на GitHub</a>\n\n` +
-      `🌐 <a href="https://cheapestinference.com/pools">Официальная страница тарифов платформы</a>\n` +
-      `👨‍💻 <b>Связь с автором / Поддержка:</b> <a href="https://t.me/grizlizora">@grizlizora</a>`;
+      `🐙 <a href="https://github.com/grizlizora/cheapestinference-bot">Исходный код на GitHub</a>`;
   } else {
     return `${guideIcon} <b>How this bot works</b>\n\n` +
       `1. The bot monitors the <a href="https://cheapestinference.com/pools">official CheapestInference website</a> 24/7 via resilient high-speed proxy channels.\n` +
@@ -195,8 +191,6 @@ export function renderHelpText(ctx: BotContext): string {
       `5. The moment a slot opens — you receive instant notifications with direct checkout buttons!\n\n` +
       `💡 <b>Open-Source Project:</b>\n` +
       `This project is 100% open-source, robust, and transparent under the MIT license.\n` +
-      `🐙 <a href="https://github.com/grizlizora/cheapestinference-bot">Source code on GitHub</a>\n\n` +
-      `🌐 <a href="https://cheapestinference.com/pools">Official Platform Pricing Page</a>\n` +
-      `👨‍💻 <b>Author Contact & Support:</b> <a href="https://t.me/grizlizora">@grizlizora</a>`;
+      `🐙 <a href="https://github.com/grizlizora/cheapestinference-bot">Source code on GitHub</a>`;
   }
 }
