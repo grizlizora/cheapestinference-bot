@@ -207,7 +207,7 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     name: "3D Memo Spec",
   },
   event_new_pool: {
-    customEmojiId: "5472164874886846699",
+    customEmojiId: "5325547803936572038",
     unicodeFallback: "✨",
     name: "3D Sparkle",
   },
@@ -244,7 +244,7 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     name: "3D Qwen Crystal Ball",
   },
   ai_glm: {
-    customEmojiId: "5472164874886846699",
+    customEmojiId: "5217444336089714383",
     unicodeFallback: "🧬",
     name: "3D GLM Neural",
   },
