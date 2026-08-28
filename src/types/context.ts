@@ -5,6 +5,8 @@ import { UserRecord, SupportedLanguage } from "./db.js";
 export interface SessionData {
   tempPoolSlug?: string;
   lastActiveMenu?: string;
+  waitingForCustomStars?: boolean;
+  pendingCustomStars?: number;
 }
 
 export type BotContext = Context &

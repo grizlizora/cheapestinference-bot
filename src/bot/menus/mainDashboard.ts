@@ -1,3 +1,4 @@
+import { InlineKeyboard } from "grammy";
 import { Menu } from "@grammyjs/menu";
 import { BotContext } from "../../types/context.js";
 import { PoolStateDAO } from "../../db/dao/poolState.js";
@@ -274,6 +275,21 @@ export function createMainMenuHierarchy(
       )
       .row();
   }
+
+  donateMenu
+    .text(
+      (ctx) => ctx.t("donate.btn_custom_stars"),
+      async (ctx) => {
+        await ctx.answerCallbackQuery().catch(() => {});
+        ctx.session.waitingForCustomStars = true;
+        const cancelKeyboard = new InlineKeyboard().text(
+          ctx.t("common.back"),
+          "donate_cancel_custom"
+        );
+        await safeEditMessageText(ctx, ctx.t("donate.prompt_custom_stars"), cancelKeyboard);
+      }
+    )
+    .row();
 
   donateMenu.text(
     (ctx) => ctx.t("common.back"),

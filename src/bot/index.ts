@@ -33,6 +33,8 @@ import { DonationDAO } from "../db/dao/donations.js";
 import { LiveDashboardManager } from "./liveSync/liveDashboardManager.js";
 import { ActiveDashboardRegistry } from "./liveSync/dashboardRegistry.js";
 import { icon } from "./views/iconTheme.js";
+import { renderDonateText } from "./views/donateView.js";
+import { safeEditMessageText } from "./views/common.js";
 
 export function createTelegramBot(
   token: string,
@@ -523,6 +525,80 @@ export function createTelegramBot(
         await bot.api.sendMessage(adminTgId, adminText, { parse_mode: "HTML" }).catch(() => {});
       }
     }
+  });
+
+  // 13. Custom Stars Input & Confirmation Flow
+  bot.on("message:text", async (ctx, next) => {
+    if (ctx.session?.waitingForCustomStars) {
+      const text = ctx.message.text.trim();
+      const num = parseInt(text, 10);
+      if (isNaN(num) || num < 1 || num > 10000 || !/^\d+$/.test(text)) {
+        const cancelKeyboard = new InlineKeyboard().text(
+          ctx.t("common.back"),
+          "donate_cancel_custom"
+        );
+        await ctx.reply(ctx.t("donate.error_invalid_custom_stars"), {
+          parse_mode: "HTML",
+          reply_markup: cancelKeyboard,
+        });
+        return;
+      }
+
+      ctx.session.waitingForCustomStars = false;
+      ctx.session.pendingCustomStars = num;
+
+      const confirmText = ctx.t("donate.confirm_custom_stars_title", { stars: String(num) });
+      const keyboard = new InlineKeyboard()
+        .text(ctx.t("donate.btn_confirm_pay"), `confirm_custom_stars:${num}`)
+        .row()
+        .text(ctx.t("donate.btn_cancel"), "donate_cancel_custom");
+
+      await ctx.reply(confirmText, {
+        parse_mode: "HTML",
+        reply_markup: keyboard,
+      });
+      return;
+    }
+    return next();
+  });
+
+  bot.callbackQuery(/^confirm_custom_stars:(\d+)$/, async (ctx) => {
+    await ctx.answerCallbackQuery().catch(() => {});
+    const stars = parseInt(ctx.match[1], 10);
+    if (isNaN(stars) || stars <= 0) return;
+
+    ctx.session.waitingForCustomStars = false;
+    ctx.session.pendingCustomStars = undefined;
+
+    try {
+      const title = ctx.t("donate.invoice_title", { stars: String(stars) });
+      const desc = ctx.t("donate.invoice_desc", { stars: String(stars) });
+      const payload = JSON.stringify({
+        userId: ctx.user.id,
+        telegramId: ctx.from.id,
+        stars,
+        ts: Date.now(),
+      });
+      await ctx.replyWithInvoice(
+        title,
+        desc,
+        payload,
+        "XTR",
+        [{ label: ctx.t("donate.invoice_label", { stars: String(stars) }), amount: stars }]
+      );
+    } catch (err) {
+      console.error("❌ [Telegram Stars Custom Invoice Error]:", err);
+    }
+  });
+
+  bot.callbackQuery("donate_cancel_custom", async (ctx) => {
+    await ctx.answerCallbackQuery().catch(() => {});
+    ctx.session.waitingForCustomStars = false;
+    ctx.session.pendingCustomStars = undefined;
+    const profile = dispatcher.getInvertedIndex().getProfileByTgId(ctx.from.id);
+    const totalStars = profile?.totalDonatedStars || 0;
+    await safeEditMessageText(ctx, renderDonateText(ctx, totalStars));
+    return ctx.menu.nav("donate-menu");
   });
 
   // Wire Scraper diff_events to dispatcher

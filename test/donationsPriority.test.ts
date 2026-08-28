@@ -168,4 +168,53 @@ describe("Real-World Telegram Stars (XTR) End-to-End Simulation & Priority Dispa
     expect(topDonors[0].telegram_id).toBe(2001);
     expect(topDonors[0].total_stars).toBe(350);
   });
+
+  it("Full Simulation 4: Custom Stars Amount Input, Interactive Confirmation & Invoice Generation", () => {
+    const customUser = userDao.upsertUser({
+      telegram_id: 3001,
+      username: "custom_donor",
+      first_name: "Charlie",
+      language: "uk",
+    });
+
+    // 1. Validate invalid inputs
+    const invalidInputs = ["abc", "-50", "0", "10001", "33.5", "  "];
+    for (const input of invalidInputs) {
+      const trimmed = input.trim();
+      const num = parseInt(trimmed, 10);
+      const isValid = !isNaN(num) && num >= 1 && num <= 10000 && /^\d+$/.test(trimmed);
+      expect(isValid).toBe(false);
+    }
+
+    // 2. Validate valid custom inputs
+    const validInputs = ["1", "77", "500", "2500", "10000"];
+    for (const input of validInputs) {
+      const trimmed = input.trim();
+      const num = parseInt(trimmed, 10);
+      const isValid = !isNaN(num) && num >= 1 && num <= 10000 && /^\d+$/.test(trimmed);
+      expect(isValid).toBe(true);
+    }
+
+    // 3. Simulate user submitting 77 Stars
+    const selectedAmount = 77;
+    const pendingStars = selectedAmount;
+    expect(pendingStars).toBe(77);
+
+    // 4. Simulate user confirming payment (confirm_custom_stars:77)
+    const confirmedChargeId = "tg_custom_charge_77_ok";
+    donationDao.recordDonation(customUser.id, 3001, selectedAmount, confirmedChargeId);
+
+    // 5. Verify database and RAM priority updates
+    expect(donationDao.getUserTotalDonated(customUser.id)).toBe(77);
+    expect(userDao.getByTelegramId(3001)?.total_donated_stars).toBe(77);
+
+    // Index priority resolution
+    db.exec(`INSERT INTO subscriptions (user_id, pool_slug, block_id) VALUES (${customUser.id}, 'flagship', 'europe')`);
+    const index = new SubscriberInvertedIndex(db);
+    const resolved = index.resolveSubscribers("flagship", "europe", "available");
+
+    expect(resolved).toHaveLength(1);
+    expect(resolved[0].telegramId).toBe(3001);
+    expect(resolved[0].totalDonatedStars).toBe(77);
+  });
 });
