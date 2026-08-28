@@ -434,27 +434,27 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     name: "3D Security Shield",
   },
   coffee: {
-    customEmojiId: "5368324170671202293",
+    customEmojiId: "5307845791283425776",
     unicodeFallback: "☕",
     name: "3D Hot Coffee Cup",
   },
   star: {
-    customEmojiId: "5445284980970201254",
+    customEmojiId: "5456658836062479826",
     unicodeFallback: "⭐",
     name: "3D Animated Telegram Star",
   },
   tip_lightbulb: {
-    customEmojiId: "5370689973278225579",
+    customEmojiId: "5422439311196834318",
     unicodeFallback: "💡",
     name: "3D Glowing Lightbulb",
   },
   git_octopus: {
-    customEmojiId: "5382029705903875321",
+    customEmojiId: "5352815688010441881",
     unicodeFallback: "🐙",
     name: "3D Git Octopus",
   },
   writing_hand: {
-    customEmojiId: "5361730073005139702",
+    customEmojiId: "5470060791883374114",
     unicodeFallback: "✍️",
     name: "3D Writing Hand",
   },
