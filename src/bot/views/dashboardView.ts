@@ -6,9 +6,14 @@ import { escapeHtml, formatRelativeTime, stripLeadingEmoji } from "../../i18n/in
 import { clampMessageText, formatMonitoringFooter } from "./common.js";
 import { icon, getRawUnicode, IconKey } from "./iconTheme.js";
 
+import { renderCapacityBar } from "./capacityBar.js";
+import { POOL_RANKS } from "./poolRanks.js";
+
 export interface PoolBadgeInfo {
   icon: string;
   iconHtml: string;
+  capacityBarUnicode: string;
+  capacityBarHtml: string;
   shortStatus: string;
   statusBadgeKey: string;
   iconKey: IconKey;
@@ -16,6 +21,9 @@ export interface PoolBadgeInfo {
 
 export function computePoolBadgeInfo(availableCount: number, totalBlocks: number): PoolBadgeInfo {
   const total = totalBlocks || 3;
+  const capacityBarUnicode = renderCapacityBar(availableCount, total, "unicode");
+  const capacityBarHtml = renderCapacityBar(availableCount, total, "html");
+
   let iconKey: IconKey = "status_sold_out";
   let statusBadgeKey = "common.status_sold_out";
 
@@ -30,6 +38,8 @@ export function computePoolBadgeInfo(availableCount: number, totalBlocks: number
   return {
     icon: getRawUnicode(iconKey),
     iconHtml: icon(iconKey),
+    capacityBarUnicode,
+    capacityBarHtml,
     shortStatus: `${availableCount}/${total}`,
     statusBadgeKey,
     iconKey,
@@ -52,7 +62,8 @@ export function renderDashboardText(
     lastVerifiedTs,
     ctx.lang,
     lastUserInteractionAt,
-    telemetry?.consecutiveFailures || 0
+    telemetry?.consecutiveFailures || 0,
+    telemetry?.lastScrapeLatencyMs || 140
   );
 
   if (summaries.length === 0) {
@@ -70,23 +81,24 @@ export function renderDashboardText(
       const rawStatusText = (directText && directText !== textKey)
         ? directText
         : stripLeadingEmoji(ctx.t(badgeInfo.statusBadgeKey));
-      const statusBadge = `${badgeInfo.iconHtml} ${rawStatusText}`;
+      
+      const rank = POOL_RANKS[p.slug] || {
+        iconsHtml: icon("pool_generic"),
+        tierName: { [ctx.lang]: p.name },
+      };
+      const rankTitle = rank.tierName[ctx.lang] || p.name;
+
       const rawModels = (p.models || []).slice(0, 10).join(", ");
       const modelsText = escapeHtml(rawModels) || ctx.t("common.custom_models");
 
-      let poolIcon = icon("pool_generic");
-      if (p.slug.includes("flagship")) poolIcon = icon("pool_flagship");
-      else if (p.slug.includes("core")) poolIcon = icon("pool_core");
-      else if (p.slug.includes("frontier")) poolIcon = icon("pool_frontier");
-
-      const statusLabel = ctx.lang === "uk" ? "Статус" : ctx.lang === "ru" ? "Статус" : "Status";
+      const statusLabel = ctx.lang === "uk" ? "Місткість" : ctx.lang === "ru" ? "Вместимость" : "Capacity";
       const blocksFreeText = ctx.lang === "uk" ? "блоків вільно" : ctx.lang === "ru" ? "блоков свободно" : "blocks free";
       const modelsLabel = ctx.lang === "uk" ? "Моделі" : ctx.lang === "ru" ? "Модели" : "Models";
       const basePriceLabel = ctx.lang === "uk" ? "Базовий тариф: від" : ctx.lang === "ru" ? "Базовый тариф: от" : "Base price: from";
       const urlText = ctx.lang === "uk" ? "Сторінка тарифу на сайті" : ctx.lang === "ru" ? "Страница тарифа на сайте" : "Plan page on website";
 
-      return `${poolIcon} <b>${escapeHtml(p.name)}</b>\n` +
-        `• ${statusLabel}: ${statusBadge} <i>(${p.available_count}/${p.total_blocks || 3} ${blocksFreeText})</i>\n` +
+      return `${rank.iconsHtml} <b>${escapeHtml(rankTitle)}</b>\n` +
+        `• ${statusLabel}: [ ${badgeInfo.capacityBarHtml} ] <b>${rawStatusText}</b> <i>(${p.available_count}/${p.total_blocks || 3} ${blocksFreeText})</i>\n` +
         `• ${modelsLabel}: <code>${modelsText}</code>\n` +
         `• ${basePriceLabel} <b>$${p.min_price}/міс</b>\n` +
         `${icon("nav_link")} <a href="https://cheapestinference.com/pools/${p.slug}">${urlText}</a>`;

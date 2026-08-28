@@ -13,6 +13,9 @@ import { escapeHtml, formatRelativeTime, stripLeadingEmoji } from "../../i18n/in
 import { clampMessageText, formatMonitoringFooter } from "./common.js";
 
 import { icon, getRegionalGlobeIcon } from "./iconTheme.js";
+import { formatBlockHoursWithLocal, getShiftPersonification } from "./timezoneHelper.js";
+import { POOL_RANKS } from "./poolRanks.js";
+import { renderCapacityBar } from "./capacityBar.js";
 
 export const DEFAULT_BLOCK_IDS = ["asia", "europe", "americas"];
 export const DEFAULT_BLOCK_HOURS: Record<string, string> = {
@@ -101,7 +104,8 @@ export function renderPoolDetailText(
 
   const blocksList = blocks
     .map((b) => {
-      const blockName = ctx.t(`common.block_${b.block_id}`) || b.block_id;
+      const shiftHeader = getShiftPersonification(b.block_id, ctx.lang);
+      const hoursLocal = formatBlockHoursWithLocal(b.block_id, b.hours_utc, ctx.lang);
       const smart = intelligenceEngine
         ? intelligenceEngine.getSmartStatus(slug, b.block_id, b.status, ctx.lang)
         : null;
@@ -115,15 +119,13 @@ export function renderPoolDetailText(
         : stripLeadingEmoji(isAvailable ? ctx.t("common.status_available") : ctx.t("common.status_sold_out"));
       const statusBadge = `${statusIcon} ${rawStatusText}`;
 
-      const blockIcon = getBlockIcon(b.block_id);
+      const timeWord = ctx.lang === "uk" ? "Час" : ctx.lang === "ru" ? "Время" : "Hours";
+      const statusWord = ctx.lang === "uk" ? "Статус" : ctx.lang === "ru" ? "Статус" : "Status";
+      const priceWord = ctx.lang === "uk" ? "Ціна" : ctx.lang === "ru" ? "Цена" : "Price";
 
-      let row = ctx.t("pool_detail.block_row", {
-        block_icon: blockIcon,
-        block_name: blockName,
-        hours_utc: b.hours_utc,
-        status_badge: statusBadge,
-        price: b.price_month,
-      });
+      let row = `• ${shiftHeader}\n` +
+        `   <b>${timeWord}:</b> <code>${hoursLocal}</code>\n` +
+        `   <b>${statusWord}:</b> ${statusBadge} | <b>${priceWord}:</b> <code>$${b.price_month}/міс</code>`;
 
       if (isAvailable && smart?.predictionTip) {
         row += `\n   ${smart.predictionTip}`;
@@ -137,7 +139,7 @@ export function renderPoolDetailText(
 
       return row;
     })
-    .join("\n");
+    .join("\n\n");
 
   const parseNum = (v: string) => parseFloat(String(v).replace(/[^0-9.-]/g, "")) || 0;
   const prices = blocks.map((b) => parseNum(b.price_month)).filter((p) => p > 0);
@@ -149,32 +151,41 @@ export function renderPoolDetailText(
   const lastVerified = poolStateDao.getLastVerified();
   const lastVerifiedTs = telemetry?.lastScrapeTimestamp || lastVerified?.timestamp;
 
-  const monitoringText = formatMonitoringFooter(
+  const footerStr = formatMonitoringFooter(
     lastVerifiedTs,
     ctx.lang,
     lastUserInteractionAt,
-    telemetry?.consecutiveFailures || 0
+    telemetry?.consecutiveFailures || 0,
+    telemetry?.lastScrapeLatencyMs || 140
   );
-  const timeFooter = `\n\n${icon("nav_clock")} <i>${ctx.lang === "uk" ? "Дані перевірено" : ctx.lang === "ru" ? "Данные проверены" : "Verified at"}: ${monitoringText}</i>`;
 
-  let specificPoolIcon = icon("pool_generic");
-  if (slug.includes("flagship")) specificPoolIcon = icon("pool_flagship");
-  else if (slug.includes("core")) specificPoolIcon = icon("pool_core");
-  else if (slug.includes("frontier")) specificPoolIcon = icon("pool_frontier");
+  const rank = POOL_RANKS[slug] || {
+    iconsHtml: icon("pool_generic"),
+    tierName: { [ctx.lang]: first.pool_name },
+    tagline: { [ctx.lang]: first.description },
+  };
+  const rankTitle = rank.tierName[ctx.lang] || first.pool_name;
+  const tagline = rank.tagline[ctx.lang] || first.description || "Unlimited AI inference pool";
 
+  const totalBlocks = blocks.length || 3;
+  const availableCount = blocks.filter((b) => b.status === "available" || b.status === "limited").length;
+  const capacityBar = renderCapacityBar(availableCount, totalBlocks, "html");
+
+  const capacityLabel = ctx.lang === "uk" ? "Місткість кластера" : ctx.lang === "ru" ? "Вместимость кластера" : "Cluster Capacity";
   const descLabel = ctx.lang === "uk" ? "Опис:" : ctx.lang === "ru" ? "Описание:" : "Description:";
   const modelsLabel = ctx.lang === "uk" ? "Включені моделі (безліміт):" : ctx.lang === "ru" ? "Включенные модели (безлимит):" : "Included Models (unlimited):";
   const costLabel = ctx.lang === "uk" ? "Вартість:" : ctx.lang === "ru" ? "Стоимость:" : "Pricing:";
   const baseLabel = ctx.lang === "uk" ? "Базовий тариф: від" : ctx.lang === "ru" ? "Базовый тариф: от" : "Base rate: from";
   const dayLabel = ctx.lang === "uk" ? "день" : ctx.lang === "ru" ? "день" : "day";
   const discountLabel = ctx.lang === "uk" ? "Знижка при оплаті за рік:" : ctx.lang === "ru" ? "Скидка при оплате за год:" : "Annual discount:";
-  const blocksLabel = ctx.lang === "uk" ? "Регіональні 8-годинні блоки (UTC):" : ctx.lang === "ru" ? "Региональные 8-часовые блоки (UTC):" : "Regional 8-hour blocks (UTC):";
+  const blocksLabel = ctx.lang === "uk" ? "Регіональні 8-годинні зміни:" : ctx.lang === "ru" ? "Региональные 8-часовые смены:" : "Regional 8-hour shifts:";
   const urlText = ctx.lang === "uk" ? "Сторінка тарифу на сайті" : ctx.lang === "ru" ? "Страница тарифа на сайте" : "Plan page on website";
   const annualDiscountPct = Math.round((first.annual_discount || 0.15) * 100);
 
-  const fullText = `${specificPoolIcon} <b>${escapeHtml(first.pool_name)}</b>\n\n` +
+  const fullText = `${rank.iconsHtml} <b>${escapeHtml(rankTitle)}</b>\n` +
+    `• ${capacityLabel}: [ ${capacityBar} ] <i>(${availableCount}/${totalBlocks} вільні)</i>\n\n` +
     `${icon("event_tier_update")} <b>${descLabel}</b>\n` +
-    `<i>${escapeHtml(first.description || "Unlimited AI inference pool")}</i>\n\n` +
+    `<i>${escapeHtml(tagline)}</i>\n\n` +
     `${icon("ai_robot")} <b>${modelsLabel}</b>\n` +
     `${modelsList || "  • Custom open-weights models"}\n\n` +
     `${icon("price_money")} <b>${costLabel}</b>\n` +
@@ -182,7 +193,8 @@ export function renderPoolDetailText(
     `• ${discountLabel} <b>${annualDiscountPct}%</b>\n\n` +
     `${icon("nav_clock")} <b>${blocksLabel}</b>\n` +
     `${blocksList}\n\n` +
-    `${icon("nav_link")} <a href="https://cheapestinference.com/pools/${slug}"><b>${urlText}</b></a>`;
+    `${icon("nav_link")} <a href="https://cheapestinference.com/pools/${slug}"><b>${urlText}</b></a>\n\n` +
+    `${footerStr}`;
 
-  return clampMessageText(`${fullText}${timeFooter}`);
+  return clampMessageText(fullText);
 }

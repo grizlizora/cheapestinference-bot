@@ -65,7 +65,6 @@ export function initSchema(db: Database.Database): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_users_active ON users(is_active);
-    CREATE INDEX IF NOT EXISTS idx_users_admins ON users(telegram_id) WHERE is_admin = 1 AND is_active = 1;
 
     -- 2. Subscriptions Table
     CREATE TABLE IF NOT EXISTS subscriptions (
@@ -213,6 +212,9 @@ export function initSchema(db: Database.Database): void {
   } catch {}
   try {
     db.exec(`ALTER TABLE slot_price_history ADD COLUMN new_price_num REAL NOT NULL DEFAULT 0.0;`);
+  } catch {}
+  try {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_users_admins ON users(telegram_id) WHERE is_admin = 1 AND is_active = 1;`);
   } catch {}
 }
 

@@ -9,12 +9,21 @@ import { config, isUserAdmin } from "../../config/env.js";
 import { escapeHtml } from "../../i18n/index.js";
 import { icon } from "../views/iconTheme.js";
 
-const failedClaimAttempts = new Map<number, { count: number; lockedUntil: number }>();
+interface FailedClaimRecord {
+  count: number;
+  lockedUntil: number;
+  lastAttemptAt: number;
+}
+
+const failedClaimAttempts = new Map<number, FailedClaimRecord>();
 
 function cleanExpiredLockouts(now: number): void {
-  if (failedClaimAttempts.size > 50) {
+  if (failedClaimAttempts.size > 20) {
     for (const [id, rec] of failedClaimAttempts.entries()) {
-      if (now > rec.lockedUntil && rec.lockedUntil > 0) {
+      if (
+        (rec.lockedUntil > 0 && now > rec.lockedUntil) ||
+        (rec.lockedUntil === 0 && now - (rec.lastAttemptAt || 0) > 15 * 60 * 1000)
+      ) {
         failedClaimAttempts.delete(id);
       }
     }
@@ -158,7 +167,8 @@ export function createAdminHandler(
       const tgId = ctx.from.id;
       const now = Date.now();
       cleanExpiredLockouts(now);
-      const attemptRecord = failedClaimAttempts.get(tgId) || { count: 0, lockedUntil: 0 };
+      const attemptRecord = failedClaimAttempts.get(tgId) || { count: 0, lockedUntil: 0, lastAttemptAt: now };
+      attemptRecord.lastAttemptAt = now;
 
       if (now < attemptRecord.lockedUntil) {
         await ctx.reply("⛔ Too many failed attempts. Please try again in 15 minutes.", { parse_mode: "HTML" });

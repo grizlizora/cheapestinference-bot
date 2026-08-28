@@ -71,7 +71,13 @@ export type IconKey =
   | "price_dollar"
   | "price_all_time_low"
   | "price_fair"
-  | "prediction_crystal";
+  | "prediction_crystal"
+  // Day/Night Shifts & Hierarchy
+  | "shift_night"
+  | "shift_day"
+  | "shift_evening"
+  | "rank_diamond"
+  | "rank_shield";
 
 export interface IconDefinition {
   customEmojiId: string;
@@ -369,6 +375,31 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     customEmojiId: "5361837567463399422",
     unicodeFallback: "🔮",
     name: "3D Crystal Ball",
+  },
+  shift_night: {
+    customEmojiId: "5451959871257713464",
+    unicodeFallback: "🌌",
+    name: "3D Night Cosmos",
+  },
+  shift_day: {
+    customEmojiId: "5472164874886846699",
+    unicodeFallback: "☀️",
+    name: "3D Day Sun",
+  },
+  shift_evening: {
+    customEmojiId: "5397575638146110953",
+    unicodeFallback: "🌆",
+    name: "3D Evening Sunset",
+  },
+  rank_diamond: {
+    customEmojiId: "5375296873982604963",
+    unicodeFallback: "💎",
+    name: "3D Diamond Gem",
+  },
+  rank_shield: {
+    customEmojiId: "5237799019329105246",
+    unicodeFallback: "🛡️",
+    name: "3D Security Shield",
   },
 };
 

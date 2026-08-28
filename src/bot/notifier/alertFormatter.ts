@@ -103,6 +103,8 @@ function resolveBlockName(eventBlock: string, lang: SupportedLanguage): string {
   return eventBlock;
 }
 
+import { formatBlockHoursWithLocal, getShiftPersonification } from "../views/timezoneHelper.js";
+
 function getRegionIcon(block: string): string {
   const lower = (block || "").toLowerCase();
   if (lower.includes("asia") || lower.includes("азія") || lower.includes("азия")) {
@@ -161,7 +163,8 @@ export function formatAlertMessage(
       ? "Слоты разбирают за минуты! Забронируйте по кнопке ниже:"
       : "Slots sell out fast! Claim using the button below:";
 
-    const hoursText = event.hoursUtc ? ` <code>(${escapeHtml(event.hoursUtc)})</code>` : "";
+    const hoursLocal = event.hoursUtc ? formatBlockHoursWithLocal(event.block, event.hoursUtc, lang) : "";
+    const hoursText = hoursLocal ? ` <code>(${escapeHtml(hoursLocal)})</code>` : "";
     const modelsList = (event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ");
 
     const body = `${getRegionIcon(event.block)} <b>${regionLabel}:</b> ${escapeHtml(blockName)}${hoursText}\n` +
@@ -327,7 +330,8 @@ export function formatAlertMessage(
       ? "Зафиксировать цену можно по ссылке ниже:"
       : "Lock in this rate via the button below:";
 
-    const hoursText = event.hoursUtc ? ` <code>(${escapeHtml(event.hoursUtc)})</code>` : "";
+    const hoursLocal = event.hoursUtc ? formatBlockHoursWithLocal(event.block, event.hoursUtc, lang) : "";
+    const hoursText = hoursLocal ? ` <code>(${escapeHtml(hoursLocal)})</code>` : "";
     const cleanOld = cleanPriceString(event.previousPrice);
 
     const body = `${getRegionIcon(event.block)} <b>${regionLabel}:</b> ${escapeHtml(blockName)}${hoursText}\n` +

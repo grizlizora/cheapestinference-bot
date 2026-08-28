@@ -5,6 +5,7 @@ export class DatabaseMaintenanceManager {
   private stmtPruneSlotHistoryBatch: Database.Statement;
   private stmtPruneCatalogHistoryBatch: Database.Statement;
   private stmtPruneSlotPriceHistoryBatch: Database.Statement;
+  private stmtPruneActiveDashboardsBatch: Database.Statement;
   private stmtFreelistCount: Database.Statement;
 
   constructor(
@@ -44,6 +45,16 @@ export class DatabaseMaintenanceManager {
       WHERE id IN (
         SELECT id FROM slot_price_history 
         WHERE changed_at < datetime('now', '-90 days')
+        LIMIT 2000
+      )
+    `);
+
+    this.stmtPruneActiveDashboardsBatch = db.prepare(`
+      DELETE FROM active_dashboards 
+      WHERE chat_id IN (
+        SELECT chat_id FROM active_dashboards 
+        WHERE last_interaction_at < datetime('now', '-48 hours')
+           OR consecutive_errors >= 3
         LIMIT 2000
       )
     `);
@@ -94,7 +105,16 @@ export class DatabaseMaintenanceManager {
       }
     } catch {}
 
-    // 5. Reclaim freed pages back to OS via dynamic incremental vacuum
+    // 5. Purge expired active dashboards (>48 hours)
+    try {
+      while (true) {
+        const dashResult = this.stmtPruneActiveDashboardsBatch.run();
+        totalDeleted += dashResult.changes;
+        if (dashResult.changes < 2000) break;
+      }
+    } catch {}
+
+    // 6. Reclaim freed pages back to OS via dynamic incremental vacuum
     let pagesReclaimed = 0;
     try {
       let prevFreelist = Infinity;

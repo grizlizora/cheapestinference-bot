@@ -22,6 +22,7 @@ export { safeEditMessageText } from "../views/common.js";
 import { renderDashboardText, renderSettingsText, renderChangeLanguageText, renderHelpText, computePoolBadgeInfo } from "../views/dashboardView.js";
 import { renderPoolDetailText } from "../views/poolDetailView.js";
 import { safeEditMessageText } from "../views/common.js";
+import { POOL_RANKS } from "../views/poolRanks.js";
 
 export function createMainMenuHierarchy(
   poolStateDao: PoolStateDAO,
@@ -243,8 +244,11 @@ export function createMainMenuHierarchy(
       const summaries = poolStateDao.getPoolSummaries();
       for (const pool of summaries) {
         const badge = computePoolBadgeInfo(pool.available_count, pool.total_blocks);
+        const rank = POOL_RANKS[pool.slug] || { rawIcons: "📦", tierName: { [ctx.lang]: pool.name } };
+        const poolName = rank.tierName[ctx.lang] || pool.name;
+        const btnLabel = `${rank.rawIcons} ${poolName} [${badge.capacityBarUnicode}]`;
         range
-          .text(`${badge.icon} ${pool.name} [${badge.shortStatus}]`, async (c) => {
+          .text(btnLabel, async (c) => {
             await c.answerCallbackQuery().catch(() => {});
             c.session.tempPoolSlug = pool.slug;
             if (c.chat) {
@@ -259,6 +263,17 @@ export function createMainMenuHierarchy(
           .row();
       }
     })
+    .text(
+      (ctx) => ctx.t("menu.btn_subscriptions"),
+      async (ctx) => {
+        ctx.answerCallbackQuery().catch(() => {});
+        if (ctx.chat) {
+          dashboardRegistry?.updateView(ctx.chat.id, "subscriptions");
+        }
+        await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
+        return ctx.menu.nav("subscriptions-menu");
+      }
+    )
     .text(
       (ctx) => ctx.t("common.refresh"),
       async (ctx) => {

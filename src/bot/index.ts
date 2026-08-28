@@ -188,9 +188,9 @@ export function createTelegramBot(
           if (adminId === ctx.from.id) continue;
 
           const adminUser = userDao.getByTelegramId(adminId);
-          const adminLang = (adminUser?.language as SupportedLanguage) || "uk";
           const wantsAlerts = (adminUser?.notify_admin_new_users ?? 1) === 1;
 
+          if (wantsAlerts) {
             const userIcon = `<tg-emoji emoji-id="5373012449597335010">👤</tg-emoji>`;
             const idIcon = `<tg-emoji emoji-id="5422683699130933153">🪪</tg-emoji>`;
             const usersIcon = `<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji>`;
