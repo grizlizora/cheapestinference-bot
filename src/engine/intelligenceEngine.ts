@@ -1,6 +1,7 @@
 import { SlotHistoryDAO, SlotAnalytics } from "../db/dao/slotHistory.js";
 import { PredictiveAnalyticsEngine } from "./predictiveEngine.js";
 import { SupportedLanguage, translate } from "../i18n/index.js";
+import { icon } from "../bot/views/iconTheme.js";
 
 export interface SmartStatusResult {
   badge: string;
@@ -43,20 +44,22 @@ export class AvailabilityIntelligenceEngine {
       if (enhanced.eta.isPredictable) {
         let confBadge = translate(lang, "intelligence.conf_low") || "⚪";
         if (enhanced.eta.confidence === "HIGH") {
-          confBadge = translate(lang, "intelligence.conf_high") || "🟢 Висока точність";
+          const rawConf = (translate(lang, "intelligence.conf_high") || "Висока точність").replace(/^[🟢🟡🔴]\s*/u, "");
+          confBadge = `${icon("status_available")} ${rawConf}`;
         } else if (enhanced.eta.confidence === "MEDIUM") {
-          confBadge = translate(lang, "intelligence.conf_medium") || "🟡 Середня точність";
+          const rawConf = (translate(lang, "intelligence.conf_medium") || "Середня точність").replace(/^[🟢🟡🔴]\s*/u, "");
+          confBadge = `${icon("status_partially_available")} ${rawConf}`;
         }
 
         const recurrenceText = enhanced.eta.detectedCadenceHours
           ? (translate(lang, "intelligence.cadence_daily") || "добовий цикл 24h")
           : enhanced.eta.formattedEtaWindow;
 
-        const avgLifeText = enhanced.avgDurationFormatted ? ` (сер. життя: ${enhanced.avgDurationFormatted} 🔥)` : "";
+        const avgLifeText = enhanced.avgDurationFormatted ? ` (сер. життя: ${enhanced.avgDurationFormatted} ${icon("event_hot_slot")})` : "";
 
-        etaTip = `⏳ <i>${translate(lang, "intelligence.eta_title") || "Очікувана поява"}: ${recurrenceText}${avgLifeText} [${confBadge}]</i>`;
+        etaTip = `${icon("prediction_crystal")} <i>${translate(lang, "intelligence.eta_title") || "Очікувана поява"}: ${recurrenceText}${avgLifeText} [${confBadge}]</i>`;
       } else {
-        collectingStatsTip = `📊 <i>${translate(lang, "intelligence.eta_gathering_data", {
+        collectingStatsTip = `${icon("nav_chart")} <i>${translate(lang, "intelligence.eta_gathering_data", {
           count: enhanced.eta.sampleCount,
           min: enhanced.eta.minRequired,
         }) || `Збір статистики (${enhanced.eta.sampleCount}/${enhanced.eta.minRequired})`}</i>`;
@@ -80,9 +83,11 @@ export class AvailabilityIntelligenceEngine {
     let tip = "";
     if (enhanced.avgDurationFormatted) {
       if (isHot) {
-        tip = `⚡ <i>${translate(lang, "intelligence.tag_sells_out_in", { duration: enhanced.avgDurationFormatted }) || `Розбирають за ${enhanced.avgDurationFormatted} 🔥`}</i>`;
+        const rawHot = (translate(lang, "intelligence.tag_sells_out_in", { duration: enhanced.avgDurationFormatted }) || `Розбирають за ${enhanced.avgDurationFormatted}`).replace(/^[⚡🔥]\s*/u, "");
+        tip = `${icon("event_hot_slot")} <i>${rawHot}</i>`;
       } else {
-        tip = `⏱ <i>${translate(lang, "intelligence.tag_avg_uptime", { duration: enhanced.avgDurationFormatted }) || `Середній час наявності: ${enhanced.avgDurationFormatted}`}</i>`;
+        const rawAvg = (translate(lang, "intelligence.tag_avg_uptime", { duration: enhanced.avgDurationFormatted }) || `Середній час наявності: ${enhanced.avgDurationFormatted}`).replace(/^[⏱🕒]\s*/u, "");
+        tip = `${icon("nav_clock")} <i>${rawAvg}</i>`;
       }
     }
 

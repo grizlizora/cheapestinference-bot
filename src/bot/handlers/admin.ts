@@ -7,6 +7,7 @@ import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
 import { ProxyPool } from "../../proxy/proxyPool.js";
 import { config, isUserAdmin } from "../../config/env.js";
 import { escapeHtml } from "../../i18n/index.js";
+import { icon } from "../views/iconTheme.js";
 
 const failedClaimAttempts = new Map<number, { count: number; lockedUntil: number }>();
 
@@ -71,7 +72,7 @@ export function renderAdminText(
   const newUsersEnabled = (adminUser?.notify_admin_new_users ?? 1) === 1;
 
   return ctx.t("admin.stats_title", {
-    status: scraperTelemetry.consecutiveFailures === 0 ? "HEALTHY 🟢" : "DEGRADED 🟡",
+    status: scraperTelemetry.consecutiveFailures === 0 ? `HEALTHY ${icon("status_available")}` : `DEGRADED ${icon("status_partially_available")}`,
     uptime: uptimeStr,
     total_users: userStats.total,
     active_users: userStats.active,

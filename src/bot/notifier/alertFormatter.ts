@@ -75,19 +75,19 @@ export function formatPriceRatingBadge(
 
   if (pa.rating === "all_time_low") {
     const rawText = (translate(lang, "alerts.price_all_time_low") || `Історичний мінімум! Найнижча ціна ($${currStr})`).replace(/^[🔥⚡]\s*/u, "");
-    return `${icon("price_all_time_low")} <b>${rawText}</b>`;
+    return `${icon("price_all_time_low")} ${rawText.startsWith("<b>") ? rawText : `<b>${rawText}</b>`}`;
   }
   if (pa.rating === "below_average" && pa.avgPrice != null) {
     const rawText = (translate(lang, "alerts.price_below_average", { current: currStr, avg: avgStr }) || `Нижче середнього ($${currStr} vs сер. $${avgStr})`).replace(/^[🟢🟡🔴]\s*/u, "");
-    return `${icon("status_available")} <b>${rawText}</b>`;
+    return `${icon("status_available")} ${rawText.startsWith("<b>") ? rawText : `<b>${rawText}</b>`}`;
   }
   if (pa.rating === "above_average" && pa.avgPrice != null) {
     const rawText = (translate(lang, "alerts.price_above_average", { current: currStr, avg: avgStr }) || `Вище середнього ($${currStr} vs сер. $${avgStr})`).replace(/^[🟢🟡🔴]\s*/u, "");
-    return `${icon("status_sold_out")} <b>${rawText}</b>`;
+    return `${icon("status_sold_out")} ${rawText.startsWith("<b>") ? rawText : `<b>${rawText}</b>`}`;
   }
   if (pa.rating === "fair" && pa.avgPrice != null) {
     const rawText = (translate(lang, "alerts.price_fair_value") || "Стандартна ціна (в межах норми)").replace(/^⚖️?\s*/u, "");
-    return `${icon("price_fair")} <b>${rawText}</b>`;
+    return `${icon("price_fair")} ${rawText.startsWith("<b>") ? rawText : `<b>${rawText}</b>`}`;
   }
   return "";
 }

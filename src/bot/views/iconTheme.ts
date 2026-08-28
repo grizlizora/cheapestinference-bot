@@ -419,7 +419,7 @@ export function setIconThemeConfig(config: {
 }): void {
   if (config.mode !== undefined) activeRenderMode = config.mode;
   if (config.overrides !== undefined) {
-    activeOverrides = { ...activeOverrides, ...config.overrides };
+    activeOverrides = { ...config.overrides };
   }
   recomputeCache();
 }
