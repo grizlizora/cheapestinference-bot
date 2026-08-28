@@ -8,6 +8,7 @@ import { ProxyPool } from "../../proxy/proxyPool.js";
 import { config, isUserAdmin } from "../../config/env.js";
 import { escapeHtml } from "../../i18n/index.js";
 import { icon } from "../views/iconTheme.js";
+import { SubscriberInvertedIndex } from "../notifier/subscriberIndex.js";
 
 interface FailedClaimRecord {
   count: number;
@@ -135,6 +136,8 @@ export function createAdminKeyboard(ctx: BotContext, userDao: UserDAO): InlineKe
   const adminUser = ctx.from ? userDao.getByTelegramId(ctx.from.id) : undefined;
   const newUsersEnabled = (adminUser?.notify_admin_new_users ?? 1) === 1;
 
+  const dashboardLabel = ctx.lang === "uk" ? "📊 Головний дашборд" : ctx.lang === "ru" ? "📊 Главный дашборд" : "📊 Main Dashboard";
+
   return new InlineKeyboard()
     .text(
       newUsersEnabled
@@ -151,14 +154,17 @@ export function createAdminKeyboard(ctx: BotContext, userDao: UserDAO): InlineKe
     .row()
     .text(ctx.t("admin.btn_test_alert"), "admin_test_alert")
     .row()
-    .text(ctx.t("common.refresh"), "admin_refresh");
+    .text(ctx.t("common.refresh"), "admin_refresh")
+    .row()
+    .text(dashboardLabel, "admin_open_dashboard");
 }
 
 export function createAdminHandler(
   userDao: UserDAO,
   subDao: SubscriptionDAO,
   scraper: ScraperOrchestrator,
-  proxyPool: ProxyPool
+  proxyPool: ProxyPool,
+  invertedIndex?: SubscriberInvertedIndex
 ) {
   return async (ctx: BotContext) => {
     if (!ctx.from) return;
@@ -185,6 +191,7 @@ export function createAdminHandler(
 
       if (matchesBotToken || matchesAdminSecret) {
         userDao.setAdmin(tgId, true);
+        invertedIndex?.updateUserPreferences(tgId, { isAdmin: true });
         failedClaimAttempts.delete(tgId);
         await ctx.reply(ctx.t("admin.claim_success"), { parse_mode: "HTML" });
       } else {

@@ -133,15 +133,19 @@ export class TursoCloudSync {
           stmt: {
             sql: `
               CREATE TABLE IF NOT EXISTS active_dashboards (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                chat_id INTEGER NOT NULL UNIQUE,
+                chat_id INTEGER PRIMARY KEY,
                 message_id INTEGER NOT NULL,
-                current_view TEXT NOT NULL DEFAULT 'dashboard',
-                selected_pool TEXT,
-                last_rendered_text_hash TEXT NOT NULL DEFAULT '',
-                last_rendered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                user_id INTEGER NOT NULL,
+                view_type TEXT NOT NULL DEFAULT 'dashboard',
+                pool_slug TEXT,
+                language TEXT NOT NULL DEFAULT 'en',
+                last_rendered_text_hash INTEGER NOT NULL DEFAULT 0,
+                last_rendered_keyboard_hash INTEGER NOT NULL DEFAULT 0,
+                last_telegram_edit_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                last_interaction_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 consecutive_errors INTEGER NOT NULL DEFAULT 0,
-                last_interaction_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
               );
             `,
           },
@@ -551,6 +555,11 @@ export class TursoCloudSync {
       }
     } finally {
       this.isFlushing = false;
+      if (this.pendingMutations.length > 0 && !this.flushTimer) {
+        this.flushTimer = setTimeout(() => {
+          this.flush().catch(() => {});
+        }, 1000);
+      }
     }
   }
 

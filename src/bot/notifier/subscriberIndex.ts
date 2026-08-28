@@ -211,7 +211,11 @@ export class SubscriberInvertedIndex {
 
     // Sort only small donor and free user sub-arrays
     if (donors.length > 1) {
-      donors.sort((a, b) => (b.totalDonatedStars || 0) - (a.totalDonatedStars || 0));
+      donors.sort((a, b) => {
+        const diff = (b.totalDonatedStars || 0) - (a.totalDonatedStars || 0);
+        if (diff !== 0) return diff;
+        return (b.lastActiveAt || 0) - (a.lastActiveAt || 0);
+      });
     }
     if (freeUsers.length > 1) {
       freeUsers.sort((a, b) => (b.lastActiveAt || 0) - (a.lastActiveAt || 0));

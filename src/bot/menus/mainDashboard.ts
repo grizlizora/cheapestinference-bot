@@ -247,62 +247,61 @@ export function createMainMenuHierarchy(
   ];
 
   const donateMenu = new Menu<BotContext>("donate-menu");
-  for (const tier of donateTiers) {
-    donateMenu
-      .text(
-        (ctx) => ctx.t(tier.key),
-        async (ctx) => {
-          await ctx.answerCallbackQuery().catch(() => {});
-          try {
-            const title = ctx.t("donate.invoice_title", { stars: String(tier.stars) });
-            const desc = ctx.t("donate.invoice_desc", { stars: String(tier.stars) });
-            const payload = JSON.stringify({
-              userId: ctx.user.id,
-              telegramId: ctx.from?.id,
-              stars: tier.stars,
-              ts: Date.now(),
-            });
-            await ctx.replyWithInvoice(
-              title,
-              desc,
-              payload,
-              "XTR",
-              [{ label: ctx.t("donate.invoice_label", { stars: String(tier.stars) }), amount: tier.stars }]
-            );
-          } catch (err) {
-            console.error("❌ [Telegram Stars Invoice Error]:", err);
-          }
-        }
-      )
-      .row();
-  }
+  
+  const handleTierPay = async (ctx: BotContext, stars: number) => {
+    await ctx.answerCallbackQuery().catch(() => {});
+    try {
+      const title = ctx.t("donate.invoice_title", { stars: String(stars) });
+      const desc = ctx.t("donate.invoice_desc", { stars: String(stars) });
+      const payload = JSON.stringify({
+        userId: ctx.user.id,
+        telegramId: ctx.from?.id,
+        stars,
+        ts: Date.now(),
+      });
+      await ctx.replyWithInvoice(
+        title,
+        desc,
+        payload,
+        "XTR",
+        [{ label: ctx.t("donate.invoice_label", { stars: String(stars) }), amount: stars }]
+      );
+    } catch (err) {
+      console.error("❌ [Telegram Stars Invoice Error]:", err);
+    }
+  };
+
+  const handleCustomStars = async (ctx: BotContext) => {
+    await ctx.answerCallbackQuery().catch(() => {});
+    ctx.session.waitingForCustomStars = true;
+    const cancelKeyboard = new InlineKeyboard().text(
+      ctx.t("common.back"),
+      "donate_cancel_custom"
+    );
+    await safeEditMessageText(ctx, ctx.t("donate.prompt_custom_stars", { star_icon: icon("star") }), cancelKeyboard);
+  };
 
   donateMenu
+    .text((ctx) => ctx.t("donate.btn_tier_15"), (ctx) => handleTierPay(ctx, 15))
+    .text((ctx) => ctx.t("donate.btn_tier_50"), (ctx) => handleTierPay(ctx, 50))
+    .row()
+    .text((ctx) => ctx.t("donate.btn_tier_100"), (ctx) => handleTierPay(ctx, 100))
+    .text((ctx) => ctx.t("donate.btn_tier_250"), (ctx) => handleTierPay(ctx, 250))
+    .row()
+    .text((ctx) => ctx.t("donate.btn_tier_500"), (ctx) => handleTierPay(ctx, 500))
+    .text((ctx) => ctx.t("donate.btn_custom_stars"), (ctx) => handleCustomStars(ctx))
+    .row()
     .text(
-      (ctx) => ctx.t("donate.btn_custom_stars"),
+      (ctx) => ctx.t("common.back"),
       async (ctx) => {
         await ctx.answerCallbackQuery().catch(() => {});
-        ctx.session.waitingForCustomStars = true;
-        const cancelKeyboard = new InlineKeyboard().text(
-          ctx.t("common.back"),
-          "donate_cancel_custom"
-        );
-        await safeEditMessageText(ctx, ctx.t("donate.prompt_custom_stars", { star_icon: icon("star") }), cancelKeyboard);
+        if (ctx.chat) {
+          dashboardRegistry?.updateView(ctx.chat.id, "settings");
+        }
+        await safeEditMessageText(ctx, renderSettingsText(ctx));
+        return ctx.menu.nav("settings-menu");
       }
-    )
-    .row();
-
-  donateMenu.text(
-    (ctx) => ctx.t("common.back"),
-    async (ctx) => {
-      await ctx.answerCallbackQuery().catch(() => {});
-      if (ctx.chat) {
-        dashboardRegistry?.updateView(ctx.chat.id, "settings");
-      }
-      await safeEditMessageText(ctx, renderSettingsText(ctx));
-      return ctx.menu.nav("settings-menu");
-    }
-  );
+    );
 
   const helpMenu = new Menu<BotContext>("help-menu")
     .text(

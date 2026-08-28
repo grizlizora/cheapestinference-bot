@@ -133,6 +133,7 @@ export function createTelegramBot(
         (ctx as any).isNewUser = true;
         isBrandNew = true;
 
+        const isAdmin = isUserAdmin(ctx.from.id, userDao, ctx.from.username);
         // Register in In-Memory Inverted Index immediately
         dispatcher.getInvertedIndex().upsertUserProfile({
           userId: user.id,
@@ -140,6 +141,8 @@ export function createTelegramBot(
           language: lang,
           isMuted: false,
           isActive: true,
+          isAdmin,
+          totalDonatedStars: (user as any).total_donated_stars || 0,
           notifyAvailableGlobal: true,
           notifySoldOutGlobal: false,
           notifyModelsGlobal: true,
@@ -149,6 +152,7 @@ export function createTelegramBot(
       } else {
         // Self-healing: if user exists in DB but not in RAM index (e.g. edge-case cache miss or re-hydration)
         let inMemoryProfile = dispatcher.getInvertedIndex().getProfileByTgId(ctx.from.id);
+        const isAdmin = (user.is_admin ?? 0) === 1 || isUserAdmin(ctx.from.id, userDao, ctx.from.username);
         if (!inMemoryProfile) {
           dispatcher.getInvertedIndex().upsertUserProfile({
             userId: user.id,
@@ -156,6 +160,8 @@ export function createTelegramBot(
             language: (user.language as SupportedLanguage) || "en",
             isMuted: (user.is_muted ?? 0) === 1,
             isActive: (user.is_active ?? 1) === 1,
+            isAdmin,
+            totalDonatedStars: (user as any).total_donated_stars || 0,
             notifyAvailableGlobal: (user.notify_available_global ?? 1) === 1,
             notifySoldOutGlobal: (user.notify_sold_out_global ?? 0) === 1,
             notifyModelsGlobal: (user.notify_models_global ?? 1) === 1,
@@ -171,7 +177,12 @@ export function createTelegramBot(
           userDao.touchLastActive(ctx.from.id);
           if (inMemoryProfile) inMemoryProfile.lastDbTouchAt = now;
         }
-        dispatcher.getInvertedIndex().updateUserPreferences(ctx.from.id, { lastActiveAt: now, language: user.language as any });
+        dispatcher.getInvertedIndex().updateUserPreferences(ctx.from.id, {
+          lastActiveAt: now,
+          language: user.language as any,
+          isAdmin,
+          totalDonatedStars: (user as any).total_donated_stars || 0,
+        });
 
         if (user.is_active === 0) {
           userDao.reactivateUser(ctx.from.id);
@@ -322,13 +333,24 @@ export function createTelegramBot(
 
   bot.command("language", createLanguageHandler(languageMenu));
 
-  bot.command("admin", createAdminHandler(userDao, subDao, scraper, proxyPool));
-  bot.command("stats", createAdminHandler(userDao, subDao, scraper, proxyPool));
+  bot.command("admin", createAdminHandler(userDao, subDao, scraper, proxyPool, dispatcher.getInvertedIndex()));
+  bot.command("stats", createAdminHandler(userDao, subDao, scraper, proxyPool, dispatcher.getInvertedIndex()));
   bot.command("backup", createBackupHandler(userDao.db, userDao, subDao));
   bot.command("export_users", createUsersExportHandler(userDao.db, userDao, subDao));
   bot.command("export_history", createHistoryExportHandler(userDao.db, userDao));
 
   // 11. Admin Interactive Callback Handlers (Protected by requireAdmin)
+  bot.callbackQuery("admin_open_dashboard", async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    await ctx.answerCallbackQuery().catch(() => {});
+    const msgId = ctx.callbackQuery?.message?.message_id;
+    if (ctx.chat && msgId) {
+      activeDashboardRegistry.register(ctx.chat.id, msgId, ctx.user.id, ctx.lang, "dashboard");
+    }
+    const rendered = renderDashboardText(ctx, poolStateDao, historyDao, scraper);
+    await safeEditMessageText(ctx, rendered, { reply_markup: mainDashboardMenu });
+  });
+
   bot.callbackQuery("admin_toggle_new_users", async (ctx) => {
     if (!(await requireAdmin(ctx))) return;
     const newVal = userDao.toggleAdminNewUsers(ctx.from!.id);
@@ -601,8 +623,13 @@ export function createTelegramBot(
 
     const profile = dispatcher.getInvertedIndex().getProfileByTgId(ctx.from.id);
     const totalStars = profile?.totalDonatedStars || 0;
-    await safeEditMessageText(ctx, renderDonateText(ctx, totalStars)).catch(() => {});
-    return ctx.menu.nav("donate-menu");
+    try {
+      if (ctx.menu && typeof ctx.menu.nav === "function") {
+        await safeEditMessageText(ctx, renderDonateText(ctx, totalStars));
+        return await ctx.menu.nav("donate-menu");
+      }
+    } catch {}
+    await safeEditMessageText(ctx, renderDonateText(ctx, totalStars), { reply_markup: mainDashboardMenu });
   });
 
   // Wire Scraper diff_events to dispatcher
