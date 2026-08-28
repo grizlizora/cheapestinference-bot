@@ -571,6 +571,9 @@ export function createTelegramBot(
     ctx.session.pendingCustomStars = undefined;
 
     try {
+      // Remove inline keyboard to prevent double clicks
+      await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {});
+
       const title = ctx.t("donate.invoice_title", { stars: String(stars) });
       const desc = ctx.t("donate.invoice_desc", { stars: String(stars) });
       const payload = JSON.stringify({
@@ -595,9 +598,10 @@ export function createTelegramBot(
     await ctx.answerCallbackQuery().catch(() => {});
     ctx.session.waitingForCustomStars = false;
     ctx.session.pendingCustomStars = undefined;
+
     const profile = dispatcher.getInvertedIndex().getProfileByTgId(ctx.from.id);
     const totalStars = profile?.totalDonatedStars || 0;
-    await safeEditMessageText(ctx, renderDonateText(ctx, totalStars));
+    await safeEditMessageText(ctx, renderDonateText(ctx, totalStars)).catch(() => {});
     return ctx.menu.nav("donate-menu");
   });
 

@@ -190,14 +190,7 @@ export class ScraperOrchestrator extends EventEmitter {
       this.lastSource = result.source;
       this.lastUsedProxy = result.usedProxy;
 
-      // 1. Synchronously persist state to SQLite first
-      try {
-        this.poolStateDao.saveSnapshot(result.snapshot, result.source, result.latencyMs);
-      } catch (e: any) {
-        this.emit("warn", `Failed to save snapshot to SQLite: ${e.message}`);
-      }
-
-      // 2. FAST PATH: Compute diffs and dispatch alerts IMMEDIATELY at T+0ms
+      // 1. FAST PATH: Compute diffs and dispatch alerts IMMEDIATELY at T+0ms (Zero DB Delay)
       const events = this.diffEngine.processSnapshot(result.snapshot);
 
       this.emit("heartbeat", {
@@ -213,6 +206,17 @@ export class ScraperOrchestrator extends EventEmitter {
         this.emit("diff_events", events);
       }
 
+      // 2. Offload DB writes to asynchronous microtask (non-blocking for real-time notifications)
+      queueMicrotask(() => {
+        try {
+          if (result.snapshot) {
+            this.poolStateDao.saveSnapshot(result.snapshot, result.source, result.latencyMs);
+          }
+        } catch (e: any) {
+          this.emit("warn", `Failed to save snapshot to SQLite: ${e.message}`);
+        }
+      });
+
       return events;
     } catch (err: any) {
       this.consecutiveFailures++;
@@ -223,7 +227,10 @@ export class ScraperOrchestrator extends EventEmitter {
     }
   }
 
-  private async fetchFromEngines(bypassEtag: boolean): Promise<ScrapeResult> {
+  /**
+   * Hedged dual-engine execution: Queries API first, then races HTML snapshot after 150ms if slow
+   */
+  private async fetchFromEngines(bypassEtag = false): Promise<ScrapeResult> {
     const effectiveApiEtag = bypassEtag ? undefined : this.apiEtag;
     const effectiveApiLastModified = bypassEtag ? undefined : this.apiLastModified;
     const effectiveHtmlEtag = bypassEtag ? undefined : this.htmlEtag;
@@ -254,7 +261,7 @@ export class ScraperOrchestrator extends EventEmitter {
         apiController.signal
       );
 
-      // Hedged Request: if primary API query exceeds 1000ms, race against concurrent HTML fallback
+      // Hedged Request: if primary API query exceeds 150ms, race against concurrent HTML fallback
       const hedgePromise = new Promise<ScrapeResult>((resolve, reject) => {
         hedgeTimer = setTimeout(async () => {
           try {
@@ -268,7 +275,7 @@ export class ScraperOrchestrator extends EventEmitter {
           } catch (e) {
             reject(e);
           }
-        }, 1000);
+        }, 150);
       });
 
       const result = await Promise.race([

@@ -101,7 +101,7 @@ export function renderPoolDetailText(
   const blocks = poolStateDao.getPoolBlocks(slug);
 
   if (!blocks || blocks.length === 0) {
-    return ctx.t("pool_detail.no_data", { pool_slug: slug.toUpperCase() });
+    return ctx.t("pool_detail.no_data", { pool: slug.toUpperCase(), pool_slug: slug.toUpperCase() });
   }
 
   const first = blocks[0];

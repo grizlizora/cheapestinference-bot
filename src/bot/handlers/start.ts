@@ -28,6 +28,11 @@ export function createStartHandler(
   return async (ctx: BotContext) => {
     if (!ctx.from || !ctx.chat) return;
 
+    if (ctx.session) {
+      ctx.session.waitingForCustomStars = false;
+      ctx.session.pendingCustomStars = undefined;
+    }
+
     // Automatic admin recognition by username (e.g. @grizlizora)
     isUserAdmin(ctx.from.id, userDao, ctx.from.username);
 

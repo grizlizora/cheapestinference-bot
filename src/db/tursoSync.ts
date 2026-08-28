@@ -103,9 +103,45 @@ export class TursoCloudSync {
                 notify_prices_global INTEGER NOT NULL DEFAULT 1,
                 notify_admin_new_users INTEGER NOT NULL DEFAULT 1,
                 is_admin INTEGER NOT NULL DEFAULT 0,
+                total_donated_stars INTEGER NOT NULL DEFAULT 0,
                 last_active_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+              );
+            `,
+          },
+        },
+        {
+          type: "execute",
+          stmt: {
+            sql: `
+              CREATE TABLE IF NOT EXISTS donations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                telegram_id INTEGER NOT NULL,
+                amount_stars INTEGER NOT NULL,
+                currency TEXT NOT NULL DEFAULT 'XTR',
+                telegram_payment_charge_id TEXT NOT NULL UNIQUE,
+                provider_payment_charge_id TEXT,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+              );
+            `,
+          },
+        },
+        {
+          type: "execute",
+          stmt: {
+            sql: `
+              CREATE TABLE IF NOT EXISTS active_dashboards (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chat_id INTEGER NOT NULL UNIQUE,
+                message_id INTEGER NOT NULL,
+                current_view TEXT NOT NULL DEFAULT 'dashboard',
+                selected_pool TEXT,
+                last_rendered_text_hash TEXT NOT NULL DEFAULT '',
+                last_rendered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                consecutive_errors INTEGER NOT NULL DEFAULT 0,
+                last_interaction_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
               );
             `,
           },
@@ -202,6 +238,7 @@ export class TursoCloudSync {
                 block_id TEXT NOT NULL,
                 old_price TEXT NOT NULL,
                 new_price TEXT NOT NULL,
+                new_price_num REAL NOT NULL DEFAULT 0.0,
                 price_delta REAL NOT NULL,
                 percent_delta REAL NOT NULL,
                 changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -247,11 +284,11 @@ export class TursoCloudSync {
         INSERT INTO users (
           id, telegram_id, username, first_name, language, is_muted, is_active,
           notify_available_global, notify_sold_out_global, notify_models_global, notify_prices_global,
-          notify_admin_new_users, is_admin, last_active_at, created_at, updated_at
+          notify_admin_new_users, is_admin, total_donated_stars, last_active_at, created_at, updated_at
         ) VALUES (
           @id, @telegram_id, @username, @first_name, @language, @is_muted, @is_active,
           @notify_available_global, @notify_sold_out_global, @notify_models_global, @notify_prices_global,
-          @notify_admin_new_users, @is_admin, @last_active_at, @created_at, @updated_at
+          @notify_admin_new_users, @is_admin, @total_donated_stars, @last_active_at, @created_at, @updated_at
         )
         ON CONFLICT(telegram_id) DO UPDATE SET
           id = excluded.id,
@@ -264,7 +301,9 @@ export class TursoCloudSync {
           notify_sold_out_global = excluded.notify_sold_out_global,
           notify_models_global = excluded.notify_models_global,
           notify_prices_global = excluded.notify_prices_global,
+          notify_admin_new_users = excluded.notify_admin_new_users,
           is_admin = excluded.is_admin,
+          total_donated_stars = excluded.total_donated_stars,
           last_active_at = excluded.last_active_at,
           updated_at = excluded.updated_at
       `);
@@ -458,6 +497,9 @@ export class TursoCloudSync {
     } catch (err: any) {
       console.warn(`⚠️ [TursoSync] Background batch push warning (${batch.length} mutations):`, err?.message || err);
       this.pendingMutations = [...batch, ...this.pendingMutations];
+      if (this.pendingMutations.length > TursoCloudSync.MAX_PENDING_MUTATIONS) {
+        this.pendingMutations = this.pendingMutations.slice(0, TursoCloudSync.MAX_PENDING_MUTATIONS);
+      }
       if (!this.flushTimer) {
         this.flushTimer = setTimeout(() => {
           this.flush().catch(() => {});

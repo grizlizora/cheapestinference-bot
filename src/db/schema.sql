@@ -110,6 +110,7 @@ CREATE TABLE IF NOT EXISTS slot_price_history (
 
 CREATE INDEX IF NOT EXISTS idx_slot_price_hist_retention ON slot_price_history(changed_at);
 CREATE INDEX IF NOT EXISTS idx_slot_price_hist_lookup ON slot_price_history(pool_slug, block_id);
+CREATE INDEX IF NOT EXISTS idx_slot_price_hist_analytics_covering ON slot_price_history(pool_slug, block_id, new_price_num);
 
 -- 7. Notification Logs Table
 CREATE TABLE IF NOT EXISTS notification_logs (

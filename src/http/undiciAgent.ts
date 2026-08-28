@@ -96,6 +96,9 @@ export function createDirectUndiciAgent(
 
     tlsSocket.setNoDelay(true);
     tlsSocket.setKeepAlive(true, 1000);
+    tlsSocket.on("timeout", () => {
+      tlsSocket.destroy(new Error("TLS Connect Timeout"));
+    });
 
     if (tlsCache) {
       tlsSocket.on("session", (sessionBuffer: Buffer) => {
@@ -262,7 +265,7 @@ export function createHttpProxyAgent(
 
 export class UndiciDispatcherPool {
   private dispatchers = new Map<string, Dispatcher>();
-  private readonly directAgent: Agent;
+  private directAgent: Agent;
   private readonly tlsCache: TlsSessionTicketCache;
   private readonly maxCached: number;
 
@@ -301,6 +304,14 @@ export class UndiciDispatcherPool {
   }
 
   public invalidate(proxyUrl: string): void {
+    if (!proxyUrl || proxyUrl === "") {
+      try {
+        this.directAgent.destroy();
+      } catch {}
+      this.directAgent = createDirectUndiciAgent(this.config, this.tlsCache);
+      return;
+    }
+
     const existing = this.dispatchers.get(proxyUrl);
     if (existing) {
       this.dispatchers.delete(proxyUrl);

@@ -88,6 +88,14 @@ export class ActiveDashboardRegistry {
     poolSlug?: string
   ): void {
     const now = Date.now();
+    // High-watermark LRU bound: cap in-memory sessions at 10,000 to maintain flat heap <45MB
+    if (this.activeSessions.size >= 10_000 && !this.activeSessions.has(chatId)) {
+      const oldestKey = this.activeSessions.keys().next().value;
+      if (oldestKey !== undefined) {
+        this.activeSessions.delete(oldestKey);
+      }
+    }
+
     const entry: ActiveDashboardEntry = {
       chatId,
       messageId,

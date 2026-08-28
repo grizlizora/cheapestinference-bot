@@ -165,11 +165,22 @@ export class NotificationDispatcher {
     }
 
     // 2. Format and Enqueue messages with Flyweight Template Deduplication
-    // Avoids generating 5,000 separate string allocations for identical alerts across subscribers
+    // Avoids generating separate string allocations for identical alerts across subscribers
     const singleMsgTemplateCache = new Map<string, OutgoingAlertMessage>();
     const bundleMsgTemplateCache = new Map<string, OutgoingAlertMessage>();
 
-    for (const { user, matchedEvents } of userEventsMap.values()) {
+    // Sort aggregated user entries by 3-tier priority before enqueueing to eliminate multi-event donor interleaving
+    const sortedUserEntries = Array.from(userEventsMap.values()).sort((a, b) => {
+      const adminDiff = (b.user.isAdmin ? 1 : 0) - (a.user.isAdmin ? 1 : 0);
+      if (adminDiff !== 0) return adminDiff;
+
+      const starsDiff = (b.user.totalDonatedStars || 0) - (a.user.totalDonatedStars || 0);
+      if (starsDiff !== 0) return starsDiff;
+
+      return (b.user.lastActiveAt || 0) - (a.user.lastActiveAt || 0);
+    });
+
+    for (const { user, matchedEvents } of sortedUserEntries) {
       if (matchedEvents.length === 1) {
         const single = matchedEvents[0];
         const cachedDuration = eventAnalyticsCache.get(single.event.id);

@@ -191,30 +191,33 @@ export class SubscriberInvertedIndex {
       }
     }
 
-    // Filter active users (granular per-pool index keys are authoritative)
-    const results: PackedUserProfile[] = [];
+    // 3-Bucket Linear Partition (Dial's Scheme): O(k) linear separation
+    const admins: PackedUserProfile[] = [];
+    const donors: PackedUserProfile[] = [];
+    const freeUsers: PackedUserProfile[] = [];
+
     for (const userId of matchedUserIds) {
       const profile = this.profiles.get(userId);
       if (!profile || !profile.isActive) continue;
 
-      results.push(profile);
+      if (profile.isAdmin) {
+        admins.push(profile);
+      } else if ((profile.totalDonatedStars || 0) > 0) {
+        donors.push(profile);
+      } else {
+        freeUsers.push(profile);
+      }
     }
 
-    // 3-Tier Priority Queue Sorting:
-    // 1. Admins first
-    // 2. Top Donors (totalDonatedStars DESC)
-    // 3. Most recently active users
-    results.sort((a, b) => {
-      const adminDiff = (b.isAdmin ? 1 : 0) - (a.isAdmin ? 1 : 0);
-      if (adminDiff !== 0) return adminDiff;
+    // Sort only small donor and free user sub-arrays
+    if (donors.length > 1) {
+      donors.sort((a, b) => (b.totalDonatedStars || 0) - (a.totalDonatedStars || 0));
+    }
+    if (freeUsers.length > 1) {
+      freeUsers.sort((a, b) => (b.lastActiveAt || 0) - (a.lastActiveAt || 0));
+    }
 
-      const starsDiff = (b.totalDonatedStars || 0) - (a.totalDonatedStars || 0);
-      if (starsDiff !== 0) return starsDiff;
-
-      return (b.lastActiveAt || 0) - (a.lastActiveAt || 0);
-    });
-
-    return results;
+    return [...admins, ...donors, ...freeUsers];
   }
 
   /**
