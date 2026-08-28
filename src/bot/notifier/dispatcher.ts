@@ -164,23 +164,66 @@ export class NotificationDispatcher {
       }
     }
 
-    // 2. Format and Enqueue messages (Single or Chunked Bundles <= 3,800 chars)
+    // 2. Format and Enqueue messages with Flyweight Template Deduplication
+    // Avoids generating 5,000 separate string allocations for identical alerts across subscribers
+    const singleMsgTemplateCache = new Map<string, OutgoingAlertMessage>();
+    const bundleMsgTemplateCache = new Map<string, OutgoingAlertMessage>();
+
     for (const { user, matchedEvents } of userEventsMap.values()) {
       if (matchedEvents.length === 1) {
         const single = matchedEvents[0];
         const cachedDuration = eventAnalyticsCache.get(single.event.id);
-        const msg = formatAlertMessage(user, single.event, single.priority, cachedDuration);
-        this.enqueue(msg);
+        const cacheKey = `${user.language}:${single.event.id}:${single.priority}`;
+        let template = singleMsgTemplateCache.get(cacheKey);
+        if (!template) {
+          template = formatAlertMessage(user, single.event, single.priority, cachedDuration);
+          singleMsgTemplateCache.set(cacheKey, template);
+        }
+        // Flyweight shallow clone with recipient-specific IDs
+        this.enqueue({
+          ...template,
+          id: crypto.randomUUID(),
+          telegramId: user.telegramId,
+          userId: user.userId,
+          isMuted: user.isMuted,
+          enqueuedAt: Date.now(),
+        });
       } else {
         const MAX_BUNDLE_EVENTS_PER_MSG = 8;
         for (let i = 0; i < matchedEvents.length; i += MAX_BUNDLE_EVENTS_PER_MSG) {
           const slice = matchedEvents.slice(i, i + MAX_BUNDLE_EVENTS_PER_MSG);
           if (slice.length === 1) {
-            const cachedDuration = eventAnalyticsCache.get(slice[0].event.id);
-            this.enqueue(formatAlertMessage(user, slice[0].event, slice[0].priority, cachedDuration));
+            const single = slice[0];
+            const cachedDuration = eventAnalyticsCache.get(single.event.id);
+            const cacheKey = `${user.language}:${single.event.id}:${single.priority}`;
+            let template = singleMsgTemplateCache.get(cacheKey);
+            if (!template) {
+              template = formatAlertMessage(user, single.event, single.priority, cachedDuration);
+              singleMsgTemplateCache.set(cacheKey, template);
+            }
+            this.enqueue({
+              ...template,
+              id: crypto.randomUUID(),
+              telegramId: user.telegramId,
+              userId: user.userId,
+              isMuted: user.isMuted,
+              enqueuedAt: Date.now(),
+            });
           } else {
-            const msg = formatBundledAlertMessage(user, slice);
-            this.enqueue(msg);
+            const bundleKey = `${user.language}:${slice.map((s) => s.event.id).join(",")}`;
+            let bundleTemplate = bundleMsgTemplateCache.get(bundleKey);
+            if (!bundleTemplate) {
+              bundleTemplate = formatBundledAlertMessage(user, slice);
+              bundleMsgTemplateCache.set(bundleKey, bundleTemplate);
+            }
+            this.enqueue({
+              ...bundleTemplate,
+              id: crypto.randomUUID(),
+              telegramId: user.telegramId,
+              userId: user.userId,
+              isMuted: user.isMuted,
+              enqueuedAt: Date.now(),
+            });
           }
         }
       }
@@ -246,9 +289,11 @@ export class NotificationDispatcher {
     setImmediate(processNextTick);
   }
 
+  private readonly deferredScratch: OutgoingAlertMessage[] = [];
+
   private popValidCandidate(q: CircularRingBuffer<OutgoingAlertMessage>): OutgoingAlertMessage | undefined {
     const now = Date.now();
-    const deferred: OutgoingAlertMessage[] = [];
+    this.deferredScratch.length = 0;
     let chosen: OutgoingAlertMessage | undefined;
     let scanCount = 0;
     const maxScan = Math.min(q.size(), 50);
@@ -270,7 +315,7 @@ export class NotificationDispatcher {
 
       // 3. Check per-user rate limit (1.05s gap)
       if (!this.rateLimiter.canDispatchToUser(candidate.telegramId)) {
-        deferred.push(candidate);
+        this.deferredScratch.push(candidate);
         continue;
       }
 
@@ -279,9 +324,10 @@ export class NotificationDispatcher {
     }
 
     // Re-queue rate-limited candidates to the tail so ready subscribers behind them are processed
-    for (const d of deferred) {
-      q.push(d);
+    for (let i = 0; i < this.deferredScratch.length; i++) {
+      q.push(this.deferredScratch[i]);
     }
+    this.deferredScratch.length = 0;
     return chosen;
   }
 

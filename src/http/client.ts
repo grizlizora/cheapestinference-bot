@@ -116,6 +116,19 @@ export class RobustHttpClient {
     if (!rawEncoding || typeof rawEncoding !== "string") return buffer.toString("utf-8");
     const enc = rawEncoding.toLowerCase().trim();
     try {
+      // Fast-path: Synchronous decompression for small buffers (<16KB) eliminates libuv threadpool context switch (~0.4ms)
+      if (buffer.length < 16_384) {
+        if (enc === "gzip" || enc === "x-gzip") return zlib.gunzipSync(buffer).toString("utf-8");
+        if (enc === "br") return zlib.brotliDecompressSync(buffer).toString("utf-8");
+        if (enc === "deflate") {
+          try {
+            return zlib.inflateSync(buffer).toString("utf-8");
+          } catch {
+            return zlib.inflateRawSync(buffer).toString("utf-8");
+          }
+        }
+      }
+
       if (enc === "gzip" || enc === "x-gzip") {
         const decompressed = await gunzipAsync(buffer);
         return decompressed.toString("utf-8");
@@ -256,7 +269,7 @@ export class RobustHttpClient {
 
         if (isSocketReset && !socketRetried) {
           socketRetried = true;
-          if (proxy.url) this.invalidateDispatcher(proxy.url);
+          this.invalidateDispatcher(proxy.url || "");
           continue;
         }
 

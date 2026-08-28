@@ -59,26 +59,56 @@ export class TlsSessionTicketCache {
   }
 }
 
+import net from "node:net";
+
 export function createDirectUndiciAgent(
   config?: UndiciPoolConfig,
   tlsCache?: TlsSessionTicketCache
 ): Agent {
-  return new Agent({
-    connect: {
-      timeout: config?.connectTimeoutMs ?? 8_000,
+  const directConnector = (opts: any, callback: any) => {
+    const host = opts.hostname || opts.host;
+    const port = Number(opts.port) || (opts.protocol === "http:" ? 80 : 443);
+    const isHttps = opts.protocol === "https:" || port === 443;
+
+    if (!isHttps) {
+      const socket = net.createConnection({
+        host,
+        port,
+        timeout: config?.connectTimeoutMs ?? 8_000,
+        lookup: defaultDnsCache.lookup as any,
+      });
+      socket.setNoDelay(true);
+      socket.setKeepAlive(true, 1000);
+      return callback(null, socket);
+    }
+
+    const cachedSession = tlsCache ? tlsCache.get(host) : undefined;
+    const tlsSocket = tls.connect({
+      host,
+      port,
+      servername: opts.servername || host,
+      rejectUnauthorized: true,
+      ALPNProtocols: ["http/1.1"],
+      session: cachedSession,
       lookup: defaultDnsCache.lookup as any,
-      autoSelectFamily: true,
-      autoSelectFamilyAttemptTimeout: 50,
-      keepAlive: true,
-      keepAliveInitialDelay: 1000,
-      noDelay: true,
-      maxCachedSessions: 100,
-      tls: tlsCache
-        ? {
-            session: (host: string) => tlsCache.get(host),
-          }
-        : undefined,
-    } as any,
+      timeout: config?.connectTimeoutMs ?? 8_000,
+    });
+
+    tlsSocket.setNoDelay(true);
+    tlsSocket.setKeepAlive(true, 1000);
+
+    if (tlsCache) {
+      tlsSocket.on("session", (sessionBuffer: Buffer) => {
+        tlsCache.set(host, sessionBuffer);
+      });
+    }
+
+    tlsSocket.once("secureConnect", () => callback(null, tlsSocket));
+    tlsSocket.on("error", (err) => callback(err, null));
+  };
+
+  return new Agent({
+    connect: directConnector as any,
     keepAliveTimeout: config?.keepAliveTimeoutMs ?? 45_000,
     keepAliveMaxTimeout: config?.keepAliveMaxTimeoutMs ?? 55_000,
     keepAliveTimeoutThreshold: 1000,
