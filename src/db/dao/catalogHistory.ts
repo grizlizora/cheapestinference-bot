@@ -89,7 +89,8 @@ export class CatalogHistoryDAO {
         JSON.stringify(diff.upgraded),
         JSON.stringify(diff.removed),
         JSON.stringify(diff.currentModels),
-      ]
+      ],
+      true
     );
   }
 
@@ -127,7 +128,8 @@ export class CatalogHistoryDAO {
           previousManualProvisioning: payload.previousManualProvisioning,
           newManualProvisioning: payload.newManualProvisioning,
         }),
-      ]
+      ],
+      true
     );
   }
 
@@ -160,7 +162,8 @@ export class CatalogHistoryDAO {
           percentageDelta: payload.percentageDelta,
           isDiscount,
         }),
-      ]
+      ],
+      true
     );
   }
 
@@ -188,7 +191,8 @@ export class CatalogHistoryDAO {
       `INSERT INTO slot_price_history (
         pool_slug, block_id, old_price, new_price, new_price_num, price_delta, percent_delta, changed_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-      [poolSlug, blockId, oldPrice, newPrice, newPriceNum, priceDelta, percentDelta]
+      [poolSlug, blockId, oldPrice, newPrice, newPriceNum, priceDelta, percentDelta],
+      true
     );
   }
 

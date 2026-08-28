@@ -130,12 +130,14 @@ export class SlotHistoryDAO {
        SET closed_at = CURRENT_TIMESTAMP,
            duration_seconds = CAST((strftime('%s', 'now') - strftime('%s', opened_at)) AS INTEGER)
        WHERE pool_slug = ? AND block_id = ? AND closed_at IS NULL`,
-      [poolSlug, blockId]
+      [poolSlug, blockId],
+      true
     );
     tursoCloudSync.pushMutation(
       `INSERT INTO slot_lifecycle_history (pool_slug, block_id, initial_status, price_month, opened_at)
        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-      [poolSlug, blockId, initialStatus, priceMonth]
+      [poolSlug, blockId, initialStatus, priceMonth],
+      true
     );
   }
 
@@ -146,7 +148,8 @@ export class SlotHistoryDAO {
        SET closed_at = CURRENT_TIMESTAMP,
            duration_seconds = CAST((strftime('%s', 'now') - strftime('%s', opened_at)) AS INTEGER)
        WHERE pool_slug = ? AND block_id = ? AND closed_at IS NULL`,
-      [poolSlug, blockId]
+      [poolSlug, blockId],
+      true
     );
   }
 
