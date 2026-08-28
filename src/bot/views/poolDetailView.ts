@@ -169,7 +169,7 @@ export function renderPoolDetailText(
   const dayLabel = ctx.lang === "uk" ? "день" : ctx.lang === "ru" ? "день" : "day";
   const discountLabel = ctx.lang === "uk" ? "Знижка при оплаті за рік:" : ctx.lang === "ru" ? "Скидка при оплате за год:" : "Annual discount:";
   const blocksLabel = ctx.lang === "uk" ? "Регіональні 8-годинні блоки (UTC):" : ctx.lang === "ru" ? "Региональные 8-часовые блоки (UTC):" : "Regional 8-hour blocks (UTC):";
-  const linkLabel = ctx.lang === "uk" ? "Офіційне посилання:" : ctx.lang === "ru" ? "Официальная ссылка:" : "Official link:";
+  const urlText = ctx.lang === "uk" ? "Сторінка тарифу на сайті" : ctx.lang === "ru" ? "Страница тарифа на сайте" : "Plan page on website";
   const annualDiscountPct = Math.round((first.annual_discount || 0.15) * 100);
 
   const fullText = `${specificPoolIcon} <b>${escapeHtml(first.pool_name)}</b>\n\n` +
@@ -182,7 +182,7 @@ export function renderPoolDetailText(
     `• ${discountLabel} <b>${annualDiscountPct}%</b>\n\n` +
     `${icon("nav_clock")} <b>${blocksLabel}</b>\n` +
     `${blocksList}\n\n` +
-    `${icon("nav_link")} <b>${linkLabel}</b> <a href="https://cheapestinference.com/pools/${slug}">https://cheapestinference.com/pools/${slug}</a>`;
+    `${icon("nav_link")} <a href="https://cheapestinference.com/pools/${slug}"><b>${urlText}</b></a>`;
 
   return clampMessageText(`${fullText}${timeFooter}`);
 }
