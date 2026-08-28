@@ -164,24 +164,39 @@ export function renderHelpText(ctx: BotContext): string {
 
   if (ctx.lang === "uk") {
     return `${guideIcon} <b>Як працює цей бот?</b>\n\n` +
-      `1. Бот цілодобово перевіряє сторінку <a href="https://cheapestinference.com/pools">cheapestinference.com/pools</a> через захищений анонімний Tor/проксі канал.\n` +
+      `1. Бот цілодобово перевіряє <a href="https://cheapestinference.com/pools">офіційний сайт CheapestInference</a> через захищений високошвидкісний канал.\n` +
       `2. Кожен тариф ділиться на три щоденні 8-годинні часові блоки (Азія, Європа, Америка).\n` +
-      `3. Ви можете переглядати актуальну наявність слотів у реальному часі за допомогою кнопок меню.\n` +
+      `3. Ви можете переглядати актуальну наявність слотів у реальному часі наживо.\n` +
       `4. У картці кожного тарифу (пулу) ви можете налаштувати персональні сповіщення на потрібні вам слоти або окремі регіони.\n` +
-      `5. Щойно слот з'являється — ви миттєво отримуєте повідомлення з прямим посиланням на покупку!`;
+      `5. Щойно слот з'являється — ви миттєво отримуєте повідомлення з кнопкою швидкого бронювання!\n\n` +
+      `💡 <b>Open-Source проект:</b>\n` +
+      `Проект є повністю відкритим, надійним та прозорим під ліцензією MIT.\n` +
+      `🐙 <a href="https://github.com/grizlizora/cheapestinference-bot">Відкритий вихідний код на GitHub</a>\n\n` +
+      `🌐 <a href="https://cheapestinference.com/pools">Офіційна сторінка тарифів платформи</a>\n` +
+      `👨‍💻 <b>Зв'язок з автором / Підтримка:</b> <a href="https://t.me/grizlizora">@grizlizora</a>`;
   } else if (ctx.lang === "ru") {
     return `${guideIcon} <b>Как работает этот бот?</b>\n\n` +
-      `1. Бот круглосуточно проверяет страницу <a href="https://cheapestinference.com/pools">cheapestinference.com/pools</a> через защищенный анонимный Tor/прокси канал.\n` +
+      `1. Бот круглосуточно проверяет <a href="https://cheapestinference.com/pools">официальный сайт CheapestInference</a> через защищенный высокоскоростной канал.\n` +
       `2. Каждый тариф делится на три ежедневных 8-часовых временных блока (Азия, Европа, Америка).\n` +
       `3. Вы можете просматривать актуальное наличие слотов в реальном времени с помощью кнопок меню.\n` +
       `4. В карточке каждого тарифа (пула) вы можете настроить персональные уведомления на нужные вам слоты или отдельные регионы.\n` +
-      `5. Как только слот появляется — вы мгновенно получаете сообщение с прямой ссылкой на покупку!`;
+      `5. Как только слот появляется — вы моментально получаете сообщение с кнопкой бронирования!\n\n` +
+      `💡 <b>Open-Source проект:</b>\n` +
+      `Проект имеет полностью открытый, надежный и прозрачный исходный код под лицензией MIT.\n` +
+      `🐙 <a href="https://github.com/grizlizora/cheapestinference-bot">Исходный код на GitHub</a>\n\n` +
+      `🌐 <a href="https://cheapestinference.com/pools">Официальная страница тарифов платформы</a>\n` +
+      `👨‍💻 <b>Связь с автором / Поддержка:</b> <a href="https://t.me/grizlizora">@grizlizora</a>`;
   } else {
     return `${guideIcon} <b>How this bot works</b>\n\n` +
-      `1. The bot monitors <a href="https://cheapestinference.com/pools">cheapestinference.com/pools</a> 24/7 via resilient secure proxy channels.\n` +
-      `2. Each pool is partitioned into three daily 8-hour regional blocks (Asia, Europe, Americas).\n` +
+      `1. The bot monitors the <a href="https://cheapestinference.com/pools">official CheapestInference website</a> 24/7 via resilient high-speed proxy channels.\n` +
+      `2. Each compute pool is partitioned into three daily 8-hour regional blocks (Asia, Europe, Americas).\n` +
       `3. You can inspect live slot availability in real time via the menu buttons.\n` +
       `4. In each pool card, you can configure granular alerts for specific slots or regions.\n` +
-      `5. As soon as a slot appears — you receive instant notifications with direct checkout links!`;
+      `5. The moment a slot opens — you receive instant notifications with direct checkout buttons!\n\n` +
+      `💡 <b>Open-Source Project:</b>\n` +
+      `This project is 100% open-source, robust, and transparent under the MIT license.\n` +
+      `🐙 <a href="https://github.com/grizlizora/cheapestinference-bot">Source code on GitHub</a>\n\n` +
+      `🌐 <a href="https://cheapestinference.com/pools">Official Platform Pricing Page</a>\n` +
+      `👨‍💻 <b>Author Contact & Support:</b> <a href="https://t.me/grizlizora">@grizlizora</a>`;
   }
 }

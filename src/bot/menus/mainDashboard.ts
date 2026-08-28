@@ -304,6 +304,19 @@ export function createMainMenuHierarchy(
     );
 
   const helpMenu = new Menu<BotContext>("help-menu")
+    .url(
+      "🐙 GitHub",
+      "https://github.com/grizlizora/cheapestinference-bot"
+    )
+    .url(
+      "🌐 CheapestInference",
+      "https://cheapestinference.com/pools"
+    )
+    .row()
+    .url(
+      "👨‍💻 @grizlizora",
+      "https://t.me/grizlizora"
+    )
     .text(
       (ctx) => ctx.t("common.back"),
       async (ctx) => {
