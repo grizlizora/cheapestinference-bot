@@ -1,5 +1,5 @@
 import { RobustHttpClient } from "../http/client.js";
-import { PoolsSnapshot, ScrapeResult } from "../types/domain.js";
+import { PoolsSnapshot, ScrapeResult, normalizeSlotStatus } from "../types/domain.js";
 import { IFetcherEngine } from "./types.js";
 
 export class JsonApiEngine implements IFetcherEngine {
@@ -66,7 +66,7 @@ export class JsonApiEngine implements IFetcherEngine {
             block: String(b.block),
             hoursUtc: String(b.hoursUtc || ""),
             pricePerMonth: String(b.pricePerMonth || "0"),
-            status: String(b.status || "available"),
+            status: normalizeSlotStatus(b.status),
           }))
         : [],
       infraSpec: rawPool.infraSpec ? String(rawPool.infraSpec) : undefined,

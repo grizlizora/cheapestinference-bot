@@ -206,11 +206,12 @@ export class ScraperOrchestrator extends EventEmitter {
         this.emit("diff_events", events);
       }
 
-      // 2. Offload DB writes to asynchronous microtask (non-blocking for real-time notifications)
+      // 2. Offload DB writes to asynchronous microtask using authoritative noise-filtered snapshot
       queueMicrotask(() => {
         try {
-          if (result.snapshot) {
-            this.poolStateDao.saveSnapshot(result.snapshot, result.source, result.latencyMs);
+          const authoritativeSnapshot = this.diffEngine.getSnapshot() || result.snapshot;
+          if (authoritativeSnapshot) {
+            this.poolStateDao.saveSnapshot(authoritativeSnapshot, result.source, result.latencyMs);
           }
         } catch (e: any) {
           this.emit("warn", `Failed to save snapshot to SQLite: ${e.message}`);
@@ -228,7 +229,8 @@ export class ScraperOrchestrator extends EventEmitter {
   }
 
   /**
-   * Hedged dual-engine execution: Queries API first, then races HTML snapshot after 150ms if slow
+   * Resilient dual-engine execution: Queries live HTML snapshot first (primary ground truth),
+   * with automatic fallback to JSON API.
    */
   private async fetchFromEngines(bypassEtag = false): Promise<ScrapeResult> {
     const effectiveApiEtag = bypassEtag ? undefined : this.apiEtag;
@@ -236,99 +238,25 @@ export class ScraperOrchestrator extends EventEmitter {
     const effectiveHtmlEtag = bypassEtag ? undefined : this.htmlEtag;
     const effectiveHtmlLastModified = bypassEtag ? undefined : this.htmlLastModified;
 
-    // Fast-path Circuit Breaker: If API is healthy, use Hedged Racing
-    const isCircuitOpen = Date.now() < this.apiCircuitOpenUntil;
-    if (isCircuitOpen) {
+    try {
       const htmlResult = await this.htmlEngine.fetch(
         effectiveHtmlEtag,
         effectiveHtmlLastModified,
-        5_000
+        4_000
       );
       if (htmlResult.etag) this.htmlEtag = htmlResult.etag;
       if (htmlResult.lastModified) this.htmlLastModified = htmlResult.lastModified;
       return htmlResult;
-    }
-
-    const apiController = new AbortController();
-    const htmlController = new AbortController();
-
-    let hedgeTimer: NodeJS.Timeout | undefined;
-    try {
-      const apiPromise = this.apiEngine.fetch(
+    } catch (htmlErr: any) {
+      this.emit("warn", `HTML Engine fetch error (${htmlErr?.message || htmlErr}). Falling back to JSON API.`);
+      const apiResult = await this.apiEngine.fetch(
         effectiveApiEtag,
         effectiveApiLastModified,
-        3_000,
-        apiController.signal
+        4_000
       );
-
-      // Hedged Request: if primary API query exceeds 150ms, race against concurrent HTML fallback
-      const hedgePromise = new Promise<ScrapeResult>((resolve, reject) => {
-        hedgeTimer = setTimeout(async () => {
-          try {
-            const htmlRes = await this.htmlEngine.fetch(
-              effectiveHtmlEtag,
-              effectiveHtmlLastModified,
-              3_000,
-              htmlController.signal
-            );
-            resolve(htmlRes);
-          } catch (e) {
-            reject(e);
-          }
-        }, 150);
-      });
-
-      const result = await Promise.race([
-        apiPromise.then((res) => {
-          if (hedgeTimer) clearTimeout(hedgeTimer);
-          htmlController.abort(); // Immediately cancel orphaned HTML fetch
-          return res;
-        }).catch((err) => {
-          if (apiController.signal.aborted) return null as any;
-          throw err;
-        }),
-        hedgePromise.then((res) => {
-          apiController.abort(); // Immediately cancel slow API fetch
-          return res;
-        }).catch(async () => {
-          return await apiPromise;
-        }),
-      ]).then((res) => {
-        if (!res) throw new Error("API fetch cancelled by hedge race");
-        return res;
-      });
-
-      if (hedgeTimer) clearTimeout(hedgeTimer);
-
-      this.apiConsecutiveErrors = 0;
-      if (result.etag) {
-        if (result.source === "api") this.apiEtag = result.etag;
-        else this.htmlEtag = result.etag;
-      }
-      if (result.lastModified) {
-        if (result.source === "api") this.apiLastModified = result.lastModified;
-        else this.htmlLastModified = result.lastModified;
-      }
-      return result;
-    } catch (apiErr: any) {
-      if (hedgeTimer) clearTimeout(hedgeTimer);
-      this.apiConsecutiveErrors++;
-      if (this.apiConsecutiveErrors >= 2) {
-        // Open circuit for 60 seconds
-        this.apiCircuitOpenUntil = Date.now() + 60_000;
-        this.emit("warn", `API Engine circuit opened for 60s due to consecutive failures. Defaulting to HTML fallback.`);
-      } else {
-        this.emit("warn", `API Engine failed (${apiErr.message}). Switching to HTML fallback.`);
-      }
-
-      const htmlResult = await this.htmlEngine.fetch(
-        effectiveHtmlEtag,
-        effectiveHtmlLastModified,
-        5_000
-      );
-      if (htmlResult.etag) this.htmlEtag = htmlResult.etag;
-      if (htmlResult.lastModified) this.htmlLastModified = htmlResult.lastModified;
-      return htmlResult;
+      if (apiResult.etag) this.apiEtag = apiResult.etag;
+      if (apiResult.lastModified) this.apiLastModified = apiResult.lastModified;
+      return apiResult;
     }
   }
 

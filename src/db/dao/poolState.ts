@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import { PoolStateRecord } from "../../types/db.js";
-import { PoolData, PoolsSnapshot } from "../../types/domain.js";
+import { PoolData, PoolsSnapshot, isSlotAvailable } from "../../types/domain.js";
 import { tursoCloudSync } from "../tursoSync.js";
 
 export class PoolStateDAO {
@@ -195,7 +195,7 @@ export class PoolStateDAO {
       }
 
       const availableCount = records.filter(
-        (r) => r.status === "available" || r.status === "limited"
+        (r) => isSlotAvailable(r.status)
       ).length;
 
       // Lowest block price

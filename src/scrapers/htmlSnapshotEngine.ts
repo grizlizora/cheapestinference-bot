@@ -1,10 +1,22 @@
 import * as cheerio from "cheerio";
 import { RobustHttpClient } from "../http/client.js";
-import { PoolsSnapshot, ScrapeResult, PoolData } from "../types/domain.js";
+import { PoolsSnapshot, ScrapeResult, PoolData, normalizeSlotStatus } from "../types/domain.js";
 import { IFetcherEngine } from "./types.js";
 
 const PUSH_PREFIX_REGEX = /(?:(?:self|window|globalThis)\.__next_f|(?:\((?:self|window|globalThis)\.__next_f=(?:self|window|globalThis)\.__next_f\|\|\[\]\)))\.push\(\[\d+,\s*/g;
 const SLUG_REGEX = /"slug"\s*:\s*"(flagship|frontier|core|[\w-]+)"/g;
+
+function sanitizePoolBlocks(pools: PoolData[]): PoolData[] {
+  return pools.map((p) => ({
+    ...p,
+    blocks: Array.isArray(p.blocks)
+      ? p.blocks.map((b) => ({
+          ...b,
+          status: normalizeSlotStatus(b.status),
+        }))
+      : [],
+  }));
+}
 
 export class HtmlSnapshotEngine implements IFetcherEngine {
   private readonly htmlUrl = "https://cheapestinference.com/pools";
@@ -48,7 +60,7 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
       return {
         success: true,
         modified: true,
-        snapshot: { success: true, data: rscPools },
+        snapshot: { success: true, data: sanitizePoolBlocks(rscPools) },
         etag: res.etag,
         lastModified: res.lastModified,
         source: "html_rsc_stream",
@@ -69,7 +81,7 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
           return {
             success: true,
             modified: true,
-            snapshot: parsed,
+            snapshot: { success: true, data: sanitizePoolBlocks(parsed.data) },
             etag: res.etag,
             lastModified: res.lastModified,
             source: "html_snapshot",
@@ -95,7 +107,7 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
           return {
             success: true,
             modified: true,
-            snapshot: { success: true, data: poolsData },
+            snapshot: { success: true, data: sanitizePoolBlocks(poolsData) },
             etag: res.etag,
             lastModified: res.lastModified,
             source: "html_snapshot",
@@ -191,7 +203,7 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
     if (flightChunks.length === 0) return null;
     const combinedFlight = flightChunks.join("");
 
-    const pools: PoolData[] = [];
+    const poolsMap = new Map<string, PoolData>();
     SLUG_REGEX.lastIndex = 0;
     let slugMatch: RegExpExecArray | null;
 
@@ -210,34 +222,34 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
         try {
           const parsed = JSON.parse(candidateJson);
           if (parsed.slug && Array.isArray(parsed.blocks) && parsed.blocks.length > 0) {
-            if (!pools.some((p) => p.slug === parsed.slug)) {
-              pools.push({
-                id: String(parsed.id || parsed.slug),
-                slug: String(parsed.slug),
-                modelId: String(parsed.modelId || parsed.slug),
-                modelName: String(parsed.modelName || parsed.name || parsed.slug),
-                models: Array.isArray(parsed.models) ? parsed.models.map(String) : [],
-                description: String(parsed.description || ""),
-                status: String(parsed.status || "active"),
-                minPricePerDay: String(parsed.minPricePerDay || "0"),
-                annualDiscount: typeof parsed.annualDiscount === "number" ? parsed.annualDiscount : 0.15,
-                blocks: parsed.blocks.map((b: any) => ({
-                  block: String(b.block),
-                  hoursUtc: String(b.hoursUtc || ""),
-                  pricePerMonth: String(b.pricePerMonth || "0"),
-                  status: String(b.status || "available"),
-                })),
-                infraSpec: parsed.infraSpec ? String(parsed.infraSpec) : undefined,
-                manualProvisioning: Boolean(parsed.manualProvisioning),
-              });
-              foundValidPool = true;
-            }
+            const normalizedBlocks = parsed.blocks.map((b: any) => ({
+              block: String(b.block),
+              hoursUtc: String(b.hoursUtc || ""),
+              pricePerMonth: String(b.pricePerMonth || "0"),
+              status: normalizeSlotStatus(b.status),
+            }));
+
+            poolsMap.set(parsed.slug, {
+              id: String(parsed.id || parsed.slug),
+              slug: String(parsed.slug),
+              modelId: String(parsed.modelId || parsed.slug),
+              modelName: String(parsed.modelName || parsed.name || parsed.slug),
+              models: Array.isArray(parsed.models) ? parsed.models.map(String) : [],
+              description: String(parsed.description || ""),
+              status: String(parsed.status || "active"),
+              minPricePerDay: String(parsed.minPricePerDay || "0"),
+              annualDiscount: typeof parsed.annualDiscount === "number" ? parsed.annualDiscount : 0.15,
+              blocks: normalizedBlocks,
+              infraSpec: parsed.infraSpec ? String(parsed.infraSpec) : undefined,
+              manualProvisioning: Boolean(parsed.manualProvisioning),
+            });
+            foundValidPool = true;
           }
         } catch {}
       }
     }
 
-    return pools.length > 0 ? pools : null;
+    return poolsMap.size > 0 ? Array.from(poolsMap.values()) : null;
   }
 
   private extractBalancedJsonObject(str: string, startIndex: number): string | null {

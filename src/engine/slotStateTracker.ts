@@ -5,10 +5,13 @@
 
 import {
   PoolData,
+  PoolBlock,
   PoolsSnapshot,
   DiffEvent,
   DemandCategory,
   DropPatternType,
+  isSlotAvailable,
+  normalizeSlotStatus,
 } from "../types/domain.js";
 import { SlotHistoryDAO } from "../db/dao/slotHistory.js";
 import { PriceDiffEvaluator, StagedSlotPriceChange } from "./priceDiffEvaluator.js";
@@ -68,9 +71,27 @@ export class SlotStateTracker {
 
   public getSnapshot(): PoolsSnapshot | null {
     if (!this.isInitialized) return null;
+    const pools: PoolData[] = [];
+    for (const [slug, pool] of this.inMemoryPools) {
+      const blocks: PoolBlock[] = [];
+      for (const [, slot] of this.inMemorySlots) {
+        if (slot.poolSlug === slug) {
+          blocks.push({
+            block: slot.block,
+            hoursUtc: slot.hoursUtc,
+            pricePerMonth: slot.pricePerMonth,
+            status: normalizeSlotStatus(slot.status),
+          });
+        }
+      }
+      pools.push({
+        ...pool,
+        blocks: blocks.length > 0 ? blocks : pool.blocks,
+      });
+    }
     return {
       success: true,
-      data: Array.from(this.inMemoryPools.values()),
+      data: pools,
     };
   }
 
@@ -186,8 +207,8 @@ export class SlotStateTracker {
         const prevSlot = this.inMemorySlots.get(key);
 
         if (prevSlot) {
-          const wasAvailable = prevSlot.status === "available" || prevSlot.status === "limited";
-          const isAvailable = block.status === "available" || block.status === "limited";
+          const wasAvailable = isSlotAvailable(prevSlot.status);
+          const isAvailable = isSlotAvailable(block.status);
 
           // Status Transition: Became Available (K=1 Fast-Track)
           if (!wasAvailable && isAvailable) {
@@ -315,7 +336,7 @@ export class SlotStateTracker {
             lastSeenAt: timestamp,
           });
 
-          if (block.status === "available" || block.status === "limited") {
+          if (isSlotAvailable(block.status)) {
             historyDao?.recordSlotOpened(pool.slug, block.block, block.status, block.pricePerMonth);
             events.push({
               id: crypto.randomUUID(),

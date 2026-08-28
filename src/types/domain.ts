@@ -169,3 +169,16 @@ export interface ScrapeResult {
   usedProxy?: string | null;
 }
 
+export function normalizeSlotStatus(rawStatus: any): "available" | "limited" | "sold-out" {
+  const clean = String(rawStatus || "").toLowerCase().trim().replace(/_/g, "-");
+  if (clean === "available" || clean === "in-stock" || clean === "active") return "available";
+  if (clean === "limited" || clean === "low-stock" || clean === "partially-available") return "limited";
+  return "sold-out";
+}
+
+export function isSlotAvailable(status: any): boolean {
+  const normalized = normalizeSlotStatus(status);
+  return normalized === "available" || normalized === "limited";
+}
+
+

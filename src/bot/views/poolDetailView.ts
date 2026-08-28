@@ -4,6 +4,7 @@
  */
 
 import { BotContext } from "../../types/context.js";
+import { isSlotAvailable } from "../../types/domain.js";
 import { PoolStateDAO } from "../../db/dao/poolState.js";
 import { SubscriptionDAO } from "../../db/dao/subscriptions.js";
 import { SlotHistoryDAO } from "../../db/dao/slotHistory.js";
@@ -135,7 +136,7 @@ export function renderPoolDetailText(
         ? intelligenceEngine.getSmartStatus(slug, b.block_id, b.status, ctx.lang)
         : null;
 
-      const isAvailable = b.status === "available" || b.status === "limited";
+      const isAvailable = isSlotAvailable(b.status);
       const statusIcon = isAvailable ? icon("status_available") : icon("status_sold_out");
       const textKey = isAvailable ? "common.status_available_text" : "common.status_sold_out_text";
       const directText = ctx.t(textKey);
