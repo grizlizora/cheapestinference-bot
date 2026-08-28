@@ -110,13 +110,14 @@ export class SlotStateTracker {
       }
 
       const key = `${row.pool_slug}:${row.block_id}`;
+      const normalizedStatus = normalizeSlotStatus(row.status);
       this.inMemorySlots.set(key, {
         poolSlug: row.pool_slug,
         poolName: row.pool_name,
         models,
         block: row.block_id,
         hoursUtc: row.hours_utc || "",
-        status: row.status,
+        status: normalizedStatus,
         pricePerMonth: row.price_month,
         lastSeenAt: Date.now(),
       });
@@ -142,7 +143,7 @@ export class SlotStateTracker {
       p.blocks.push({
         block: row.block_id,
         hoursUtc: row.hours_utc || "",
-        status: row.status,
+        status: normalizedStatus,
         pricePerMonth: row.price_month,
       });
     }
