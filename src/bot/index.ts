@@ -191,14 +191,24 @@ export function createTelegramBot(
           const adminLang = (adminUser?.language as SupportedLanguage) || "uk";
           const wantsAlerts = (adminUser?.notify_admin_new_users ?? 1) === 1;
 
-          if (wantsAlerts) {
-            const adminMsg = translate(adminLang, "admin.new_user_alert", {
-              first_name: escapeHtml(ctx.from.first_name),
-              username: usernameStr,
-              telegram_id: ctx.from.id,
-              language: langFlag,
-              total_users: userStats.total,
-            });
+            const userIcon = `<tg-emoji emoji-id="5373012449597335010">👤</tg-emoji>`;
+            const idIcon = `<tg-emoji emoji-id="5422683699130933153">🪪</tg-emoji>`;
+            const usersIcon = `<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji>`;
+            const langIcon = `<tg-emoji emoji-id="5399898266265475100">🌐</tg-emoji>`;
+            const flagMap: Record<string, string> = {
+              uk: `Українська <tg-emoji emoji-id="5447309366568953338">🇺🇦</tg-emoji>`,
+              en: `English <tg-emoji emoji-id="5202196682497859879">🇬🇧</tg-emoji>`,
+              ru: `Русский <tg-emoji emoji-id="5449408995691341691">🇷🇺</tg-emoji>`,
+            };
+            const langStr = flagMap[ctx.lang] || ctx.lang;
+
+            const adminMsg = `${userIcon} <b>Новий користувач у боті!</b>\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+              `• <b>Ім'я:</b> <code>${escapeHtml(ctx.from.first_name)}</code>\n` +
+              `• <b>Username:</b> ${usernameStr}\n` +
+              `• ${idIcon} <b>Telegram ID:</b> <code>${ctx.from.id}</code>\n` +
+              `• ${langIcon} <b>Мова інтерфейсу:</b> ${langStr}\n` +
+              `• ${usersIcon} <b>Всього користувачів:</b> <code>${userStats.total}</code>`;
 
             bot.api
               .sendMessage(adminId, adminMsg, { parse_mode: "HTML" })

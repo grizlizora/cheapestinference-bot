@@ -10,6 +10,7 @@ import { config, isUserAdmin } from "../../config/env.js";
 import { UserDAO } from "../../db/dao/users.js";
 import { SubscriptionDAO } from "../../db/dao/subscriptions.js";
 import { escapeHtml } from "../../i18n/index.js";
+import { icon } from "../views/iconTheme.js";
 
 async function computeFileSha256(filePath: string): Promise<string> {
   const hash = crypto.createHash("sha256");
@@ -43,7 +44,8 @@ export function createUsersExportHandler(
       return;
     }
 
-    const statusMsg = await ctx.reply(ctx.t("admin.export_users_in_progress"), {
+    const progressText = `${icon("nav_clock")} <i>Формування Excel/CSV звіту про користувачів та підписки...</i>`;
+    const statusMsg = await ctx.reply(progressText, {
       parse_mode: "HTML",
     });
 
@@ -114,12 +116,12 @@ export function createUsersExportHandler(
       const activeSubsCount = subDao.getTotalActiveSubscriptions();
 
       const caption = [
-        `👥 <b>CheapestInference — Звіт користувачів (Excel/CSV)</b>`,
+        `${icon("nav_admin")} <b>CheapestInference — Звіт користувачів (Excel/CSV)</b>`,
         `━━━━━━━━━━━━━━━━━━━━━━━━`,
-        `📅 <b>Дата вивантаження:</b> <code>${new Date().toISOString()}</code>`,
-        `👥 <b>Всього користувачів:</b> <code>${stats.total}</code> (Активні: ${stats.active}, Заблокували: ${stats.blocked})`,
-        `🔔 <b>Всього правил підписок:</b> <code>${activeSubsCount}</code>`,
-        `📊 <b>Формат:</b> <code>CSV UTF-8 (Excel-Ready)</code>`,
+        `${icon("nav_clock")} <b>Дата вивантаження:</b> <code>${new Date().toISOString()}</code>`,
+        `<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> <b>Всього користувачів:</b> <code>${stats.total}</code> (Активні: ${stats.active}, Заблокували: ${stats.blocked})`,
+        `${icon("notify_bell_on")} <b>Всього правил підписок:</b> <code>${activeSubsCount}</code>`,
+        `${icon("nav_chart")} <b>Формат:</b> <code>CSV UTF-8 (Excel-Ready)</code>`,
         `\n💡 <i>Файл можна відкрити в Microsoft Excel, Google Таблицях або Apple Numbers.</i>`,
       ].join("\n");
 
@@ -158,7 +160,8 @@ export function createHistoryExportHandler(
       return;
     }
 
-    const statusMsg = await ctx.reply(ctx.t("admin.export_history_in_progress"), {
+    const progressText = `${icon("nav_clock")} <i>Формування Excel/CSV звіту про всю історію змін...</i>`;
+    const statusMsg = await ctx.reply(progressText, {
       parse_mode: "HTML",
     });
 
@@ -276,12 +279,12 @@ export function createHistoryExportHandler(
       const filename = `history_cheapestinference_${timestamp}.csv`;
 
       const caption = [
-        `📜 <b>CheapestInference — Повна історія всіх змін (Excel/CSV)</b>`,
+        `${icon("event_tier_update")} <b>CheapestInference — Повна історія всіх змін (Excel/CSV)</b>`,
         `━━━━━━━━━━━━━━━━━━━━━━━━`,
-        `📅 <b>Дата вивантаження:</b> <code>${new Date().toISOString()}</code>`,
-        `📊 <b>Всього історичних записів:</b> <code>${combined.length}</code>`,
-        `⚡ <b>Включає:</b> відкриття/закриття слотів, час життя в наявності, історія змін цін, оновлення моделей ШІ.`,
-        `📁 <b>Формат:</b> <code>CSV UTF-8 (Excel-Ready)</code>`,
+        `${icon("nav_clock")} <b>Дата вивантаження:</b> <code>${new Date().toISOString()}</code>`,
+        `${icon("nav_chart")} <b>Всього історичних записів:</b> <code>${combined.length}</code>`,
+        `${icon("event_slot_drop")} <b>Включає:</b> відкриття/закриття слотів, час життя в наявності, історія змін цін, оновлення моделей ШІ.`,
+        `${icon("pool_generic")} <b>Формат:</b> <code>CSV UTF-8 (Excel-Ready)</code>`,
         `\n💡 <i>Файл зручно аналізувати та будувати графіки в Excel або Google Таблицях.</i>`,
       ].join("\n");
 
@@ -321,10 +324,10 @@ export function createBackupHandler(
       return;
     }
 
-    const statusMsg = await ctx.reply(
-      ctx.t("admin.backup_in_progress"),
-      { parse_mode: "HTML" }
-    );
+    const progressText = `${icon("nav_clock")} <i>Формування бекапу бази даних SQLite (VACUUM INTO)...</i>`;
+    const statusMsg = await ctx.reply(progressText, {
+      parse_mode: "HTML",
+    });
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const randomSuffix = crypto.randomBytes(3).toString("hex");
@@ -362,14 +365,14 @@ export function createBackupHandler(
       const activeSubs = subDao.getTotalActiveSubscriptions();
 
       const caption = [
-        `💾 <b>CheapestInference SQLite Database Snapshot</b>`,
+        `${icon("pool_core")} <b>CheapestInference SQLite Database Snapshot</b>`,
         `━━━━━━━━━━━━━━━━━━━━━━━━`,
-        `📅 <b>Date:</b> <code>${new Date().toISOString()}</code>`,
-        `📦 <b>File Size:</b> <code>${sizeMb} MB</code> (${fileStats.size.toLocaleString()} bytes)`,
-        `⚡ <b>Snapshot Time:</b> <code>${durationMs}ms</code>`,
-        `👥 <b>Total Users:</b> <code>${userStats.total}</code> (Active: ${userStats.active})`,
-        `🔔 <b>Active Subscriptions:</b> <code>${activeSubs}</code>`,
-        `🔒 <b>SHA-256:</b> <code>${sha256Hash.substring(0, 16)}...${sha256Hash.substring(48)}</code>`,
+        `${icon("nav_clock")} <b>Date:</b> <code>${new Date().toISOString()}</code>`,
+        `${icon("pool_generic")} <b>File Size:</b> <code>${sizeMb} MB</code> (${fileStats.size.toLocaleString()} bytes)`,
+        `${icon("event_slot_drop")} <b>Snapshot Time:</b> <code>${durationMs}ms</code>`,
+        `<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> <b>Total Users:</b> <code>${userStats.total}</code> (Active: ${userStats.active})`,
+        `${icon("notify_bell_on")} <b>Active Subscriptions:</b> <code>${activeSubs}</code>`,
+        `${icon("event_slot_sold")} <b>SHA-256:</b> <code>${sha256Hash.substring(0, 16)}...${sha256Hash.substring(48)}</code>`,
       ].join("\n");
 
       // Send document to admin chat
