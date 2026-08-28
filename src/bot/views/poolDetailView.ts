@@ -36,36 +36,34 @@ export function renderPoolSettingsText(
   const slug = ctx.session?.tempPoolSlug || "flagship";
   const flags = subDao.getPoolFlags(ctx.user.id, slug);
   const blocks = poolStateDao.getPoolBlocks(slug);
-  const poolName = blocks[0]?.pool_name || slug.toUpperCase();
+  const rank = POOL_RANKS[slug];
+  const poolTitle = rank?.tierName[ctx.lang] || blocks[0]?.pool_name || slug.toUpperCase();
 
-  const onText = ctx.lang === "uk" ? `УВІМКНЕНО ${icon("toggle_on")}` : ctx.lang === "ru" ? `ВКЛЮЧЕНО ${icon("toggle_on")}` : `ENABLED ${icon("toggle_on")}`;
-  const offText = ctx.lang === "uk" ? `ВИМКНЕНО ${icon("toggle_off")}` : ctx.lang === "ru" ? `ВЫКЛЮЧЕНО ${icon("toggle_off")}` : `DISABLED ${icon("toggle_off")}`;
+  const onText = ctx.lang === "uk" ? `Увімкнено ${icon("toggle_on")}` : ctx.lang === "ru" ? `Включено ${icon("toggle_on")}` : `Enabled ${icon("toggle_on")}`;
+  const offText = ctx.lang === "uk" ? `Вимкнено ${icon("toggle_off")}` : ctx.lang === "ru" ? `Выключено ${icon("toggle_off")}` : `Disabled ${icon("toggle_off")}`;
 
   const headerTitle = ctx.lang === "uk"
-    ? `<b>Фільтри сповіщень • ${escapeHtml(poolName)}</b>\n\nНалаштуйте, які саме події ви хочете отримувати для тарифу <b>${escapeHtml(poolName)}</b>:`
+    ? `<b>Фільтри сповіщень • ${escapeHtml(poolTitle)}</b>`
     : ctx.lang === "ru"
-    ? `<b>Фильтры уведомлений • ${escapeHtml(poolName)}</b>\n\nНастройте, какие именно события вы хотите получать для тарифа <b>${escapeHtml(poolName)}</b>:`
-    : `<b>Notification Filters • ${escapeHtml(poolName)}</b>\n\nConfigure which events you want to receive for <b>${escapeHtml(poolName)}</b>:`;
+    ? `<b>Фильтры уведомлений • ${escapeHtml(poolTitle)}</b>`
+    : `<b>Notification Filters • ${escapeHtml(poolTitle)}</b>`;
 
+  const subStatusLabel = ctx.lang === "uk" ? "Підписка на кластер" : ctx.lang === "ru" ? "Подписка на кластер" : "Cluster Subscription";
+  const poolStatus = flags.isSubscribed ? onText : offText;
+
+  const categoriesHeader = ctx.lang === "uk" ? "Категорії сповіщень:" : ctx.lang === "ru" ? "Категории уведомлений:" : "Event Categories:";
   const dropsLabel = ctx.lang === "uk" ? "Вільні слоти (Drops)" : ctx.lang === "ru" ? "Свободные слоты (Drops)" : "Available Slots (Drops)";
   const soldLabel = ctx.lang === "uk" ? "Розпродано (Sold Out)" : ctx.lang === "ru" ? "Распродано (Sold Out)" : "Sold Out";
   const modelsLabel = ctx.lang === "uk" ? "Оновлення моделей" : ctx.lang === "ru" ? "Обновления моделей" : "Model Updates";
   const pricesLabel = ctx.lang === "uk" ? "Зміна цін та знижок" : ctx.lang === "ru" ? "Изменение цен и скидок" : "Price & Discount Changes";
-  const subStatusLabel = ctx.lang === "uk" ? "Статус підписки на пул" : ctx.lang === "ru" ? "Статус подписки на пул" : "Pool Subscription Status";
-
-  let poolIcon = icon("pool_generic");
-  if (slug.includes("flagship")) poolIcon = icon("pool_flagship");
-  else if (slug.includes("core")) poolIcon = icon("pool_core");
-  else if (slug.includes("frontier")) poolIcon = icon("pool_frontier");
-
-  const poolStatus = flags.isSubscribed ? onText : offText;
 
   return `${icon("nav_settings")} ${headerTitle}\n\n` +
+    `${icon("notify_bell_on")} <b>${subStatusLabel}:</b> ${poolStatus}\n\n` +
+    `<b>${categoriesHeader}</b>\n` +
     `• ${icon("event_slot_drop")} ${dropsLabel}: ${flags.available ? onText : offText}\n` +
     `• ${icon("event_slot_sold")} ${soldLabel}: ${flags.soldOut ? onText : offText}\n` +
-    `• ${icon("event_batch_drop")} ${modelsLabel}: ${flags.models ? onText : offText}\n` +
-    `• ${icon("price_tag")} ${pricesLabel}: ${flags.prices ? onText : offText}\n\n` +
-    `${icon("pool_generic")} <b>${subStatusLabel}:</b> ${poolStatus}`;
+    `• ${icon("ai_robot")} ${modelsLabel}: ${flags.models ? onText : offText}\n` +
+    `• ${icon("price_tag")} ${pricesLabel}: ${flags.prices ? onText : offText}`;
 }
 
 export function renderPoolDetailText(
@@ -78,8 +76,8 @@ export function renderPoolDetailText(
   const slug = ctx.session?.tempPoolSlug || "flagship";
   const blocks = poolStateDao.getPoolBlocks(slug);
 
-  if (blocks.length === 0) {
-    return ctx.t("pool_detail.no_data", { pool: slug.toUpperCase() });
+  if (!blocks || blocks.length === 0) {
+    return ctx.t("pool_detail.no_data", { pool_slug: slug.toUpperCase() });
   }
 
   const first = blocks[0];
@@ -101,6 +99,8 @@ export function renderPoolDetailText(
   }
 
   const intelligenceEngine = historyDao ? new AvailabilityIntelligenceEngine(historyDao) : null;
+  const currencyMonth = ctx.t("common.currency_month") || "mo";
+  const freeLabel = ctx.lang === "uk" ? "вільні" : ctx.lang === "ru" ? "свободно" : "free";
 
   const blocksList = blocks
     .map((b) => {
@@ -121,7 +121,7 @@ export function renderPoolDetailText(
 
       let row = `${shift.icon} <b>${shift.name}</b> <i>(${shift.shiftName})</i>\n` +
         `• <code>${hoursLocal}</code>\n` +
-        `• ${statusIcon} <b>${rawStatusText}</b> — <b>$${cleanPrice}/міс</b>`;
+        `• ${statusIcon} <b>${rawStatusText}</b> — <b>$${cleanPrice}/${currencyMonth}</b>`;
 
       if (isAvailable && smart?.predictionTip) {
         row += `\n  ${smart.predictionTip}`;
@@ -135,9 +135,8 @@ export function renderPoolDetailText(
 
   const parseNum = (v: string) => parseFloat(String(v).replace(/[^0-9.-]/g, "")) || 0;
   const prices = blocks.map((b) => parseNum(b.price_month)).filter((p) => p > 0);
-  const minPriceNum = prices.length > 0 ? Math.min(...prices) : parseNum(first.min_price_day);
-  const minPrice = minPriceNum > 0 ? minPriceNum.toFixed(2) : "0.00";
-  const minPriceDay = minPriceNum > 0 ? (minPriceNum / 30).toFixed(2) : "0.00";
+  const minPrice = prices.length > 0 ? Math.min(...prices).toFixed(2) : "0.00";
+  const minPriceDay = (parseFloat(minPrice) / 30).toFixed(2);
 
   const telemetry = scraper?.getTelemetry();
   const lastVerified = poolStateDao.getLastVerified();
@@ -172,11 +171,11 @@ export function renderPoolDetailText(
   const annualDiscountPct = Math.round((first.annual_discount || 0.15) * 100);
 
   const fullText = `${rank.iconsHtml} <b>${escapeHtml(rankTitle)}</b>\n` +
-    `• ${capacityLabel}: [ ${capacityBar} ] <i>(${availableCount}/${totalBlocks} вільні)</i>\n\n` +
+    `• ${capacityLabel}: [ ${capacityBar} ] <i>(${availableCount}/${totalBlocks} ${freeLabel})</i>\n\n` +
     `${icon("ai_robot")} <b>${modelsLabel}</b>\n` +
     `${modelsList || "  • Custom open-weights models"}\n\n` +
     `${icon("price_money")} <b>${costLabel}</b>\n` +
-    `• ${baseLabel} <b>$${minPrice}/міс</b> (~$${minPriceDay}/${dayLabel})\n` +
+    `• ${baseLabel} <b>$${minPrice}/${currencyMonth}</b> (~$${minPriceDay}/${dayLabel})\n` +
     `• ${discountLabel} <b>${annualDiscountPct}%</b>\n\n` +
     `${icon("nav_clock")} <b>${blocksLabel}</b>\n` +
     `${blocksList}\n\n` +

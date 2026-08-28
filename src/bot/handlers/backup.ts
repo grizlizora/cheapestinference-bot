@@ -9,7 +9,7 @@ import { BotContext } from "../../types/context.js";
 import { config, isUserAdmin } from "../../config/env.js";
 import { UserDAO } from "../../db/dao/users.js";
 import { SubscriptionDAO } from "../../db/dao/subscriptions.js";
-import { escapeHtml } from "../../i18n/index.js";
+import { escapeHtml, stripLeadingEmoji } from "../../i18n/index.js";
 import { icon } from "../views/iconTheme.js";
 
 async function computeFileSha256(filePath: string): Promise<string> {
@@ -44,7 +44,7 @@ export function createUsersExportHandler(
       return;
     }
 
-    const progressText = `${icon("nav_clock")} <i>Формування Excel/CSV звіту про користувачів та підписки...</i>`;
+    const progressText = `${icon("nav_clock")} ${stripLeadingEmoji(ctx.t("admin.export_users_in_progress"))}`;
     const statusMsg = await ctx.reply(progressText, {
       parse_mode: "HTML",
     });
@@ -160,7 +160,7 @@ export function createHistoryExportHandler(
       return;
     }
 
-    const progressText = `${icon("nav_clock")} <i>Формування Excel/CSV звіту про всю історію змін...</i>`;
+    const progressText = `${icon("nav_clock")} ${stripLeadingEmoji(ctx.t("admin.export_history_in_progress"))}`;
     const statusMsg = await ctx.reply(progressText, {
       parse_mode: "HTML",
     });
@@ -324,7 +324,7 @@ export function createBackupHandler(
       return;
     }
 
-    const progressText = `${icon("nav_clock")} <i>Формування бекапу бази даних SQLite (VACUUM INTO)...</i>`;
+    const progressText = `${icon("nav_clock")} ${stripLeadingEmoji(ctx.t("admin.backup_in_progress"))}`;
     const statusMsg = await ctx.reply(progressText, {
       parse_mode: "HTML",
     });

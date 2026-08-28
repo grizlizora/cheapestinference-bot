@@ -331,16 +331,16 @@ export function createSubscriptionsMenu(
 export function renderSubscriptionsText(ctx: BotContext, subDao: SubscriptionDAO): string {
   const isGlobal = subDao.hasSubscription(ctx.user.id, "ALL", "ALL");
 
-  const onText = ctx.lang === "uk" ? `УВІМКНЕНО ${icon("toggle_on")}` : ctx.lang === "ru" ? `ВКЛЮЧЕНО ${icon("toggle_on")}` : `ENABLED ${icon("toggle_on")}`;
-  const offText = ctx.lang === "uk" ? `ВИМКНЕНО ${icon("toggle_off")}` : ctx.lang === "ru" ? `ВЫКЛЮЧЕНО ${icon("toggle_off")}` : `DISABLED ${icon("toggle_off")}`;
+  const onText = ctx.lang === "uk" ? `Увімкнено ${icon("toggle_on")}` : ctx.lang === "ru" ? `Включено ${icon("toggle_on")}` : `Enabled ${icon("toggle_on")}`;
+  const offText = ctx.lang === "uk" ? `Вимкнено ${icon("toggle_off")}` : ctx.lang === "ru" ? `Выключено ${icon("toggle_off")}` : `Disabled ${icon("toggle_off")}`;
 
   const titleText = ctx.lang === "uk"
-    ? `<b>Керування сповіщеннями</b>\n\nНалаштуйте категорії подій, тарифи та регіональні блоки.`
+    ? `<b>Керування сповіщеннями</b>\n\nНалаштуйте категорії подій, тарифи та регіональні блоки:`
     : ctx.lang === "ru"
-    ? `<b>Управление уведомлениями</b>\n\nНастройте категории событий, тарифы и региональные блоки.`
-    : `<b>Notification Management</b>\n\nConfigure event categories, tiers, and regional blocks.`;
+    ? `<b>Управление уведомлениями</b>\n\nНастройте категории событий, тарифы и региональные блоки:`
+    : `<b>Notification Management</b>\n\nConfigure event categories, tiers, and regional blocks:`;
 
-  const globalFiltersHeader = ctx.lang === "uk" ? "Глобальні фільтри за замовчуванням:" : ctx.lang === "ru" ? "Глобальные фильтры по умолчанию:" : "Default Global Filters:";
+  const globalFiltersHeader = ctx.lang === "uk" ? "Глобальні фільтри:" : ctx.lang === "ru" ? "Глобальные фильтры:" : "Global Filters:";
   const dropsLabel = ctx.lang === "uk" ? "Вільні слоти" : ctx.lang === "ru" ? "Свободные слоты" : "Available Slots";
   const soldLabel = ctx.lang === "uk" ? "Розпродано (Sold Out)" : ctx.lang === "ru" ? "Распродано (Sold Out)" : "Sold Out";
   const modelsLabel = ctx.lang === "uk" ? "Оновлення моделей" : ctx.lang === "ru" ? "Обновления моделей" : "Model Updates";
@@ -359,10 +359,10 @@ export function renderSubscriptionsText(ctx: BotContext, subDao: SubscriptionDAO
   const globalStatus = isGlobal ? onText : offText;
 
   return `${icon("notify_bell_on")} ${titleText}\n\n` +
-    `${icon("nav_settings")} <b>${globalFiltersHeader}</b>\n` +
+    `<b>${globalFiltersHeader}</b>\n` +
     `• ${icon("event_slot_drop")} ${dropsLabel}: ${availStatus}\n` +
     `• ${icon("event_slot_sold")} ${soldLabel}: ${soldStatus}\n` +
-    `• ${icon("event_batch_drop")} ${modelsLabel}: ${modelStatus}\n` +
+    `• ${icon("ai_robot")} ${modelsLabel}: ${modelStatus}\n` +
     `• ${icon("price_tag")} ${pricesLabel}: ${priceStatus}\n\n` +
     `${icon("nav_language")} <b>${globalAlertsLabel}:</b> ${globalStatus}\n` +
     `🔊 <b>${soundLabel}:</b> ${soundStatus}`;

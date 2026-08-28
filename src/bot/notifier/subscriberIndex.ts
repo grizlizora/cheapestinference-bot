@@ -271,6 +271,9 @@ export class SubscriberInvertedIndex {
       if (profile) {
         profile.isActive = false;
       }
+      for (const set of this.index.values()) {
+        set.delete(userId);
+      }
     }
   }
 

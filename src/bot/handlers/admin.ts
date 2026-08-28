@@ -111,7 +111,10 @@ export function renderAdminText(
   const memoryLabel = ctx.lang === "uk" ? "Пам'ять процесу" : ctx.lang === "ru" ? "Память процесса" : "Process memory";
   const newUsersLabel = ctx.lang === "uk" ? "Сповіщення про нових користувачів" : ctx.lang === "ru" ? "Уведомления о новых пользователях" : "New user alerts";
 
-  return `${icon("nav_chart")} ${adminHeader}\n\n` +
+  const msUnit = ctx.lang === "en" ? "ms" : "мс";
+  const title = adminHeader.replace(/<\/?b>/g, "");
+
+  return `${icon("nav_admin")} <b>${title}</b>\n━━━━━━━━━━━━━━━━━━━━━━━━\n` +
     `${statusOrb} <b>${statusTitle}:</b> ${statusLabel} ${statusOrb}\n` +
     `${icon("nav_clock")} <b>${uptimeTitle}:</b> ${uptimeStr}\n\n` +
     `${usersIcon} <b>${usersTitle}:</b>\n` +
@@ -120,7 +123,7 @@ export function renderAdminText(
     `• ${blockedLabel}: <b>${userStats.blocked}</b>\n` +
     `• ${subsLabel}: <b>${activeSubs}</b>\n\n` +
     `${spiderIcon} <b>${scraperTitle}:</b>\n` +
-    `• ${pollLabel}: <b>${lastScrapeStr}</b> (${latencyLabel}: ${scraperTelemetry.lastScrapeLatencyMs}мс)\n` +
+    `• ${pollLabel}: <b>${lastScrapeStr}</b> (${latencyLabel}: ${scraperTelemetry.lastScrapeLatencyMs}${msUnit})\n` +
     `• ${sourceLabel}: <code>${escapeHtml(scraperTelemetry.lastSource || "N/A")}</code>\n` +
     `• ${errorsLabel}: <b>${scraperTelemetry.consecutiveFailures}</b>\n` +
     `• ${proxyLabel}: <b>${proxyModeStr}</b>\n\n` +
