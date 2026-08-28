@@ -71,21 +71,52 @@ export function renderAdminText(
   const adminUser = ctx.from ? userDao.getByTelegramId(ctx.from.id) : undefined;
   const newUsersEnabled = (adminUser?.notify_admin_new_users ?? 1) === 1;
 
-  return ctx.t("admin.stats_title", {
-    status: scraperTelemetry.consecutiveFailures === 0 ? `HEALTHY ${icon("status_available")}` : `DEGRADED ${icon("status_partially_available")}`,
-    uptime: uptimeStr,
-    total_users: userStats.total,
-    active_users: userStats.active,
-    blocked_users: userStats.blocked,
-    active_subscriptions: activeSubs,
-    last_scrape_ago: lastScrapeStr,
-    latency: scraperTelemetry.lastScrapeLatencyMs,
-    source: escapeHtml(scraperTelemetry.lastSource || "N/A"),
-    consecutive_failures: scraperTelemetry.consecutiveFailures,
-    proxy_status: proxyModeStr,
-    memory_mb: memUsageMb,
-    new_users_status: newUsersEnabled ? ctx.t("subscriptions.filter_on") : ctx.t("subscriptions.filter_off"),
-  });
+  const usersIcon = `<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji>`;
+  const spiderIcon = `<tg-emoji emoji-id="5445149053853637789">🕷</tg-emoji>`;
+  const brainRamIcon = icon("pool_core");
+  const onText = ctx.lang === "uk" ? `УВІМКНЕНО ${icon("toggle_on")}` : ctx.lang === "ru" ? `ВКЛЮЧЕНО ${icon("toggle_on")}` : `ENABLED ${icon("toggle_on")}`;
+  const offText = ctx.lang === "uk" ? `ВИМКНЕНО ${icon("toggle_off")}` : ctx.lang === "ru" ? `ВЫКЛЮЧЕНО ${icon("toggle_off")}` : `DISABLED ${icon("toggle_off")}`;
+
+  const statusOrb = scraperTelemetry.consecutiveFailures === 0 ? icon("status_available") : icon("status_partially_available");
+  const statusLabel = scraperTelemetry.consecutiveFailures === 0 ? "HEALTHY" : "DEGRADED";
+
+  const adminHeader = ctx.lang === "uk"
+    ? "<b>Панель адміністратора & Телеметрія</b>"
+    : ctx.lang === "ru"
+    ? "<b>Панель администратора & Телеметрия</b>"
+    : "<b>Admin Panel & Telemetry</b>";
+
+  const statusTitle = ctx.lang === "uk" ? "Статус системи" : ctx.lang === "ru" ? "Статус системы" : "System Status";
+  const uptimeTitle = ctx.lang === "uk" ? "Аптайм" : ctx.lang === "ru" ? "Аптайм" : "Uptime";
+  const usersTitle = ctx.lang === "uk" ? "Користувачі" : ctx.lang === "ru" ? "Пользователи" : "Users";
+  const totalLabel = ctx.lang === "uk" ? "Всього зареєстровано" : ctx.lang === "ru" ? "Всего зарегистрировано" : "Total registered";
+  const activeLabel = ctx.lang === "uk" ? "Активних спостерігачів" : ctx.lang === "ru" ? "Активных наблюдателей" : "Active observers";
+  const blockedLabel = ctx.lang === "uk" ? "Заблокували бота" : ctx.lang === "ru" ? "Заблокировали бота" : "Blocked bot";
+  const subsLabel = ctx.lang === "uk" ? "Активних правил підписок" : ctx.lang === "ru" ? "Активных правил подписок" : "Active subscription rules";
+  const scraperTitle = ctx.lang === "uk" ? "Скрейпер & Anti-Ban" : ctx.lang === "ru" ? "Скрейпер & Anti-Ban" : "Scraper & Anti-Ban";
+  const pollLabel = ctx.lang === "uk" ? "Останнє опитування" : ctx.lang === "ru" ? "Последний опрос" : "Last poll";
+  const latencyLabel = ctx.lang === "uk" ? "Затримка" : ctx.lang === "ru" ? "Задержка" : "Latency";
+  const sourceLabel = ctx.lang === "uk" ? "Джерело даних" : ctx.lang === "ru" ? "Источник данных" : "Data source";
+  const errorsLabel = ctx.lang === "uk" ? "Помилок поспіль" : ctx.lang === "ru" ? "Ошибок подряд" : "Consecutive errors";
+  const proxyLabel = ctx.lang === "uk" ? "Режим Tor / Проксі" : ctx.lang === "ru" ? "Режим Tor / Прокси" : "Tor / Proxy Mode";
+  const memoryLabel = ctx.lang === "uk" ? "Пам'ять процесу" : ctx.lang === "ru" ? "Память процесса" : "Process memory";
+  const newUsersLabel = ctx.lang === "uk" ? "Сповіщення про нових користувачів" : ctx.lang === "ru" ? "Уведомления о новых пользователях" : "New user alerts";
+
+  return `${icon("nav_chart")} ${adminHeader}\n\n` +
+    `${statusOrb} <b>${statusTitle}:</b> ${statusLabel} ${statusOrb}\n` +
+    `${icon("nav_clock")} <b>${uptimeTitle}:</b> ${uptimeStr}\n\n` +
+    `${usersIcon} <b>${usersTitle}:</b>\n` +
+    `• ${totalLabel}: <b>${userStats.total}</b>\n` +
+    `• ${activeLabel}: <b>${userStats.active}</b>\n` +
+    `• ${blockedLabel}: <b>${userStats.blocked}</b>\n` +
+    `• ${subsLabel}: <b>${activeSubs}</b>\n\n` +
+    `${spiderIcon} <b>${scraperTitle}:</b>\n` +
+    `• ${pollLabel}: <b>${lastScrapeStr}</b> (${latencyLabel}: ${scraperTelemetry.lastScrapeLatencyMs}мс)\n` +
+    `• ${sourceLabel}: <code>${escapeHtml(scraperTelemetry.lastSource || "N/A")}</code>\n` +
+    `• ${errorsLabel}: <b>${scraperTelemetry.consecutiveFailures}</b>\n` +
+    `• ${proxyLabel}: <b>${proxyModeStr}</b>\n\n` +
+    `${brainRamIcon} <b>${memoryLabel}:</b> <b>${memUsageMb} MB</b>\n` +
+    `${icon("notify_bell_on")} <b>${newUsersLabel}:</b> ${newUsersEnabled ? onText : offText}`;
 }
 
 export function createAdminKeyboard(ctx: BotContext, userDao: UserDAO): InlineKeyboard {
