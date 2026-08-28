@@ -142,16 +142,32 @@ export function renderPoolDetailText(
   );
   const timeFooter = `\n\n${icon("nav_clock")} <i>${ctx.lang === "uk" ? "Дані перевірено" : ctx.lang === "ru" ? "Данные проверены" : "Verified at"}: ${monitoringText}</i>`;
 
-  const baseTitle = ctx.t("pool_detail.title", {
-    pool_name: escapeHtml(first.pool_name),
-    description: escapeHtml(first.description || "Unlimited AI inference pool"),
-    models_list: modelsList || "  • Custom open-weights models",
-    min_price: minPrice,
-    min_price_day: minPriceDay,
-    annual_discount: Math.round((first.annual_discount || 0.15) * 100),
-    blocks_list: blocksList,
-    url: `https://cheapestinference.com/pools/${slug}`,
-  });
+  let specificPoolIcon = icon("pool_generic");
+  if (slug.includes("flagship")) specificPoolIcon = icon("pool_flagship");
+  else if (slug.includes("core")) specificPoolIcon = icon("pool_core");
+  else if (slug.includes("frontier")) specificPoolIcon = icon("pool_frontier");
 
-  return clampMessageText(`${baseTitle}${timeFooter}`);
+  const descLabel = ctx.lang === "uk" ? "Опис:" : ctx.lang === "ru" ? "Описание:" : "Description:";
+  const modelsLabel = ctx.lang === "uk" ? "Включені моделі (безліміт):" : ctx.lang === "ru" ? "Включенные модели (безлимит):" : "Included Models (unlimited):";
+  const costLabel = ctx.lang === "uk" ? "Вартість:" : ctx.lang === "ru" ? "Стоимость:" : "Pricing:";
+  const baseLabel = ctx.lang === "uk" ? "Базовий тариф: від" : ctx.lang === "ru" ? "Базовый тариф: от" : "Base rate: from";
+  const dayLabel = ctx.lang === "uk" ? "день" : ctx.lang === "ru" ? "день" : "day";
+  const discountLabel = ctx.lang === "uk" ? "Знижка при оплаті за рік:" : ctx.lang === "ru" ? "Скидка при оплате за год:" : "Annual discount:";
+  const blocksLabel = ctx.lang === "uk" ? "Регіональні 8-годинні блоки (UTC):" : ctx.lang === "ru" ? "Региональные 8-часовые блоки (UTC):" : "Regional 8-hour blocks (UTC):";
+  const linkLabel = ctx.lang === "uk" ? "Офіційне посилання:" : ctx.lang === "ru" ? "Официальная ссылка:" : "Official link:";
+  const annualDiscountPct = Math.round((first.annual_discount || 0.15) * 100);
+
+  const fullText = `${specificPoolIcon} <b>${escapeHtml(first.pool_name)}</b>\n\n` +
+    `${icon("event_tier_update")} <b>${descLabel}</b>\n` +
+    `<i>${escapeHtml(first.description || "Unlimited AI inference pool")}</i>\n\n` +
+    `${icon("ai_robot")} <b>${modelsLabel}</b>\n` +
+    `${modelsList || "  • Custom open-weights models"}\n\n` +
+    `${icon("price_money")} <b>${costLabel}</b>\n` +
+    `• ${baseLabel} <b>$${minPrice}/міс</b> (~$${minPriceDay}/${dayLabel})\n` +
+    `• ${discountLabel} <b>${annualDiscountPct}%</b>\n\n` +
+    `🕒 <b>${blocksLabel}</b>\n` +
+    `${blocksList}\n\n` +
+    `${icon("nav_link")} <b>${linkLabel}</b> <a href="https://cheapestinference.com/pools/${slug}">https://cheapestinference.com/pools/${slug}</a>`;
+
+  return clampMessageText(`${fullText}${timeFooter}`);
 }

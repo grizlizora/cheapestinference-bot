@@ -87,73 +87,73 @@ export type IconRenderMode = "custom_emoji" | "unicode_only" | "markdown_v2";
 export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
   // Status & Health
   status_available: {
-    customEmojiId: "5368324170671202286",
+    customEmojiId: "5427009714745517609",
     unicodeFallback: "🟢",
-    name: "Neon Emerald Breathing Orb",
+    name: "3D Emerald Checkmark",
   },
   status_partially_available: {
-    customEmojiId: "5368324170671202287",
+    customEmojiId: "5361748661640372834",
     unicodeFallback: "🟡",
-    name: "Neon Amber Oscillating Orb",
+    name: "3D Trend Indicator",
   },
   status_limited: {
-    customEmojiId: "5368324170671202288",
+    customEmojiId: "5361748661640372834",
     unicodeFallback: "🟡",
-    name: "Flashing Amber Warning Orb",
+    name: "3D Trend Indicator",
   },
   status_sold_out: {
-    customEmojiId: "5368324170671202289",
+    customEmojiId: "5465665476971471368",
     unicodeFallback: "🔴",
-    name: "Pulsing Crimson Lock Orb",
+    name: "3D Crimson Cross",
   },
   status_live: {
-    customEmojiId: "5370575678452270081",
+    customEmojiId: "5264727218734524899",
     unicodeFallback: "🟢",
-    name: "Live Radar Ping",
+    name: "3D Sync Spin",
   },
   status_standby: {
     customEmojiId: "5451959871257713464",
     unicodeFallback: "💤",
-    name: "Floating Slumber Zzz",
+    name: "3D Slumber Zzz",
   },
   status_delay: {
-    customEmojiId: "5370575678452270083",
+    customEmojiId: "5465665476971471368",
     unicodeFallback: "⚠️",
-    name: "Flashing Warning Beacon",
+    name: "3D Warning",
   },
 
   // Pools
   pool_flagship: {
     customEmojiId: "5445284980978621387",
     unicodeFallback: "🚀",
-    name: "Hyperdrive Rocket",
+    name: "3D Hyperdrive Rocket",
   },
   pool_frontier: {
-    customEmojiId: "5431445009029706648",
+    customEmojiId: "5420315771991497307",
     unicodeFallback: "⚡",
-    name: "Electric Cyan Bolt",
+    name: "3D Plasma Fire",
   },
   pool_core: {
     customEmojiId: "5237799019329105246",
     unicodeFallback: "🧠",
-    name: "Cyber Neural Core",
+    name: "3D Cyber Brain",
   },
   pool_generic: {
-    customEmojiId: "5431445009029706650",
+    customEmojiId: "5472164874886846699",
     unicodeFallback: "📦",
-    name: "Quantum Server Chassis",
+    name: "3D Quantum Sparkle",
   },
 
   // Regions
   region_asia: {
     customEmojiId: "5397753673130463064",
     unicodeFallback: "🌏",
-    name: "3D Asia-Pacific Globe",
+    name: "3D Asia Globe",
   },
   region_europe: {
     customEmojiId: "5399898266265475100",
     unicodeFallback: "🌍",
-    name: "3D Europe-EMEA Globe",
+    name: "3D Europe Globe",
   },
   region_americas: {
     customEmojiId: "5397575638146110953",
@@ -161,214 +161,214 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     name: "3D Americas Globe",
   },
   region_all: {
-    customEmojiId: "5447410659074028444",
+    customEmojiId: "5399898266265475100",
     unicodeFallback: "🌐",
-    name: "Planetary Wireframe Grid",
+    name: "3D Planetary Globe",
   },
 
   // Events
   event_slot_drop: {
-    customEmojiId: "5382173167232230001",
+    customEmojiId: "5420315771991497307",
     unicodeFallback: "⚡",
-    name: "Electric Slot Drop",
+    name: "3D Slot Drop Fire",
   },
   event_slot_sold: {
-    customEmojiId: "5382173167232230002",
+    customEmojiId: "5465665476971471368",
     unicodeFallback: "🔒",
-    name: "Cyber Padlock Shut",
+    name: "3D Slot Sold Cross",
   },
   event_price_drop: {
     customEmojiId: "5361748661640372834",
     unicodeFallback: "📉",
-    name: "Laser Green Trend Down",
+    name: "3D Price Drop Trend",
   },
   event_price_hike: {
     customEmojiId: "5373001317042101552",
     unicodeFallback: "📈",
-    name: "Laser Red Trend Up",
+    name: "3D Price Hike Trend",
   },
   event_model_upgrade: {
     customEmojiId: "5445284980978621387",
     unicodeFallback: "🚀",
-    name: "AI Model Ascension",
+    name: "3D Rocket Upgrade",
   },
   event_tier_update: {
     customEmojiId: "5334882760735598374",
     unicodeFallback: "📝",
-    name: "Holographic Spec Blueprint",
+    name: "3D Memo Spec",
   },
   event_new_pool: {
     customEmojiId: "5472164874886846699",
     unicodeFallback: "✨",
-    name: "Quantum Launch Sparkle",
+    name: "3D Sparkle",
   },
   event_batch_drop: {
     customEmojiId: "5361979468887893611",
     unicodeFallback: "🆕",
-    name: "Multi-Region Batch Drop",
+    name: "3D NEW Badge",
   },
   event_hot_slot: {
     customEmojiId: "5420315771991497307",
     unicodeFallback: "🔥",
-    name: "Blazing Plasma Flame",
+    name: "3D Hot Flame",
   },
 
   // AI Models
   ai_robot: {
     customEmojiId: "5372981976804366741",
     unicodeFallback: "🤖",
-    name: "Android Sensor Head",
+    name: "3D Android Robot",
   },
   ai_deepseek: {
     customEmojiId: "5222292529533167322",
     unicodeFallback: "🐋",
-    name: "DeepSeek Oceanic Whale",
+    name: "3D DeepSeek Whale",
   },
   ai_claude: {
     customEmojiId: "5472164874886846699",
     unicodeFallback: "✨",
-    name: "Claude Radiant Star",
+    name: "3D Claude Sparkle",
   },
   ai_qwen: {
     customEmojiId: "5361837567463399422",
     unicodeFallback: "🔮",
-    name: "Qwen Quantum Crystal",
+    name: "3D Qwen Crystal Ball",
   },
   ai_glm: {
-    customEmojiId: "5285430309720966089",
+    customEmojiId: "5472164874886846699",
     unicodeFallback: "🧬",
-    name: "GLM Neural Helix",
+    name: "3D GLM Neural",
   },
   ai_llama: {
     customEmojiId: "5343553685525899318",
     unicodeFallback: "🦙",
-    name: "Cyber Llama",
+    name: "3D Cyber Llama",
   },
   ai_mistral: {
-    customEmojiId: "5285430309720966091",
+    customEmojiId: "5420315771991497307",
     unicodeFallback: "🌪️",
-    name: "Mistral Vortex",
+    name: "3D Mistral Fire",
   },
 
   // Navigation
   nav_back: {
-    customEmojiId: "5420123456789012001",
+    customEmojiId: "5361748661640372834",
     unicodeFallback: "⬅️",
-    name: "Cyber Back Arrow",
+    name: "3D Back",
   },
   nav_refresh: {
     customEmojiId: "5264727218734524899",
     unicodeFallback: "🔄",
-    name: "Dual-Ring Sync Vortex",
+    name: "3D Sync Refresh",
   },
   nav_settings: {
-    customEmojiId: "5420123456789012003",
+    customEmojiId: "5334882760735598374",
     unicodeFallback: "⚙️",
-    name: "Spinning Gear",
+    name: "3D Settings Memo",
   },
   nav_admin: {
     customEmojiId: "5467406098367521267",
     unicodeFallback: "👑",
-    name: "Star-Glint Crown",
+    name: "3D Crown",
   },
   nav_guide: {
     customEmojiId: "5226512880362332956",
     unicodeFallback: "📖",
-    name: "Holographic Datapad",
+    name: "3D Guide Book",
   },
   nav_author: {
     customEmojiId: "5190498849440931467",
     unicodeFallback: "👨‍💻",
-    name: "Cyber Hacker Badge",
+    name: "3D Hacker",
   },
   nav_language: {
-    customEmojiId: "5447410659074028444",
+    customEmojiId: "5399898266265475100",
     unicodeFallback: "🌐",
-    name: "Matrix Polyglot Globe",
+    name: "3D Language Globe",
   },
   nav_chart: {
     customEmojiId: "5431577498364158238",
     unicodeFallback: "📊",
-    name: "Holographic 3D Chart",
+    name: "3D Bar Chart",
   },
   nav_cart: {
     customEmojiId: "5431499171045581032",
     unicodeFallback: "🛒",
-    name: "Checkout Pod",
+    name: "3D Shopping Cart",
   },
   nav_link: {
     customEmojiId: "5375129357373165375",
     unicodeFallback: "🔗",
-    name: "Neon Cyber Link",
+    name: "3D Chain Link",
   },
   nav_clock: {
-    customEmojiId: "5420123456789012011",
+    customEmojiId: "5264727218734524899",
     unicodeFallback: "🕒",
-    name: "Holographic Chronometer",
+    name: "3D Chronometer",
   },
 
   // Notifications & Toggles
   notify_bell_on: {
     customEmojiId: "5242628160297641831",
     unicodeFallback: "🔔",
-    name: "Golden Alert Bell",
+    name: "3D Alert Bell",
   },
   notify_bell_off: {
     customEmojiId: "5244807637157029775",
     unicodeFallback: "🔕",
-    name: "Muted Slashed Bell",
+    name: "3D Muted Bell",
   },
   notify_loud: {
-    customEmojiId: "5433998877665544003",
+    customEmojiId: "5242628160297641831",
     unicodeFallback: "🔊",
-    name: "Sonic Speaker",
+    name: "3D Speaker",
   },
   notify_mute: {
-    customEmojiId: "5433998877665544004",
+    customEmojiId: "5244807637157029775",
     unicodeFallback: "🔇",
-    name: "Silent Speaker",
+    name: "3D Mute",
   },
   toggle_on: {
     customEmojiId: "5427009714745517609",
     unicodeFallback: "✅",
-    name: "Laser Emerald Checkmark",
+    name: "3D Checkmark",
   },
   toggle_off: {
     customEmojiId: "5465665476971471368",
     unicodeFallback: "❌",
-    name: "Laser Crimson Cross",
+    name: "3D Cross",
   },
 
   // Pricing & Analytics
   price_tag: {
-    customEmojiId: "5455112233445566001",
+    customEmojiId: "5375296873982604963",
     unicodeFallback: "🏷️",
-    name: "Glowing Discount Tag",
+    name: "3D Price Gold",
   },
   price_money: {
     customEmojiId: "5375296873982604963",
     unicodeFallback: "💰",
-    name: "Cyber Gold Tokens",
+    name: "3D Gold Money Bag",
   },
   price_dollar: {
-    customEmojiId: "5455112233445566003",
+    customEmojiId: "5375296873982604963",
     unicodeFallback: "💵",
-    name: "Digital Dollar Voucher",
+    name: "3D Dollar",
   },
   price_all_time_low: {
     customEmojiId: "5420315771991497307",
     unicodeFallback: "🔥",
-    name: "Supernova ATL Starburst",
+    name: "3D Supernova Flame",
   },
   price_fair: {
-    customEmojiId: "5455112233445566005",
+    customEmojiId: "5431577498364158238",
     unicodeFallback: "⚖️",
-    name: "Balanced Scales",
+    name: "3D Scales Metric",
   },
   prediction_crystal: {
     customEmojiId: "5361837567463399422",
     unicodeFallback: "🔮",
-    name: "Oracle Crystal Ball",
+    name: "3D Crystal Ball",
   },
 };
 

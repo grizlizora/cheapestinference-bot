@@ -84,8 +84,13 @@ export function renderDashboardText(
         url: `https://cheapestinference.com/pools/${p.slug}`,
       });
 
-      // Elevate pool box icon to animated custom emoji safely
-      return `${icon("pool_generic")} ${stripLeadingEmoji(card)}`;
+      // Elevate pool icon to specific animated custom emoji
+      let poolIcon = icon("pool_generic");
+      if (p.slug.includes("flagship")) poolIcon = icon("pool_flagship");
+      else if (p.slug.includes("core")) poolIcon = icon("pool_core");
+      else if (p.slug.includes("frontier")) poolIcon = icon("pool_frontier");
+
+      return `${poolIcon} ${stripLeadingEmoji(card)}`;
     })
     .join("\n\n");
 
