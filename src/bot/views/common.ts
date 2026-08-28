@@ -39,16 +39,21 @@ export function stripTgEmoji(text: string): string {
 export async function safeReply(
   ctx: BotContext,
   text: string,
-  extra: any = { parse_mode: "HTML", link_preview_options: { is_disabled: true } }
+  extra?: any
 ): Promise<any> {
+  const options: any = {
+    parse_mode: "HTML",
+    link_preview_options: { is_disabled: true },
+    ...(extra && extra.inline_keyboard ? { reply_markup: extra } : extra),
+  };
   const safeText = clampMessageText(toValidUtf8(text));
   try {
-    return await ctx.reply(safeText, extra);
+    return await ctx.reply(safeText, options);
   } catch (err: any) {
     const desc = err?.description || err?.message || "";
     if (desc.includes("DOCUMENT_INVALID") || desc.includes("CUSTOM_EMOJI_INVALID")) {
       const stripped = stripTgEmoji(safeText);
-      return await ctx.reply(stripped, extra);
+      return await ctx.reply(stripped, options);
     }
     throw err;
   }
@@ -61,7 +66,7 @@ export async function safeReply(
 export async function safeEditMessageText(
   ctx: BotContext,
   text: string,
-  extra: any = { parse_mode: "HTML", link_preview_options: { is_disabled: true } }
+  extra?: any
 ): Promise<void> {
   try {
     if ((ctx as any).menu && typeof (ctx as any).menu.update === "function") {
@@ -69,14 +74,19 @@ export async function safeEditMessageText(
         (ctx as any).menu.update();
       } catch {}
     }
+    const options: any = {
+      parse_mode: "HTML",
+      link_preview_options: { is_disabled: true },
+      ...(extra && extra.inline_keyboard ? { reply_markup: extra } : extra),
+    };
     const safeText = clampMessageText(toValidUtf8(text));
     try {
-      await ctx.editMessageText(safeText, extra);
+      await ctx.editMessageText(safeText, options);
     } catch (err: any) {
       const desc = err?.description || err?.message || "";
       if (desc.includes("DOCUMENT_INVALID") || desc.includes("CUSTOM_EMOJI_INVALID")) {
         const stripped = stripTgEmoji(safeText);
-        await ctx.editMessageText(stripped, extra);
+        await ctx.editMessageText(stripped, options);
         return;
       }
       throw err;

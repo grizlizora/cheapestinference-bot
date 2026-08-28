@@ -59,7 +59,7 @@
     "btn_custom_stars": "✍️ Custom ⭐",
     "prompt_custom_stars": "✍️ <b>Enter desired number of stars ({star_icon}):</b>\n\nSend a number as a message in this chat (e.g., <code>10</code>, <code>75</code>, <code>300</code>, <code>1000</code>).\n\n• <i>Minimum:</i> <b>1 {star_icon}</b>\n• <i>Maximum:</i> <b>10,000 {star_icon}</b>",
     "error_invalid_custom_stars": "⚠️ <b>Invalid number.</b> Please enter a whole number of stars between <b>1</b> and <b>10,000</b> (e.g., <code>50</code>):",
-    "confirm_custom_stars_title": "{star_icon} <b>Confirm Tip Amount</b>\n━━━━━━━━━━━━━━━━━━━━━━━━\n\nYou selected: <b>{stars} {star_icon} Telegram Stars</b>.\n\nProceed to payment?",
+    "confirm_custom_stars_title": "{star_icon} <b>Confirm Tip Amount</b>\n\nYou selected: <b>{stars} {star_icon} Telegram Stars</b>.\n\nProceed to payment?",
     "btn_confirm_pay": "✅ Confirm & Pay",
     "btn_cancel": "❌ Cancel",
     "invoice_title": "☕ Tip to Author ({stars} ⭐)",
