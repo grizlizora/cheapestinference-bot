@@ -180,24 +180,17 @@ export function createPoolDetailMenu(
       const blockIds = blocks.length > 0 ? blocks.map((b) => b.block_id) : DEFAULT_BLOCK_IDS;
       const isSubscribedToPool = subDao.isPoolSubscribed(ctx.user.id, slug, blockIds);
 
-      const availableBlocks = blocks.filter(
-        (b) => b.status === "available" || b.status === "limited"
-      );
+      const poolNameUpper = slug.toUpperCase();
+      const btnClaimLabel = ctx.lang === "uk"
+        ? `🚀 Оформити тариф ${poolNameUpper} на сайті`
+        : ctx.lang === "ru"
+        ? `🚀 Оформить тариф ${poolNameUpper} на сайте`
+        : `🚀 Claim ${poolNameUpper} on Website`;
 
-      if (availableBlocks.length > 0) {
-        for (const b of availableBlocks) {
-          const blockName = translate(ctx.lang, `common.block_${b.block_id}`) || b.block_id;
-          range.url(
-            `${ctx.t("alerts.btn_claim_slot")} (${blockName})`,
-            `https://cheapestinference.com/pools/${slug}#${b.block_id}`
-          ).row();
-        }
-      } else {
-        range.url(
-          ctx.t("common.open_site"),
-          `https://cheapestinference.com/pools/${slug}`
-        ).row();
-      }
+      range.url(
+        btnClaimLabel,
+        `https://cheapestinference.com/pools/${slug}`
+      ).row();
 
       // Toggle subscription for this pool
       range.text(

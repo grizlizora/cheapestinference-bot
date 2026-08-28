@@ -204,7 +204,6 @@ export function renderPoolDetailText(
     `• ${discountLabel} <b>${annualDiscountPct}%</b>\n\n` +
     `${icon("nav_clock")} <b>${blocksLabel}</b>\n` +
     `${blocksList}\n\n` +
-    `${icon("nav_link")} <a href="https://cheapestinference.com/pools/${slug}"><b>${urlText}</b></a>\n\n` +
     `${icon("nav_clock")} <i>${ctx.lang === "uk" ? "Дані перевірено" : ctx.lang === "ru" ? "Данные проверены" : "Verified at"}: ${footerStr}</i>`;
 
   return clampMessageText(fullText);

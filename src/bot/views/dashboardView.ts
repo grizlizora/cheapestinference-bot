@@ -94,14 +94,12 @@ export function renderDashboardText(
       const blocksFreeText = ctx.lang === "uk" ? "блоків вільно" : ctx.lang === "ru" ? "блоков свободно" : "blocks free";
       const modelsLabel = ctx.lang === "uk" ? "Моделі" : ctx.lang === "ru" ? "Модели" : "Models";
       const basePriceLabel = ctx.lang === "uk" ? "Базовий тариф: від" : ctx.lang === "ru" ? "Базовый тариф: от" : "Base price: from";
-      const urlText = ctx.lang === "uk" ? "Сторінка тарифу на сайті" : ctx.lang === "ru" ? "Страница тарифа на сайте" : "Plan page on website";
       const currencyMonth = ctx.t("common.currency_month") || "mo";
 
       return `${rank.iconsHtml} <b>${escapeHtml(rankTitle)}</b>\n` +
         `• ${statusLabel}: [ ${badgeInfo.capacityBarHtml} ] <b>${rawStatusText}</b> <i>(${p.available_count}/${p.total_blocks || 3} ${blocksFreeText})</i>\n` +
         `• ${modelsLabel}: <code>${modelsText}</code>\n` +
-        `• ${basePriceLabel} <b>$${p.min_price}/${currencyMonth}</b>\n` +
-        `${icon("nav_link")} <a href="https://cheapestinference.com/pools/${p.slug}">${urlText}</a>`;
+        `• ${basePriceLabel} <b>$${p.min_price}/${currencyMonth}</b>`;
     })
     .join("\n\n");
 
