@@ -155,8 +155,7 @@ export function renderPoolDetailText(
     lastVerifiedTs,
     ctx.lang,
     lastUserInteractionAt,
-    telemetry?.consecutiveFailures || 0,
-    telemetry?.lastScrapeLatencyMs || 140
+    telemetry?.consecutiveFailures || 0
   );
 
   const rank = POOL_RANKS[slug] || {
@@ -165,14 +164,12 @@ export function renderPoolDetailText(
     tagline: { [ctx.lang]: first.description },
   };
   const rankTitle = rank.tierName[ctx.lang] || first.pool_name;
-  const tagline = rank.tagline[ctx.lang] || first.description || "Unlimited AI inference pool";
 
   const totalBlocks = blocks.length || 3;
   const availableCount = blocks.filter((b) => b.status === "available" || b.status === "limited").length;
   const capacityBar = renderCapacityBar(availableCount, totalBlocks, "html");
 
   const capacityLabel = ctx.lang === "uk" ? "Місткість кластера" : ctx.lang === "ru" ? "Вместимость кластера" : "Cluster Capacity";
-  const descLabel = ctx.lang === "uk" ? "Опис:" : ctx.lang === "ru" ? "Описание:" : "Description:";
   const modelsLabel = ctx.lang === "uk" ? "Включені моделі (безліміт):" : ctx.lang === "ru" ? "Включенные модели (безлимит):" : "Included Models (unlimited):";
   const costLabel = ctx.lang === "uk" ? "Вартість:" : ctx.lang === "ru" ? "Стоимость:" : "Pricing:";
   const baseLabel = ctx.lang === "uk" ? "Базовий тариф: від" : ctx.lang === "ru" ? "Базовый тариф: от" : "Base rate: from";
@@ -184,8 +181,6 @@ export function renderPoolDetailText(
 
   const fullText = `${rank.iconsHtml} <b>${escapeHtml(rankTitle)}</b>\n` +
     `• ${capacityLabel}: [ ${capacityBar} ] <i>(${availableCount}/${totalBlocks} вільні)</i>\n\n` +
-    `${icon("event_tier_update")} <b>${descLabel}</b>\n` +
-    `<i>${escapeHtml(tagline)}</i>\n\n` +
     `${icon("ai_robot")} <b>${modelsLabel}</b>\n` +
     `${modelsList || "  • Custom open-weights models"}\n\n` +
     `${icon("price_money")} <b>${costLabel}</b>\n` +
@@ -194,7 +189,7 @@ export function renderPoolDetailText(
     `${icon("nav_clock")} <b>${blocksLabel}</b>\n` +
     `${blocksList}\n\n` +
     `${icon("nav_link")} <a href="https://cheapestinference.com/pools/${slug}"><b>${urlText}</b></a>\n\n` +
-    `${footerStr}`;
+    `${icon("nav_clock")} <i>${ctx.lang === "uk" ? "Дані перевірено" : ctx.lang === "ru" ? "Данные проверены" : "Verified at"}: ${footerStr}</i>`;
 
   return clampMessageText(fullText);
 }

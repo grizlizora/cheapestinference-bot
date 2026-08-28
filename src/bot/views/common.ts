@@ -97,8 +97,7 @@ export function formatMonitoringFooter(
   lastVerifiedTs: number | undefined,
   lang: string,
   lastUserInteractionAt?: number,
-  consecutiveFailures = 0,
-  latencyMs = 140
+  consecutiveFailures = 0
 ): string {
   const ts = lastVerifiedTs && lastVerifiedTs > 0 ? lastVerifiedTs : Date.now();
   const utcDateStr = new Date(ts).toISOString().replace("T", " ").substring(0, 19) + " UTC";
@@ -120,28 +119,26 @@ export function formatMonitoringFooter(
   const now = Date.now();
   const idleMs = lastUserInteractionAt ? Math.max(0, now - lastUserInteractionAt) : 0;
 
-  let modeTag = `${icon("status_live")} Live 5s`;
-  if (idleMs > 30 * 60 * 1000 && idleMs <= 24 * 60 * 60 * 1000) {
+  let modeTag = "";
+  if (idleMs <= 30 * 60 * 1000) {
+    modeTag = `${icon("status_live")} Live 5s`;
+  } else if (idleMs <= 24 * 60 * 60 * 1000) {
     const activeText = lang === "uk" ? "Моніторинг активний" : lang === "ru" ? "Мониторинг активен" : "Monitoring active";
     modeTag = `${icon("status_available")} ${activeText}`;
-  } else if (idleMs > 24 * 60 * 60 * 1000) {
+  } else {
     const standbyText = lang === "uk" ? "Режим очікування" : lang === "ru" ? "Режим ожидания" : "Standby";
     modeTag = `${icon("status_standby")} ${standbyText}`;
   }
 
-  const radarLabel = lang === "uk" ? "LIVE RADAR 24/7" : lang === "ru" ? "LIVE RADAR 24/7" : "LIVE RADAR 24/7";
-  const speedLabel = lang === "uk" ? "Швидкість" : lang === "ru" ? "Скорость" : "Latency";
-  const channelLabel = lang === "uk" ? "Захищений Tor/SOCKS5 канал" : lang === "ru" ? "Защищенный Tor/SOCKS5 канал" : "Encrypted Tor/SOCKS5 Pipeline";
-  const updatedLabel = lang === "uk" ? "Оновлено" : lang === "ru" ? "Обновлено" : "Verified";
-
-  let delayNotice = "";
+  let delayTag = "";
   if (consecutiveFailures > 0) {
-    const warn = lang === "uk" ? `[помилок: ${consecutiveFailures}]` : `[retries: ${consecutiveFailures}]`;
-    delayNotice = ` ${icon("status_delay")} <code>${warn}</code>`;
+    const warnText = lang === "uk"
+      ? `[затримка мережі, спроба ${consecutiveFailures}]`
+      : lang === "ru"
+      ? `[задержка сети, попытка ${consecutiveFailures}]`
+      : `[network delay, retry ${consecutiveFailures}]`;
+    delayTag = ` ${icon("status_delay")} ${warnText}`;
   }
 
-  return `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-    `🛰️ ${icon("status_available")} <b>${radarLabel}</b> • ${speedLabel}: ${icon("pool_frontier")} <b>${latencyMs}ms</b>\n` +
-    `${icon("rank_shield")} <b>${channelLabel}</b> • Режим: <b>${modeTag}</b>${delayNotice}\n` +
-    `${icon("nav_clock")} <i>${updatedLabel}: ${utcDateStr}${localDateStr}</i>`;
+  return `${utcDateStr}${localDateStr} (${modeTag})${delayTag}`;
 }

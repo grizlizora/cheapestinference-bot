@@ -62,8 +62,7 @@ export function renderDashboardText(
     lastVerifiedTs,
     ctx.lang,
     lastUserInteractionAt,
-    telemetry?.consecutiveFailures || 0,
-    telemetry?.lastScrapeLatencyMs || 140
+    telemetry?.consecutiveFailures || 0
   );
 
   if (summaries.length === 0) {
