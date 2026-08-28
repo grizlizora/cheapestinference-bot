@@ -136,3 +136,48 @@ export function renderSettingsText(ctx: BotContext): string {
 
   return clampMessageText(rendered);
 }
+
+export function renderChangeLanguageText(ctx: BotContext): string {
+  const title = ctx.lang === "uk"
+    ? "<b>Зміна мови інтерфейсу</b>\n\nОберіть зручну мову для роботи з ботом:"
+    : ctx.lang === "ru"
+    ? "<b>Смена языка интерфейса</b>\n\nВыберите удобный язык для работы с ботом:"
+    : "<b>Change Interface Language</b>\n\nSelect your preferred language for the bot:";
+
+  return `${icon("nav_language")} ${title}`;
+}
+
+export function renderHelpText(ctx: BotContext): string {
+  const idIcon = `<tg-emoji emoji-id="5422683699130933153">🪪</tg-emoji>`;
+  const guideIcon = icon("nav_guide");
+  const authorIcon = icon("nav_author");
+
+  if (ctx.lang === "uk") {
+    return `${guideIcon} <b>Як працює цей бот?</b>\n\n` +
+      `1. Бот цілодобово перевіряє сторінку <a href="https://cheapestinference.com/pools">cheapestinference.com/pools</a> через захищений анонімний Tor/проксі канал.\n` +
+      `2. Кожен тариф ділиться на три щоденні 8-годинні часові блоки (Азія, Європа, Америка).\n` +
+      `3. Ви можете переглядати актуальну наявність слотів у реальному часі за допомогою кнопок меню.\n` +
+      `4. У картці кожного тарифу (пулу) ви можете налаштувати персональні сповіщення на потрібні вам слоти або окремі регіони.\n` +
+      `5. Щойно слот з'являється — ви миттєво отримуєте повідомлення з прямим посиланням на покупку!\n\n` +
+      `${idIcon} <b>Ваш Telegram ID:</b> <code>${ctx.from?.id || "N/A"}</code>\n\n` +
+      `${authorIcon} <b>Зв'язок з автором / Підтримка:</b>\nTelegram: <a href="https://t.me/grizlizora">@grizlizora</a>`;
+  } else if (ctx.lang === "ru") {
+    return `${guideIcon} <b>Как работает этот бот?</b>\n\n` +
+      `1. Бот круглосуточно проверяет страницу <a href="https://cheapestinference.com/pools">cheapestinference.com/pools</a> через защищенный анонимный Tor/прокси канал.\n` +
+      `2. Каждый тариф делится на три ежедневных 8-часовых временных блока (Азия, Европа, Америка).\n` +
+      `3. Вы можете просматривать актуальное наличие слотов в реальном времени с помощью кнопок меню.\n` +
+      `4. В карточке каждого тарифа (пула) вы можете настроить персональные уведомления на нужные вам слоты или отдельные регионы.\n` +
+      `5. Как только слот появляется — вы мгновенно получаете сообщение с прямой ссылкой на покупку!\n\n` +
+      `${idIcon} <b>Ваш Telegram ID:</b> <code>${ctx.from?.id || "N/A"}</code>\n\n` +
+      `${authorIcon} <b>Связь с автором / Поддержка:</b>\nTelegram: <a href="https://t.me/grizlizora">@grizlizora</a>`;
+  } else {
+    return `${guideIcon} <b>How this bot works</b>\n\n` +
+      `1. The bot monitors <a href="https://cheapestinference.com/pools">cheapestinference.com/pools</a> 24/7 via resilient secure proxy channels.\n` +
+      `2. Each pool is partitioned into three daily 8-hour regional blocks (Asia, Europe, Americas).\n` +
+      `3. You can inspect live slot availability in real time via the menu buttons.\n` +
+      `4. In each pool card, you can configure granular alerts for specific slots or regions.\n` +
+      `5. As soon as a slot appears — you receive instant notifications with direct checkout links!\n\n` +
+      `${idIcon} <b>Your Telegram ID:</b> <code>${ctx.from?.id || "N/A"}</code>\n\n` +
+      `${authorIcon} <b>Contact Author / Support:</b>\nTelegram: <a href="https://t.me/grizlizora">@grizlizora</a>`;
+  }
+}

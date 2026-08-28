@@ -17,9 +17,9 @@ import { createBackupHandler, createUsersExportHandler, createHistoryExportHandl
 import { ActiveDashboardRegistry } from "../liveSync/dashboardRegistry.js";
 
 // Re-export presentation functions from view layer for 100% backward compatibility
-export { renderDashboardText, renderSettingsText, computePoolBadgeInfo } from "../views/dashboardView.js";
+export { renderDashboardText, renderSettingsText, renderChangeLanguageText, renderHelpText, computePoolBadgeInfo } from "../views/dashboardView.js";
 export { safeEditMessageText } from "../views/common.js";
-import { renderDashboardText, renderSettingsText, computePoolBadgeInfo } from "../views/dashboardView.js";
+import { renderDashboardText, renderSettingsText, renderChangeLanguageText, renderHelpText, computePoolBadgeInfo } from "../views/dashboardView.js";
 import { renderPoolDetailText } from "../views/poolDetailView.js";
 import { safeEditMessageText } from "../views/common.js";
 
@@ -186,7 +186,7 @@ export function createMainMenuHierarchy(
         if (ctx.chat) {
           dashboardRegistry?.updateView(ctx.chat.id, "other");
         }
-        await safeEditMessageText(ctx, ctx.t("onboarding.change_language_prompt"));
+        await safeEditMessageText(ctx, renderChangeLanguageText(ctx));
         return ctx.menu.nav("language-menu");
       }
     )
@@ -198,7 +198,7 @@ export function createMainMenuHierarchy(
         if (ctx.chat) {
           dashboardRegistry?.updateView(ctx.chat.id, "other");
         }
-        await safeEditMessageText(ctx, ctx.t("help_text", { telegram_id: String(ctx.from?.id || "N/A") }));
+        await safeEditMessageText(ctx, renderHelpText(ctx));
         return ctx.menu.nav("help-menu");
       }
     )

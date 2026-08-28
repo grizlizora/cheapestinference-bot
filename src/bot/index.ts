@@ -11,6 +11,7 @@ import { ProxyPool } from "../proxy/proxyPool.js";
 import {
   createMainMenuHierarchy,
   renderDashboardText,
+  renderHelpText,
 } from "./menus/mainDashboard.js";
 import { renderSubscriptionsText } from "./menus/subscriptions.js";
 import { createStartHandler } from "./handlers/start.js";
@@ -363,7 +364,7 @@ export function createTelegramBot(
       "https://t.me/grizlizora"
     );
     await ctx.reply(
-      ctx.t("help_text", { telegram_id: String(ctx.from?.id || "N/A") }),
+      renderHelpText(ctx),
       {
         parse_mode: "HTML",
         reply_markup: keyboard,
