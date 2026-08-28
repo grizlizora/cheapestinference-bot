@@ -234,7 +234,7 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     name: "3D DeepSeek Whale",
   },
   ai_claude: {
-    customEmojiId: "5472164874886846699",
+    customEmojiId: "5325547803936572038",
     unicodeFallback: "✨",
     name: "3D Claude Sparkle",
   },
