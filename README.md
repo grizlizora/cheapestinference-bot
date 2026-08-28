@@ -7,8 +7,9 @@
 [![grammY](https://img.shields.io/badge/grammY-Telegram%20Framework-2481CC?style=for-the-badge&logo=telegram&logoColor=white)](https://grammy.dev/)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL%20Mode-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
 [![Turso](https://img.shields.io/badge/Turso-Cloud%20Sync-00D2BA?style=for-the-badge&logo=sqlite&logoColor=white)](https://turso.tech/)
-[![Vitest](https://img.shields.io/badge/Vitest-152%20Tests%20Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)](https://vitest.dev/)
-[![Latency](https://img.shields.io/badge/Scrape%20Latency-48ms--65ms-success?style=for-the-badge&logo=lightning&logoColor=white)]()
+[![Vitest](https://img.shields.io/badge/Vitest-155%20Tests%20Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)](https://vitest.dev/)
+[![Latency](https://img.shields.io/badge/Live%20Origin%20API-240ms--280ms-success?style=for-the-badge&logo=lightning&logoColor=white)]()
+[![LiveSync](https://img.shields.io/badge/Telegram%20LiveSync-51ms--65ms-blue?style=for-the-badge&logo=telegram&logoColor=white)]()
 [![Tor](https://img.shields.io/badge/Tor%20Network-SOCKS5h-7D4698?style=for-the-badge&logo=torproject&logoColor=white)](https://www.torproject.org/)
 [![Stars](https://img.shields.io/badge/Telegram%20Stars-XTR%20Integrated-gold?style=for-the-badge&logo=telegram&logoColor=white)]()
 [![Docker](https://img.shields.io/badge/Docker-Alpine%20Multi--Stage-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
@@ -16,7 +17,7 @@
 
 <br />
 
-**⚡ Ultra-low-latency (48–65ms) 24/7 Telegram drop monitor & alert bot for [CheapestInference.com](https://cheapestinference.com/pools). Instant slot availability alerts with 1-click claim buttons, 3D animated Telegram Premium custom emoji system, 3-tier priority queue (Admins P0 ➔ Stars VIP Donors P1 ➔ Free Active P2), real-time price drop tracking, predictive availability ETA with Tukey IQR filtering, Turso Cloud Sync dual-mode persistence, and zero-lock SQLite.**
+**⚡ Real-time 24/7 drop monitor & Telegram alert bot for [CheapestInference.com](https://cheapestinference.com/pools). Direct live REST API backend integration with zero edge-cache lag, slot oscillation immunity ($K=2$ noise gate), instant slot availability alerts with 1-click claim buttons, 3D animated Telegram Premium custom emoji system, 3-tier priority queue (Admins P0 ➔ Stars VIP Donors P1 ➔ Free Active P2), real-time price drop tracking, predictive availability ETA with Tukey IQR filtering, Turso Cloud Sync dual-mode persistence, and zero-lock SQLite.**
 
 [🤖 Live Telegram Bot (@cheapestinference_bot)](https://t.me/cheapestinference_bot) • [🏛 Architecture Overview](#-system-architecture) • [📦 Supported Pools & Regional Blocks](#-supported-pools-tiers--regional-blocks) • [👨‍💻 Author & Contact](#-author--collaboration)
 
@@ -209,14 +210,15 @@ flowchart TD
 | Capability | Implementation Details | Performance / SLA |
 | :--- | :--- | :---: |
 | **Language & Runtime** | TypeScript 5.x / Node.js 20+ LTS / ES Modules | Type-Safe Strict Compilation |
-| **Scrape Latency** | Undici Persistent Pool + DNS Cache + Zero-Copy Regex | **48–65 ms** in Production |
+| **Backend REST API Latency** | Live Origin REST API + DNS Cache + Undici Connection Pool | **240–280 ms** Direct Origin |
+| **Telegram LiveSync Latency** | In-Place Dashboard Message Updates (Telegram API) | **51–65 ms** Real-Time Edits |
 | **Internal Matching Latency** | In-Memory Inverted Index ($O(1)$ Composite Hash Map) | **< 0.3 ms** (50k users) |
 | **Priority Queue Sorting** | 3-Tier Dial's Partition (Admin P0 ➔ Donors P1 ➔ Free P2) | **0 ms** dispatch overhead |
 | **Telegram Dispatch Rate** | Token Bucket Scheduler (27 msg/s, 1.05s per-chat gap) | **0% Telegram 429 Errors** |
-| **Cloud Persistence** | Dual-Mode: Local SQLite WAL + Turso Cloud Sync | **~600 ms** Cold Boot Restore |
+| **Cloud Persistence** | Dual-Mode: Local SQLite WAL + Turso Cloud Sync | **~500 ms** Cold Boot Restore |
 | **Memory Footprint** | Bounded Ring Buffers & Flat RAM Architecture | **< 45 MB Total Heap** |
 | **UI Experience** | 54 3D Custom Emojis, LiveSync In-Place Dashboards | **Zero Chat Spam** |
-| **Test Coverage** | 29 Test Suites, 152 Automated Unit & Simulation Tests | **100% Pass Rate** |
+| **Test Coverage** | 30 Test Suites, 155 Automated Unit & Simulation Tests | **100% Pass Rate** |
 
 ---
 
@@ -321,12 +323,12 @@ npm test
 ```
 
 ```
- Test Files  29 passed (29)
-      Tests  152 passed (152)
-   Duration  1.90s
+ Test Files  30 passed (30)
+      Tests  155 passed (155)
+   Duration  2.18s
 ```
 
-* **29 Test Suites**: Complete End-to-End Simulation (7 Stages), Strict 3-Tier Priority Ordering (P0 Admin ➔ P1 VIP Donors DESC ➔ P2 Free Active), Granular Multi-Tariff Event Isolation, Slot Diffing ($K=1$/$K=2$), Predictive Analytics & Outlier-Free IQR, Price Rating (ATL / Fair Value), Bipartite Model Matching, Tor Stream Isolation, In-Memory Inverted Index, Singleflight Polling, DWRR Scheduler, Live Dashboard Sync, Rate Limiting, Multi-Language i18n, Turso Cloud Sync Hydration, Telegram Stars (XTR) Custom Flow, and SQLite Migrations.
+* **30 Test Suites**: Complete End-to-End Simulation (7 Stages), Strict 3-Tier Priority Ordering (P0 Admin ➔ P1 VIP Donors DESC ➔ P2 Free Active), Granular Multi-Tariff Event Isolation, Slot Availability Oscillation Immunity ($K=2$ Noise Gate), Slot Diffing ($K=1$/$K=2$), Predictive Analytics & Outlier-Free IQR, Price Rating (ATL / Fair Value), Bipartite Model Matching, Tor Stream Isolation, In-Memory Inverted Index, Singleflight Polling, DWRR Scheduler, Live Dashboard Sync, Rate Limiting, Multi-Language i18n, Turso Cloud Sync Hydration, Telegram Stars (XTR) Custom Flow, and SQLite Migrations.
 
 ---
 
