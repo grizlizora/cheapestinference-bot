@@ -245,7 +245,7 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
   },
   ai_glm: {
     customEmojiId: "5217444336089714383",
-    unicodeFallback: "🧬",
+    unicodeFallback: "😖",
     name: "3D GLM Neural",
   },
   ai_llama: {
