@@ -117,6 +117,7 @@ export function initSchema(db: Database.Database): void {
     -- Microscopic partial index for active slots
     CREATE INDEX IF NOT EXISTS idx_slot_history_open ON slot_lifecycle_history(pool_slug, block_id) WHERE closed_at IS NULL;
     CREATE INDEX IF NOT EXISTS idx_slot_history_closed_at ON slot_lifecycle_history(closed_at) WHERE closed_at IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_slot_history_last_closed ON slot_lifecycle_history(pool_slug, block_id, closed_at DESC) WHERE closed_at IS NOT NULL;
     CREATE INDEX IF NOT EXISTS idx_slot_history_analytics_covering ON slot_lifecycle_history(pool_slug, block_id, duration_seconds, opened_at) WHERE duration_seconds IS NOT NULL;
     CREATE INDEX IF NOT EXISTS idx_slot_history_downtime_perf ON slot_lifecycle_history(pool_slug, block_id, opened_at ASC);
 

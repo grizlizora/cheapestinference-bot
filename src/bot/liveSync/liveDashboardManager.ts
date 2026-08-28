@@ -176,6 +176,12 @@ export class LiveDashboardManager {
       }
 
       this.lastChatEditTime.set(session.chatId, Date.now());
+      if (this.lastChatEditTime.size > 5000) {
+        const cutoff = Date.now() - 10 * 60 * 1000;
+        for (const [cId, t] of this.lastChatEditTime.entries()) {
+          if (t < cutoff) this.lastChatEditTime.delete(cId);
+        }
+      }
 
       const payload: Record<string, any> = {
         parse_mode: "HTML",

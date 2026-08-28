@@ -152,8 +152,11 @@ async function bootstrap() {
     }
   }
 
-  // Pre-warm HTTP socket connections
-  await httpClient.warmUp(["https://cheapestinference.com/pools", "https://cheapestinference.com/api/pools"]).catch(() => {});
+  // Pre-warm HTTP socket connections for both JSON API and HTML origins
+  await httpClient.warmUp([
+    "https://api.cheapestinference.com/api/pools",
+    "https://cheapestinference.com/pools",
+  ]).catch(() => {});
 
   console.log("🔍 [Warmup] Performing initial scrape to establish baseline catalog...");
   try {

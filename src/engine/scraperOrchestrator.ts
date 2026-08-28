@@ -276,6 +276,9 @@ export class ScraperOrchestrator extends EventEmitter {
           if (hedgeTimer) clearTimeout(hedgeTimer);
           htmlController.abort(); // Immediately cancel orphaned HTML fetch
           return res;
+        }).catch((err) => {
+          if (apiController.signal.aborted) return null as any;
+          throw err;
         }),
         hedgePromise.then((res) => {
           apiController.abort(); // Immediately cancel slow API fetch
@@ -283,7 +286,10 @@ export class ScraperOrchestrator extends EventEmitter {
         }).catch(async () => {
           return await apiPromise;
         }),
-      ]);
+      ]).then((res) => {
+        if (!res) throw new Error("API fetch cancelled by hedge race");
+        return res;
+      });
 
       if (hedgeTimer) clearTimeout(hedgeTimer);
 

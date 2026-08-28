@@ -3,6 +3,9 @@ import { RobustHttpClient } from "../http/client.js";
 import { PoolsSnapshot, ScrapeResult, PoolData } from "../types/domain.js";
 import { IFetcherEngine } from "./types.js";
 
+const PUSH_PREFIX_REGEX = /(?:(?:self|window|globalThis)\.__next_f|(?:\((?:self|window|globalThis)\.__next_f=(?:self|window|globalThis)\.__next_f\|\|\[\]\)))\.push\(\[\d+,\s*/g;
+const SLUG_REGEX = /"slug"\s*:\s*"(flagship|frontier|core|[\w-]+)"/g;
+
 export class HtmlSnapshotEngine implements IFetcherEngine {
   private readonly htmlUrl = "https://cheapestinference.com/pools";
 
@@ -135,10 +138,10 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
 
   public extractRscPayload(html: string): PoolData[] | null {
     const flightChunks: string[] = [];
-    const pushPrefixRegex = /(?:(?:self|window|globalThis)\.__next_f|(?:\((?:self|window|globalThis)\.__next_f=(?:self|window|globalThis)\.__next_f\|\|\[\]\)))\.push\(\[\d+,\s*/g;
+    PUSH_PREFIX_REGEX.lastIndex = 0;
     let match: RegExpExecArray | null;
 
-    while ((match = pushPrefixRegex.exec(html)) !== null) {
+    while ((match = PUSH_PREFIX_REGEX.exec(html)) !== null) {
       const startIndex = match.index + match[0].length;
       const firstChar = html[startIndex];
 
@@ -189,10 +192,10 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
     const combinedFlight = flightChunks.join("");
 
     const pools: PoolData[] = [];
-    const slugRegex = /"slug"\s*:\s*"(flagship|frontier|core|[\w-]+)"/g;
+    SLUG_REGEX.lastIndex = 0;
     let slugMatch: RegExpExecArray | null;
 
-    while ((slugMatch = slugRegex.exec(combinedFlight)) !== null) {
+    while ((slugMatch = SLUG_REGEX.exec(combinedFlight)) !== null) {
       let candidateIndex = slugMatch.index;
       let foundValidPool = false;
 

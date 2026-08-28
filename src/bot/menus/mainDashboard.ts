@@ -48,9 +48,12 @@ export function createMainMenuHierarchy(
           : ctx.t("admin.btn_toggle_new_users_off");
       },
       async (ctx) => {
-        if (!isUserAdmin(ctx.from?.id, userDao, ctx.from?.username)) return;
+        if (!isUserAdmin(ctx.from?.id, userDao, ctx.from?.username)) {
+          ctx.answerCallbackQuery({ text: ctx.t("admin.unauthorized", { telegram_id: String(ctx.from?.id || 0) }), show_alert: true }).catch(() => {});
+          return;
+        }
         const newVal = userDao.toggleAdminNewUsers(ctx.from!.id);
-        await ctx.answerCallbackQuery(
+        ctx.answerCallbackQuery(
           newVal === 1 ? ctx.t("admin.toast_new_users_on") : ctx.t("admin.toast_new_users_off")
         ).catch(() => {});
         if (scraper && proxyPool) {
@@ -63,8 +66,11 @@ export function createMainMenuHierarchy(
     .text(
       (ctx) => ctx.t("admin.btn_test_alert"),
       async (ctx) => {
-        if (!isUserAdmin(ctx.from?.id, userDao, ctx.from?.username) || !dispatcher) return;
-        await ctx.answerCallbackQuery({ text: ctx.t("admin.toast_test_alert_sent"), show_alert: false }).catch(() => {});
+        if (!isUserAdmin(ctx.from?.id, userDao, ctx.from?.username) || !dispatcher) {
+          ctx.answerCallbackQuery({ text: ctx.t("admin.unauthorized", { telegram_id: String(ctx.from?.id || 0) }), show_alert: true }).catch(() => {});
+          return;
+        }
+        ctx.answerCallbackQuery({ text: ctx.t("admin.toast_test_alert_sent"), show_alert: false }).catch(() => {});
         await dispatcher.sendTestAlert(ctx.from!.id, ctx.lang, "slot");
       }
     )
@@ -72,8 +78,11 @@ export function createMainMenuHierarchy(
     .text(
       (ctx) => ctx.t("admin.btn_export_users"),
       async (ctx) => {
-        if (!isUserAdmin(ctx.from?.id, userDao, ctx.from?.username)) return;
-        await ctx.answerCallbackQuery().catch(() => {});
+        if (!isUserAdmin(ctx.from?.id, userDao, ctx.from?.username)) {
+          ctx.answerCallbackQuery({ text: ctx.t("admin.unauthorized", { telegram_id: String(ctx.from?.id || 0) }), show_alert: true }).catch(() => {});
+          return;
+        }
+        ctx.answerCallbackQuery().catch(() => {});
         await createUsersExportHandler(userDao.db, userDao, subDao)(ctx);
       }
     )
@@ -81,8 +90,11 @@ export function createMainMenuHierarchy(
     .text(
       (ctx) => ctx.t("admin.btn_export_history"),
       async (ctx) => {
-        if (!isUserAdmin(ctx.from?.id, userDao, ctx.from?.username)) return;
-        await ctx.answerCallbackQuery().catch(() => {});
+        if (!isUserAdmin(ctx.from?.id, userDao, ctx.from?.username)) {
+          ctx.answerCallbackQuery({ text: ctx.t("admin.unauthorized", { telegram_id: String(ctx.from?.id || 0) }), show_alert: true }).catch(() => {});
+          return;
+        }
+        ctx.answerCallbackQuery().catch(() => {});
         await createHistoryExportHandler(userDao.db, userDao)(ctx);
       }
     )
@@ -90,8 +102,11 @@ export function createMainMenuHierarchy(
     .text(
       (ctx) => ctx.t("admin.btn_backup"),
       async (ctx) => {
-        if (!isUserAdmin(ctx.from?.id, userDao, ctx.from?.username)) return;
-        await ctx.answerCallbackQuery().catch(() => {});
+        if (!isUserAdmin(ctx.from?.id, userDao, ctx.from?.username)) {
+          ctx.answerCallbackQuery({ text: ctx.t("admin.unauthorized", { telegram_id: String(ctx.from?.id || 0) }), show_alert: true }).catch(() => {});
+          return;
+        }
+        ctx.answerCallbackQuery().catch(() => {});
         await createBackupHandler(userDao.db, userDao, subDao)(ctx);
       }
     )
@@ -99,8 +114,11 @@ export function createMainMenuHierarchy(
     .text(
       (ctx) => ctx.t("common.refresh"),
       async (ctx) => {
-        if (!isUserAdmin(ctx.from?.id, userDao, ctx.from?.username)) return;
-        await ctx.answerCallbackQuery({ text: ctx.t("common.refreshed_toast"), show_alert: false }).catch(() => {});
+        if (!isUserAdmin(ctx.from?.id, userDao, ctx.from?.username)) {
+          ctx.answerCallbackQuery({ text: ctx.t("admin.unauthorized", { telegram_id: String(ctx.from?.id || 0) }), show_alert: true }).catch(() => {});
+          return;
+        }
+        ctx.answerCallbackQuery({ text: ctx.t("common.refreshed_toast"), show_alert: false }).catch(() => {});
         if (scraper && proxyPool) {
           await safeEditMessageText(ctx, renderAdminText(ctx, userDao, subDao, scraper, proxyPool));
         }
@@ -245,7 +263,7 @@ export function createMainMenuHierarchy(
       (ctx) => ctx.t("common.refresh"),
       async (ctx) => {
         const startTime = Date.now();
-        await ctx.answerCallbackQuery({
+        ctx.answerCallbackQuery({
           text: ctx.t("common.refreshed_toast"),
           show_alert: false,
         }).catch(() => {});
@@ -273,10 +291,22 @@ export function createMainMenuHierarchy(
         try { ctx.menu.update(); } catch {}
       }
     )
+    .row()
+    .text(
+      (ctx) => ctx.t("menu.btn_subscriptions"),
+      async (ctx) => {
+        ctx.answerCallbackQuery().catch(() => {});
+        if (ctx.chat) {
+          dashboardRegistry?.updateView(ctx.chat.id, "subscriptions");
+        }
+        await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
+        return ctx.menu.nav("subscriptions-menu");
+      }
+    )
     .text(
       (ctx) => ctx.t("menu.btn_settings"),
       async (ctx) => {
-        await ctx.answerCallbackQuery().catch(() => {});
+        ctx.answerCallbackQuery().catch(() => {});
         if (ctx.chat) {
           dashboardRegistry?.updateView(ctx.chat.id, "settings");
         }

@@ -401,13 +401,25 @@ export class TursoCloudSync {
     }
   }
 
+  private static readonly MAX_PENDING_MUTATIONS = 10_000;
+
   /**
    * Enqueues a write mutation to be asynchronously pushed to Turso in the background
    */
   public pushMutation(sql: string, args: any[] = []): void {
     if (!this.isEnabled()) return;
 
+    if (this.pendingMutations.length >= TursoCloudSync.MAX_PENDING_MUTATIONS) {
+      this.pendingMutations.shift(); // Drop oldest to guarantee flat RAM bound
+    }
+
     this.pendingMutations.push({ sql, args });
+
+    // High-watermark: flush immediately if >= 100 mutations accumulated
+    if (this.pendingMutations.length >= 100) {
+      this.flush().catch(() => {});
+      return;
+    }
 
     if (!this.flushTimer) {
       this.flushTimer = setTimeout(() => {

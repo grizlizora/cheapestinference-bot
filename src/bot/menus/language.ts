@@ -27,7 +27,7 @@ export function createLanguageMenu(
     ctx.lang = lang;
     invertedIndex.updateUserPreferences(ctx.from!.id, { language: lang });
 
-    await ctx.answerCallbackQuery(toast).catch(() => {});
+    ctx.answerCallbackQuery(toast).catch(() => {});
 
     const msgId = ctx.callbackQuery?.message?.message_id;
     const pendingDeepLink = (ctx.session as any)?.pendingDeepLink;
@@ -85,7 +85,7 @@ export function createLanguageMenu(
     .text(
       (ctx) => ctx.t("common.back"),
       async (ctx) => {
-        await ctx.answerCallbackQuery().catch(() => {});
+        ctx.answerCallbackQuery().catch(() => {});
         const fromSettings = (ctx.session as any)?.fromSettings;
         if (fromSettings) {
           delete (ctx.session as any).fromSettings;

@@ -34,7 +34,7 @@ export function createSubscriptionsMenu(
   };
 
   return new Menu<BotContext>("subscriptions-menu")
-    // Row 1: Available Slots & Sold Out (2x2 Grid)
+    // Row 1: Available Slots & Sold-out Slots (2x2 Grid)
     .text(
       (ctx) =>
         (ctx.user.notify_available_global ?? 1) === 1
@@ -53,7 +53,7 @@ export function createSubscriptionsMenu(
           val === 1
             ? ctx.t("subscriptions.toast_avail_on")
             : ctx.t("subscriptions.toast_avail_off");
-        await ctx.answerCallbackQuery(toast).catch(() => {});
+        ctx.answerCallbackQuery(toast).catch(() => {});
         await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
       }
     )
@@ -75,7 +75,7 @@ export function createSubscriptionsMenu(
           val === 1
             ? ctx.t("subscriptions.toast_sold_on")
             : ctx.t("subscriptions.toast_sold_off");
-        await ctx.answerCallbackQuery(toast).catch(() => {});
+        ctx.answerCallbackQuery(toast).catch(() => {});
         await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
       }
     )
@@ -99,7 +99,7 @@ export function createSubscriptionsMenu(
           val === 1
             ? ctx.t("subscriptions.toast_models_on")
             : ctx.t("subscriptions.toast_models_off");
-        await ctx.answerCallbackQuery(toast).catch(() => {});
+        ctx.answerCallbackQuery(toast).catch(() => {});
         await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
       }
     )
@@ -121,7 +121,7 @@ export function createSubscriptionsMenu(
           val === 1
             ? ctx.t("subscriptions.toast_prices_on")
             : ctx.t("subscriptions.toast_prices_off");
-        await ctx.answerCallbackQuery(toast).catch(() => {});
+        ctx.answerCallbackQuery(toast).catch(() => {});
         await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
       }
     )
@@ -171,7 +171,7 @@ export function createSubscriptionsMenu(
         const toast = active
           ? ctx.t("subscriptions.toast_global_on")
           : ctx.t("subscriptions.toast_global_off");
-        await ctx.answerCallbackQuery(toast).catch(() => {});
+        ctx.answerCallbackQuery(toast).catch(() => {});
         await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
       }
     )
@@ -193,7 +193,7 @@ export function createSubscriptionsMenu(
           newMuted === 1
             ? ctx.t("subscriptions.toast_sound_muted")
             : ctx.t("subscriptions.toast_sound_enabled");
-        await ctx.answerCallbackQuery(toast).catch(() => {});
+        ctx.answerCallbackQuery(toast).catch(() => {});
         await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
       }
     )
@@ -253,7 +253,7 @@ export function createSubscriptionsMenu(
               const toast = active
                 ? c.t("subscriptions.toast_pool_on", { pool: pool.name })
                 : c.t("subscriptions.toast_pool_off", { pool: pool.name });
-              await c.answerCallbackQuery(toast).catch(() => {});
+              c.answerCallbackQuery(toast).catch(() => {});
               await safeEditMessageText(c, renderSubscriptionsText(c, subDao));
             }
           )
@@ -306,7 +306,7 @@ export function createSubscriptionsMenu(
                 const toast = active
                   ? c.t("subscriptions.toast_slot_on", { pool: pool.name, block: blockTitle })
                   : c.t("subscriptions.toast_slot_off", { pool: pool.name, block: blockTitle });
-                await c.answerCallbackQuery(toast).catch(() => {});
+                c.answerCallbackQuery(toast).catch(() => {});
                 await safeEditMessageText(c, renderSubscriptionsText(c, subDao));
               }
             )
@@ -317,7 +317,7 @@ export function createSubscriptionsMenu(
     .text(
       (ctx) => ctx.t("common.back"),
       async (ctx) => {
-        await ctx.answerCallbackQuery().catch(() => {});
+        ctx.answerCallbackQuery().catch(() => {});
         if (ctx.chat) {
           dashboardRegistry?.updateView(ctx.chat.id, "dashboard");
         }

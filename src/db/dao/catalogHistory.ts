@@ -8,6 +8,8 @@ export class CatalogHistoryDAO {
   private stmtInsertTierUpdate: Database.Statement;
   private stmtInsertBasePriceUpdate: Database.Statement;
   private stmtInsertSlotPriceHistory: Database.Statement;
+  private stmtGetBlockPriceAnalytics: Database.Statement;
+  private stmtGetPoolPriceAnalytics: Database.Statement;
 
   constructor(private db: Database.Database) {
     this.stmtInsertModelUpgrade = db.prepare(`
@@ -45,6 +47,26 @@ export class CatalogHistoryDAO {
         @pool_slug, @block_id, @old_price, @new_price, @new_price_num, @price_delta, @percent_delta, CURRENT_TIMESTAMP
       )
     `);
+
+    this.stmtGetBlockPriceAnalytics = db.prepare(`
+      SELECT 
+        COUNT(*) as count,
+        MIN(CASE WHEN new_price_num > 0 THEN new_price_num ELSE CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL) END) as min_p,
+        MAX(CASE WHEN new_price_num > 0 THEN new_price_num ELSE CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL) END) as max_p,
+        AVG(CASE WHEN new_price_num > 0 THEN new_price_num ELSE CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL) END) as avg_p
+      FROM slot_price_history
+      WHERE pool_slug = ? AND block_id = ? AND (new_price_num > 0 OR new_price != '')
+    `);
+
+    this.stmtGetPoolPriceAnalytics = db.prepare(`
+      SELECT 
+        COUNT(*) as count,
+        MIN(CASE WHEN new_price_num > 0 THEN new_price_num ELSE CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL) END) as min_p,
+        MAX(CASE WHEN new_price_num > 0 THEN new_price_num ELSE CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL) END) as max_p,
+        AVG(CASE WHEN new_price_num > 0 THEN new_price_num ELSE CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL) END) as avg_p
+      FROM slot_price_history
+      WHERE pool_slug = ? AND (new_price_num > 0 OR new_price != '')
+    `);
   }
 
   public recordModelUpgrade(diff: ModelCatalogDiff): void {
@@ -58,8 +80,7 @@ export class CatalogHistoryDAO {
     });
     tursoCloudSync.pushMutation(
       `INSERT INTO catalog_history (
-        pool_slug, pool_name, event_type, added_models_json, 
-        upgraded_models_json, removed_models_json, all_models_json, detected_at
+        pool_slug, pool_name, event_type, added_models_json, upgraded_models_json, removed_models_json, all_models_json, detected_at
       ) VALUES (?, ?, 'MODEL_UPGRADE', ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
       [
         diff.poolSlug,
@@ -72,52 +93,73 @@ export class CatalogHistoryDAO {
     );
   }
 
-  public recordTierUpdate(
-    poolSlug: string,
-    poolName: string,
-    models: string[],
-    payload: TierUpdatedPayload
-  ): void {
+  public recordTierUpdate(poolSlug: string, poolName: string, allModels: string[], payload: TierUpdatedPayload): void {
     this.stmtInsertTierUpdate.run({
       pool_slug: poolSlug,
       pool_name: poolName,
-      all_models: JSON.stringify(models),
-      metadata: JSON.stringify(payload),
+      all_models: JSON.stringify(allModels),
+      metadata: JSON.stringify({
+        previousDescription: payload.previousDescription,
+        newDescription: payload.newDescription,
+        previousAnnualDiscount: payload.previousAnnualDiscount,
+        newAnnualDiscount: payload.newAnnualDiscount,
+        previousInfraSpec: payload.previousInfraSpec,
+        newInfraSpec: payload.newInfraSpec,
+        previousManualProvisioning: payload.previousManualProvisioning,
+        newManualProvisioning: payload.newManualProvisioning,
+      }),
     });
     tursoCloudSync.pushMutation(
       `INSERT INTO catalog_history (
         pool_slug, pool_name, event_type, all_models_json, metadata_json, detected_at
       ) VALUES (?, ?, 'TIER_UPDATE', ?, ?, CURRENT_TIMESTAMP)`,
-      [poolSlug, poolName, JSON.stringify(models), JSON.stringify(payload)]
+      [
+        poolSlug,
+        poolName,
+        JSON.stringify(allModels),
+        JSON.stringify({
+          previousDescription: payload.previousDescription,
+          newDescription: payload.newDescription,
+          previousAnnualDiscount: payload.previousAnnualDiscount,
+          newAnnualDiscount: payload.newAnnualDiscount,
+          previousInfraSpec: payload.previousInfraSpec,
+          newInfraSpec: payload.newInfraSpec,
+          previousManualProvisioning: payload.previousManualProvisioning,
+          newManualProvisioning: payload.newManualProvisioning,
+        }),
+      ]
     );
   }
 
-  public recordBasePriceUpdate(
-    poolSlug: string,
-    poolName: string,
-    models: string[],
-    payload: PoolBasePricePayload
-  ): void {
+  public recordBasePriceUpdate(poolSlug: string, poolName: string, allModels: string[], payload: PoolBasePricePayload): void {
+    const isDiscount = payload.priceDelta < 0;
     this.stmtInsertBasePriceUpdate.run({
       pool_slug: poolSlug,
       pool_name: poolName,
-      all_models: JSON.stringify(models),
+      all_models: JSON.stringify(allModels),
       old_price: payload.previousMinPrice,
       new_price: payload.newMinPrice,
-      metadata: JSON.stringify(payload),
+      metadata: JSON.stringify({
+        priceDelta: payload.priceDelta,
+        percentageDelta: payload.percentageDelta,
+        isDiscount,
+      }),
     });
     tursoCloudSync.pushMutation(
       `INSERT INTO catalog_history (
-        pool_slug, pool_name, event_type, all_models_json,
-        previous_min_price, new_min_price, metadata_json, detected_at
+        pool_slug, pool_name, event_type, all_models_json, previous_min_price, new_min_price, metadata_json, detected_at
       ) VALUES (?, ?, 'BASE_PRICE', ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
       [
         poolSlug,
         poolName,
-        JSON.stringify(models),
+        JSON.stringify(allModels),
         payload.previousMinPrice,
         payload.newMinPrice,
-        JSON.stringify(payload),
+        JSON.stringify({
+          priceDelta: payload.priceDelta,
+          percentageDelta: payload.percentageDelta,
+          isDiscount,
+        }),
       ]
     );
   }
@@ -130,8 +172,8 @@ export class CatalogHistoryDAO {
     priceDelta: number,
     percentDelta: number
   ): void {
-    const match = String(newPrice).match(/[-+]?\d+(?:\.\d+)?/);
-    const newPriceNum = match ? parseFloat(match[0]) : 0;
+    const parseNum = (v: string) => parseFloat(String(v).replace(/[^0-9.-]/g, "")) || 0;
+    const newPriceNum = parseNum(newPrice);
 
     this.stmtInsertSlotPriceHistory.run({
       pool_slug: poolSlug,
@@ -157,29 +199,9 @@ export class CatalogHistoryDAO {
   public getPriceAnalytics(poolSlug: string, blockId?: string, currentPrice?: number): PriceAnalyticsPayload {
     let row: any;
     if (blockId && blockId !== "ALL") {
-      row = this.db
-        .prepare(`
-          SELECT 
-            COUNT(*) as count,
-            MIN(CASE WHEN new_price_num > 0 THEN new_price_num ELSE CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL) END) as min_p,
-            MAX(CASE WHEN new_price_num > 0 THEN new_price_num ELSE CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL) END) as max_p,
-            AVG(CASE WHEN new_price_num > 0 THEN new_price_num ELSE CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL) END) as avg_p
-          FROM slot_price_history
-          WHERE pool_slug = ? AND block_id = ? AND (new_price_num > 0 OR new_price != '')
-        `)
-        .get(poolSlug, blockId);
+      row = this.stmtGetBlockPriceAnalytics.get(poolSlug, blockId);
     } else {
-      row = this.db
-        .prepare(`
-          SELECT 
-            COUNT(*) as count,
-            MIN(CASE WHEN new_price_num > 0 THEN new_price_num ELSE CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL) END) as min_p,
-            MAX(CASE WHEN new_price_num > 0 THEN new_price_num ELSE CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL) END) as max_p,
-            AVG(CASE WHEN new_price_num > 0 THEN new_price_num ELSE CAST(REPLACE(REPLACE(new_price, '$', ''), ',', '') AS REAL) END) as avg_p
-          FROM slot_price_history
-          WHERE pool_slug = ? AND (new_price_num > 0 OR new_price != '')
-        `)
-        .get(poolSlug);
+      row = this.stmtGetPoolPriceAnalytics.get(poolSlug);
     }
 
     const count = Number(row?.count || 0);

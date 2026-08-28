@@ -59,7 +59,10 @@ export class TlsSessionTicketCache {
   }
 }
 
-export function createDirectUndiciAgent(config?: UndiciPoolConfig): Agent {
+export function createDirectUndiciAgent(
+  config?: UndiciPoolConfig,
+  tlsCache?: TlsSessionTicketCache
+): Agent {
   return new Agent({
     connect: {
       timeout: config?.connectTimeoutMs ?? 8_000,
@@ -69,7 +72,13 @@ export function createDirectUndiciAgent(config?: UndiciPoolConfig): Agent {
       keepAlive: true,
       keepAliveInitialDelay: 1000,
       noDelay: true,
-    },
+      maxCachedSessions: 100,
+      tls: tlsCache
+        ? {
+            session: (host: string) => tlsCache.get(host),
+          }
+        : undefined,
+    } as any,
     keepAliveTimeout: config?.keepAliveTimeoutMs ?? 45_000,
     keepAliveMaxTimeout: config?.keepAliveMaxTimeoutMs ?? 55_000,
     keepAliveTimeoutThreshold: 1000,
@@ -209,7 +218,12 @@ export function createHttpProxyAgent(
 ): ProxyAgent {
   return new ProxyAgent({
     uri: proxyUrl,
-    connect: { timeout: timeoutMs },
+    connect: {
+      timeout: timeoutMs,
+      lookup: defaultDnsCache.lookup as any,
+      noDelay: true,
+      keepAlive: true,
+    } as any,
     keepAliveTimeout: config?.keepAliveTimeoutMs ?? 45_000,
     keepAliveMaxTimeout: config?.keepAliveMaxTimeoutMs ?? 55_000,
     connections: config?.maxConnections ?? 8,
@@ -225,7 +239,7 @@ export class UndiciDispatcherPool {
   constructor(private readonly config?: UndiciPoolConfig) {
     this.maxCached = config?.maxCachedDispatchers ?? 10;
     this.tlsCache = new TlsSessionTicketCache();
-    this.directAgent = createDirectUndiciAgent(config);
+    this.directAgent = createDirectUndiciAgent(config, this.tlsCache);
   }
 
   public getDirectDispatcher(): Dispatcher {
