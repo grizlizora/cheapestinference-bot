@@ -103,6 +103,20 @@ function resolveBlockName(eventBlock: string, lang: SupportedLanguage): string {
   return eventBlock;
 }
 
+function getRegionIcon(block: string): string {
+  const lower = (block || "").toLowerCase();
+  if (lower.includes("asia") || lower.includes("азія") || lower.includes("азия")) {
+    return icon("region_asia");
+  }
+  if (lower.includes("europe") || lower.includes("європа") || lower.includes("европа")) {
+    return icon("region_europe");
+  }
+  if (lower.includes("america") || lower.includes("америка")) {
+    return icon("region_americas");
+  }
+  return icon("nav_language");
+}
+
 export function formatAlertMessage(
   user: PackedUserProfile,
   event: DiffEvent,
@@ -136,16 +150,26 @@ export function formatAlertMessage(
     });
     const header = `${icon("event_slot_drop")} ${stripLeadingEmoji(rawHeader)}`;
 
-    const body = translate(lang, "alerts.slot_appeared_body", {
-      pool_name: escapeHtml(event.poolName),
-      block_name: escapeHtml(blockName),
-      hours_utc: escapeHtml(event.hoursUtc),
-      models: (event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", "),
-      price: escapeHtml(cleanPriceString(event.newPrice)),
-      currency_month: currencyMonth,
-      status_badge: statusBadge,
-      timestamp: timeFormatted,
-    });
+    const regionLabel = lang === "uk" ? "Регіон" : lang === "ru" ? "Регион" : "Region";
+    const statusLabel = lang === "uk" ? "Статус" : lang === "ru" ? "Статус" : "Status";
+    const modelsLabel = lang === "uk" ? "Моделі" : lang === "ru" ? "Модели" : "Models";
+    const costLabel = lang === "uk" ? "Вартість" : lang === "ru" ? "Стоимость" : "Price";
+    const timeLabel = lang === "uk" ? "Час" : lang === "ru" ? "Время" : "Time";
+    const calloutText = lang === "uk"
+      ? "Слоти розбирають за хвилини! Забронюйте за кнопкою нижче:"
+      : lang === "ru"
+      ? "Слоты разбирают за минуты! Забронируйте по кнопке ниже:"
+      : "Slots sell out fast! Claim using the button below:";
+
+    const hoursText = event.hoursUtc ? ` <code>(${escapeHtml(event.hoursUtc)})</code>` : "";
+    const modelsList = (event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ");
+
+    const body = `${getRegionIcon(event.block)} <b>${regionLabel}:</b> ${escapeHtml(blockName)}${hoursText}\n` +
+      `${icon("nav_chart")} <b>${statusLabel}:</b> ${statusBadge}\n` +
+      `${icon("ai_robot")} <b>${modelsLabel}:</b> ${modelsList}\n` +
+      `${icon("price_money")} <b>${costLabel}:</b> <code>$${cleanPriceString(event.newPrice)}/${currencyMonth}</code>\n` +
+      `${icon("nav_clock")} <b>${timeLabel}:</b> <code>${timeFormatted} UTC</code>\n\n` +
+      `${icon("event_slot_drop")} <i>${calloutText}</i>`;
 
     text = `${header}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${body}`;
 
@@ -179,11 +203,18 @@ export function formatAlertMessage(
       pool_name: escapeHtml(event.poolName),
     });
     const header = `${icon("event_slot_sold")} ${stripLeadingEmoji(rawHeader)}`;
-    let body = translate(lang, "alerts.slot_disappeared_body", {
-      pool_name: escapeHtml(event.poolName),
-      block_name: escapeHtml(blockName),
-      timestamp: timeFormatted,
-    });
+
+    const regionLabel = lang === "uk" ? "Регіон" : lang === "ru" ? "Регион" : "Region";
+    const closeTimeLabel = lang === "uk" ? "Час закриття" : lang === "ru" ? "Время закрытия" : "Closed at";
+    const botNotifyText = lang === "uk"
+      ? "Бот миттєво сповістить вас, щойно слот знову стане доступним!"
+      : lang === "ru"
+      ? "Бот моментально оповестит вас, как только слот снова станет доступен!"
+      : "You will be alerted instantly as soon as a slot re-opens!";
+
+    let body = `${getRegionIcon(event.block)} <b>${regionLabel}:</b> ${escapeHtml(blockName)}\n` +
+      `${icon("nav_clock")} <b>${closeTimeLabel}:</b> <code>${timeFormatted} UTC</code>\n\n` +
+      `${icon("notify_bell_on")} <i>${botNotifyText}</i>`;
 
     const eta = event.analytics?.eta;
     if (eta) {
@@ -244,16 +275,27 @@ export function formatAlertMessage(
     }
 
     const allModelsList = (event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ");
+    const updatedModelsTitle = lang === "uk"
+      ? `У пулі оновлено конфігурацію нейромереж:`
+      : lang === "ru"
+      ? `В пуле обновлена конфигурация нейросетей:`
+      : `Neural network configuration updated:`;
+    const allModelsLabel = lang === "uk"
+      ? `Усі активні моделі (${(event.models || []).length}):`
+      : lang === "ru"
+      ? `Все активные модели (${(event.models || []).length}):`
+      : `All active models (${(event.models || []).length}):`;
+    const upgradeFreeText = lang === "uk"
+      ? "Оновлені моделі доступні за поточною підпискою без доплат!"
+      : lang === "ru"
+      ? "Обновленные модели доступны по текущей подписке без доплат!"
+      : "Upgraded models are available under existing plan at no extra charge!";
 
-    const body = translate(lang, "alerts.model_upgrade_body", {
-      pool_name: escapeHtml(event.poolName),
-      model_diff_block:
-        diffLines.length > 0
-          ? diffLines.join("\n")
-          : "• " + allModelsList,
-      all_models: allModelsList,
-      model_count: (event.models || []).length,
-    });
+    const body = `${updatedModelsTitle}\n\n` +
+      `${diffLines.length > 0 ? diffLines.join("\n") : "• " + allModelsList}\n\n` +
+      `${icon("ai_robot")} <b>${allModelsLabel}</b>\n` +
+      `${allModelsList}\n\n` +
+      `${icon("event_slot_drop")} <i>${upgradeFreeText}</i>`;
 
     text = `${header}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${body}`;
     keyboard = new InlineKeyboard().url(
@@ -277,15 +319,21 @@ export function formatAlertMessage(
     const newPriceNum = parseFloat(cleanNewPrice) || 0;
     const ratingBadge = formatPriceRatingBadge(event.slotPrice?.priceAnalytics, newPriceNum, lang);
 
-    const body = translate(lang, "alerts.slot_price_changed_body", {
-      pool_name: escapeHtml(event.poolName),
-      block_name: escapeHtml(blockName),
-      old_price: escapeHtml(cleanPriceString(event.previousPrice)),
-      new_price: escapeHtml(cleanNewPrice),
-      currency_month: currencyMonth,
-      delta_badge: deltaBadge + (ratingBadge ? `\n${ratingBadge}` : ""),
-      hours_utc: escapeHtml(event.hoursUtc),
-    });
+    const regionLabel = lang === "uk" ? "Регіон" : lang === "ru" ? "Регион" : "Region";
+    const priceLabel = lang === "uk" ? "Ціна слота" : lang === "ru" ? "Цена слота" : "Slot Price";
+    const lockPriceText = lang === "uk"
+      ? "Зафіксувати ціну можна за посиланням нижче:"
+      : lang === "ru"
+      ? "Зафиксировать цену можно по ссылке ниже:"
+      : "Lock in this rate via the button below:";
+
+    const hoursText = event.hoursUtc ? ` <code>(${escapeHtml(event.hoursUtc)})</code>` : "";
+    const cleanOld = cleanPriceString(event.previousPrice);
+
+    const body = `${getRegionIcon(event.block)} <b>${regionLabel}:</b> ${escapeHtml(blockName)}${hoursText}\n` +
+      `${icon("price_money")} <b>${priceLabel}:</b> <s>$${cleanOld}</s> ➔ <b>$${cleanNewPrice}/${currencyMonth}</b>\n` +
+      `${deltaBadge}${ratingBadge ? `\n${ratingBadge}` : ""}\n\n` +
+      `${icon("nav_link")} <i>${lockPriceText}</i>`;
 
     text = `${header}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${body}`;
 
@@ -313,14 +361,21 @@ export function formatAlertMessage(
     const newPriceNum = parseFloat(cleanNewPrice) || 0;
     const ratingBadge = formatPriceRatingBadge(event.basePrice?.priceAnalytics, newPriceNum, lang);
 
-    const body = translate(lang, "alerts.pool_base_price_body", {
-      pool_name: escapeHtml(event.poolName),
-      old_price: escapeHtml(cleanPriceString(event.previousPrice)),
-      new_price: escapeHtml(cleanNewPrice),
-      currency_month: currencyMonth,
-      delta_badge: deltaBadge + (ratingBadge ? `\n${ratingBadge}` : ""),
-      models: (event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", "),
-    });
+    const baseLabel = lang === "uk" ? "Базовий тариф пулу" : lang === "ru" ? "Базовый тариф пула" : "Pool Base Rate";
+    const modelsLabel = lang === "uk" ? "Моделі" : lang === "ru" ? "Модели" : "Models";
+    const allSubsText = lang === "uk"
+      ? "Ціна поширюється на всі нові підписки цього тарифу!"
+      : lang === "ru"
+      ? "Цена действует для всех новых подписок этого тарифа!"
+      : "Applies to all new subscriptions for this pool!";
+
+    const cleanOld = cleanPriceString(event.previousPrice);
+    const modelsList = (event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ");
+
+    const body = `${icon("price_money")} <b>${baseLabel}:</b> <s>$${cleanOld}</s> ➔ <b>$${cleanNewPrice}/${currencyMonth}</b>\n` +
+      `${deltaBadge}${ratingBadge ? `\n${ratingBadge}` : ""}\n` +
+      `${icon("ai_robot")} <b>${modelsLabel}:</b> ${modelsList}\n\n` +
+      `${icon("event_slot_drop")} <i>${allSubsText}</i>`;
 
     text = `${header}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${body}`;
     keyboard = new InlineKeyboard().url(
@@ -374,11 +429,9 @@ export function formatAlertMessage(
       );
     }
 
-    const body = translate(lang, "alerts.tier_updated_body", {
-      pool_name: escapeHtml(event.poolName),
-      tier_diff_block: diffLines.join("\n"),
-      timestamp: timeFormatted,
-    });
+    const timeLabel = lang === "uk" ? "Час" : lang === "ru" ? "Время" : "Time";
+    const body = `${diffLines.join("\n")}\n\n` +
+      `${icon("nav_clock")} <b>${timeLabel}:</b> <code>${timeFormatted} UTC</code>`;
 
     text = `${header}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${body}`;
     keyboard = new InlineKeyboard().url(
@@ -390,13 +443,28 @@ export function formatAlertMessage(
       pool_name: escapeHtml(event.poolName),
     });
     const header = `${icon("event_new_pool")} ${stripLeadingEmoji(rawHeader)}`;
-    const body = translate(lang, "alerts.new_pool_body", {
-      pool_name: escapeHtml(event.poolName),
-      models: (event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", "),
-      min_price: escapeHtml(cleanPriceString(event.newPrice)),
-      currency_month: currencyMonth,
-      description: escapeHtml((event.metadata?.description as string) || "High-performance compute pool"),
-    });
+
+    const newPoolDesc = lang === "uk"
+      ? "На платформі CheapestInference запущено новий пул!"
+      : lang === "ru"
+      ? "На платформе CheapestInference запущен новый пул!"
+      : "A new compute pool has launched on CheapestInference!";
+    const modelsLabel = lang === "uk" ? "Моделі" : lang === "ru" ? "Модели" : "Models";
+    const costLabel = lang === "uk" ? "Вартість" : lang === "ru" ? "Стоимость" : "Pricing";
+    const descLabel = lang === "uk" ? "Опис" : lang === "ru" ? "Описание" : "Description";
+    const autoSubText = lang === "uk"
+      ? "Пул автоматично підключено до моніторингу та меню сповіщень!"
+      : lang === "ru"
+      ? "Пул автоматически подключен к мониторингу и меню уведомлений!"
+      : "Pool is automatically connected to live monitoring and alerts!";
+
+    const modelsList = (event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ");
+
+    const body = `${newPoolDesc}\n\n` +
+      `${icon("ai_robot")} <b>${modelsLabel}:</b> ${modelsList}\n` +
+      `${icon("price_money")} <b>${costLabel}:</b> від <code>$${cleanPriceString(event.newPrice)}/${currencyMonth}</code>\n` +
+      `${icon("event_tier_update")} <b>${descLabel}:</b> <i>${escapeHtml((event.metadata?.description as string) || "High-performance compute pool")}</i>\n\n` +
+      `${icon("event_slot_drop")} <i>${autoSubText}</i>`;
 
     text = `${header}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${body}`;
     keyboard = new InlineKeyboard().url(
@@ -462,8 +530,8 @@ export function formatBundledAlertMessage(
         : "";
       sectionLines.push(
         `${icon("status_available")} <b>${escapeHtml(event.poolName)} • ${escapeHtml(blockName)}</b>${lifespanBadge}\n` +
-        `💰 <code>$${escapeHtml(cleanPrice)}/${currencyMonth}</code> | 🕒 <code>${escapeHtml(event.hoursUtc)}</code>\n` +
-        `🤖 ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
+        `${icon("price_money")} <code>$${escapeHtml(cleanPrice)}/${currencyMonth}</code> | ${icon("nav_clock")} <code>${escapeHtml(event.hoursUtc)}</code>\n` +
+        `${icon("ai_robot")} ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
       );
 
       if (buttonCount < 3) {
@@ -484,7 +552,7 @@ export function formatBundledAlertMessage(
       const upgradeTitle = translate(lang, "alerts.bundle_title_models") || "Model Upgrade";
       sectionLines.push(
         `${icon("event_model_upgrade")} <b>${escapeHtml(event.poolName)} • ${upgradeTitle}</b>\n` +
-        `🤖 ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
+        `${icon("ai_robot")} ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
       );
     } else if (event.type === "SLOT_PRICE_CHANGED") {
       const deltaStr = event.slotPrice
@@ -492,10 +560,10 @@ export function formatBundledAlertMessage(
         : "";
       const cleanOld = cleanPriceString(event.previousPrice);
       const cleanNew = cleanPriceString(event.newPrice);
-      const hoursStr = event.hoursUtc ? ` | 🕒 <code>${escapeHtml(event.hoursUtc)}</code>` : "";
+      const hoursStr = event.hoursUtc ? ` | ${icon("nav_clock")} <code>${escapeHtml(event.hoursUtc)}</code>` : "";
       sectionLines.push(
         `${icon("price_tag")} <b>${escapeHtml(event.poolName)} • ${escapeHtml(blockName)}</b>\n` +
-        `💰 <s>$${escapeHtml(cleanOld)}</s> ➔ <b>$${escapeHtml(cleanNew)}/${currencyMonth}</b>${deltaStr}${hoursStr}`
+        `${icon("price_money")} <s>$${escapeHtml(cleanOld)}</s> ➔ <b>$${escapeHtml(cleanNew)}/${currencyMonth}</b>${deltaStr}${hoursStr}`
       );
       if (buttonCount < 3) {
         const btnLabel = `🏷 ${event.poolSlug.toUpperCase()} (${blockName}) • $${cleanNew}`;
@@ -511,8 +579,8 @@ export function formatBundledAlertMessage(
       const tariffBadge = translate(lang, "alerts.bundle_title_base_price") || "Base Tariff";
       sectionLines.push(
         `${icon("price_money")} <b>${escapeHtml(event.poolName)} • ${tariffBadge}</b>\n` +
-        `💵 <s>$${escapeHtml(cleanOld)}</s> ➔ <b>$${escapeHtml(cleanNew)}/${currencyMonth}</b>${deltaStr}\n` +
-        `🤖 ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
+        `${icon("price_dollar")} <s>$${escapeHtml(cleanOld)}</s> ➔ <b>$${escapeHtml(cleanNew)}/${currencyMonth}</b>${deltaStr}\n` +
+        `${icon("ai_robot")} ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
       );
       if (buttonCount < 3) {
         const btnLabel = `💰 ${event.poolSlug.toUpperCase()} • $${cleanNew}`;
