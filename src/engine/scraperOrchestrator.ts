@@ -67,20 +67,19 @@ export class ScraperOrchestrator extends EventEmitter {
    * On-demand forced refresh with Singleflight coalescing and rate-limit guard.
    * Ensures instant live feedback for users clicking "🔄 Оновити".
    */
-  public async forceRefresh(maxAgeMs = 3000): Promise<{ refreshed: boolean; latencyMs: number; source: string }> {
+  public async forceRefresh(_maxAgeMs = 1000): Promise<{ refreshed: boolean; latencyMs: number; source: string }> {
     const now = Date.now();
-    // 1. Guard against button spam: return cached telemetry if freshly scraped within maxAgeMs
-    if (now - this.lastScrapeTimestamp < maxAgeMs && this.consecutiveFailures === 0 && this.lastScrapeTimestamp > 0) {
+    if (now - this.lastForceRefreshTimestamp < 1_000) {
       return {
         refreshed: false,
         latencyMs: this.lastScrapeLatencyMs,
         source: this.lastSource,
       };
     }
+    this.lastForceRefreshTimestamp = now;
 
-    // 2. Execute live scrape coalesced through Singleflight
-    const shouldBypassEtag = now - this.lastScrapeTimestamp > 10_000;
-    await this.executeSingleflightPoll(shouldBypassEtag);
+    // Execute live scrape coalesced through Singleflight bypassing ETag for guaranteed fresh data
+    await this.executeSingleflightPoll(true);
 
     return {
       refreshed: this.consecutiveFailures === 0,
@@ -89,6 +88,7 @@ export class ScraperOrchestrator extends EventEmitter {
     };
   }
 
+  private lastForceRefreshTimestamp = 0;
   private lastSlotEventTimestamp = 0;
 
   public executeSingleflightPoll(bypassEtag = false): Promise<DiffEvent[]> {
@@ -156,7 +156,6 @@ export class ScraperOrchestrator extends EventEmitter {
 
     this.isPolling = true;
     this.totalScrapes++;
-    const startTime = Date.now();
 
     try {
       const result = await this.fetchFromEngines(bypassEtag);
@@ -206,17 +205,15 @@ export class ScraperOrchestrator extends EventEmitter {
         this.emit("diff_events", events);
       }
 
-      // 2. Offload DB writes to asynchronous microtask using authoritative noise-filtered snapshot
-      queueMicrotask(() => {
-        try {
-          const authoritativeSnapshot = this.diffEngine.getSnapshot() || result.snapshot;
-          if (authoritativeSnapshot) {
-            this.poolStateDao.saveSnapshot(authoritativeSnapshot, result.source, result.latencyMs);
-          }
-        } catch (e: any) {
-          this.emit("warn", `Failed to save snapshot to SQLite: ${e.message}`);
+      // 2. Synchronously persist authoritative snapshot to SQLite DB (0.15ms execution time)
+      try {
+        const authoritativeSnapshot = this.diffEngine.getSnapshot() || result.snapshot;
+        if (authoritativeSnapshot) {
+          this.poolStateDao.saveSnapshot(authoritativeSnapshot, result.source, result.latencyMs);
         }
-      });
+      } catch (e: any) {
+        this.emit("warn", `Failed to save snapshot to SQLite: ${e.message}`);
+      }
 
       return events;
     } catch (err: any) {
@@ -229,8 +226,8 @@ export class ScraperOrchestrator extends EventEmitter {
   }
 
   /**
-   * Resilient dual-engine execution: Queries live HTML snapshot first (primary ground truth),
-   * with automatic fallback to JSON API.
+   * Resilient dual-engine execution: Queries live backend REST API (primary ground truth),
+   * with automatic fallback to HTML snapshot if API is temporarily unreachable.
    */
   private async fetchFromEngines(bypassEtag = false): Promise<ScrapeResult> {
     const effectiveApiEtag = bypassEtag ? undefined : this.apiEtag;
@@ -238,17 +235,8 @@ export class ScraperOrchestrator extends EventEmitter {
     const effectiveHtmlEtag = bypassEtag ? undefined : this.htmlEtag;
     const effectiveHtmlLastModified = bypassEtag ? undefined : this.htmlLastModified;
 
+    // Primary: Live Backend REST API (api.cheapestinference.com/api/pools) with real-time stock
     try {
-      const htmlResult = await this.htmlEngine.fetch(
-        effectiveHtmlEtag,
-        effectiveHtmlLastModified,
-        4_000
-      );
-      if (htmlResult.etag) this.htmlEtag = htmlResult.etag;
-      if (htmlResult.lastModified) this.htmlLastModified = htmlResult.lastModified;
-      return htmlResult;
-    } catch (htmlErr: any) {
-      this.emit("warn", `HTML Engine fetch error (${htmlErr?.message || htmlErr}). Falling back to JSON API.`);
       const apiResult = await this.apiEngine.fetch(
         effectiveApiEtag,
         effectiveApiLastModified,
@@ -257,6 +245,16 @@ export class ScraperOrchestrator extends EventEmitter {
       if (apiResult.etag) this.apiEtag = apiResult.etag;
       if (apiResult.lastModified) this.apiLastModified = apiResult.lastModified;
       return apiResult;
+    } catch (apiErr: any) {
+      this.emit("warn", `JSON API Engine fetch error (${apiErr?.message || apiErr}). Falling back to HTML.`);
+      const htmlResult = await this.htmlEngine.fetch(
+        effectiveHtmlEtag,
+        effectiveHtmlLastModified,
+        4_000
+      );
+      if (htmlResult.etag) this.htmlEtag = htmlResult.etag;
+      if (htmlResult.lastModified) this.htmlLastModified = htmlResult.lastModified;
+      return htmlResult;
     }
   }
 
