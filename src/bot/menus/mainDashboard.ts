@@ -293,17 +293,6 @@ export function createMainMenuHierarchy(
     )
     .row()
     .text(
-      (ctx) => ctx.t("menu.btn_subscriptions"),
-      async (ctx) => {
-        ctx.answerCallbackQuery().catch(() => {});
-        if (ctx.chat) {
-          dashboardRegistry?.updateView(ctx.chat.id, "subscriptions");
-        }
-        await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
-        return ctx.menu.nav("subscriptions-menu");
-      }
-    )
-    .text(
       (ctx) => ctx.t("menu.btn_settings"),
       async (ctx) => {
         ctx.answerCallbackQuery().catch(() => {});
