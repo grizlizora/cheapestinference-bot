@@ -525,7 +525,7 @@ export function createTelegramBot(
       stars: String(stars),
       total_stars: String(userTotalStars),
     });
-    const thanksText = `${icon("coffee")} ${thanksTitle}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${thanksBody}`;
+    const thanksText = `${icon("coffee")} ${thanksTitle}\n\n${thanksBody}`;
 
     await ctx.reply(thanksText, { parse_mode: "HTML" }).catch(() => {});
 
