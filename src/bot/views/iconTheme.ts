@@ -86,7 +86,10 @@ export type IconKey =
   | "rank_shield"
   // Donations & Stars
   | "coffee"
-  | "star";
+  | "star"
+  | "tip_lightbulb"
+  | "git_octopus"
+  | "writing_hand";
 
 export interface IconDefinition {
   customEmojiId: string;
@@ -439,6 +442,21 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     customEmojiId: "5445284980970201254",
     unicodeFallback: "⭐",
     name: "3D Animated Telegram Star",
+  },
+  tip_lightbulb: {
+    customEmojiId: "5370689973278225579",
+    unicodeFallback: "💡",
+    name: "3D Glowing Lightbulb",
+  },
+  git_octopus: {
+    customEmojiId: "5382029705903875321",
+    unicodeFallback: "🐙",
+    name: "3D Git Octopus",
+  },
+  writing_hand: {
+    customEmojiId: "5361730073005139702",
+    unicodeFallback: "✍️",
+    name: "3D Writing Hand",
   },
 };
 

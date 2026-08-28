@@ -278,7 +278,14 @@ export function createMainMenuHierarchy(
       ctx.t("common.back"),
       "donate_cancel_custom"
     );
-    await safeEditMessageText(ctx, ctx.t("donate.prompt_custom_stars", { star_icon: icon("star") }), cancelKeyboard);
+    await safeEditMessageText(
+      ctx,
+      ctx.t("donate.prompt_custom_stars", {
+        star_icon: icon("star"),
+        write_icon: icon("writing_hand"),
+      }),
+      cancelKeyboard
+    );
   };
 
   donateMenu

@@ -57,7 +57,7 @@
     "btn_tier_250": "💎 250 ⭐",
     "btn_tier_500": "👑 500 ⭐",
     "btn_custom_stars": "✍️ Своя сума ⭐",
-    "prompt_custom_stars": "✍️ <b>Введіть бажану кількість зірочок ({star_icon}):</b>\n\nНадішліть число повідомленням у чат (наприклад, <code>10</code>, <code>75</code>, <code>300</code>, <code>1000</code>).\n\n• <i>Мінімальна сума:</i> <b>1 {star_icon}</b>\n• <i>Максимальна сума:</i> <b>10 000 {star_icon}</b>",
+    "prompt_custom_stars": "{write_icon} <b>Введіть бажану кількість зірочок ({star_icon}):</b>\n\nНадішліть число повідомленням у чат (наприклад, <code>10</code>, <code>75</code>, <code>300</code>, <code>1000</code>).\n\n• <i>Мінімальна сума:</i> <b>1 {star_icon}</b>\n• <i>Максимальна сума:</i> <b>10 000 {star_icon}</b>",
     "error_invalid_custom_stars": "⚠️ <b>Некоректне число.</b> Будь ласка, введіть ціле число зірочок від <b>1</b> до <b>10 000</b> (наприклад, <code>50</code>):",
     "confirm_custom_stars_title": "{star_icon} <b>Підтвердження суми підтримки</b>\n\nВи обрали: <b>{stars} {star_icon} Telegram Stars</b>.\n\nБажаєте перейти до оплати?",
     "btn_confirm_pay": "✅ Підтвердити та оплатити",
