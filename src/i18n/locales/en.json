@@ -51,14 +51,14 @@
     "btn_contact_author": "💬 Contact Author"
   },
   "donate": {
-    "btn_tier_15": "☕ 15 ⭐ — Developer Coffee",
-    "btn_tier_50": "⚡ 50 ⭐ — High-Speed Proxy",
-    "btn_tier_100": "🚀 100 ⭐ — Scrape Cluster Server",
-    "btn_tier_250": "💎 250 ⭐ — Super Supporter",
-    "btn_tier_500": "👑 500 ⭐ — Cluster Sponsor",
-    "invoice_title": "☕ Support CheapestInference ({stars} ⭐)",
-    "invoice_desc": "Donation of {stars} ⭐ Telegram Stars to support CheapestInference ultra-low latency scraper infrastructure.",
-    "invoice_label": "Donate {stars} Stars",
+    "btn_tier_15": "☕ 15 ⭐ — Coffee for Author",
+    "btn_tier_50": "❤️ 50 ⭐ — Warm Thanks",
+    "btn_tier_100": "🚀 100 ⭐ — Respect for the Bot",
+    "btn_tier_250": "💎 250 ⭐ — Generous Tip",
+    "btn_tier_500": "👑 500 ⭐ — Supreme Supporter",
+    "invoice_title": "☕ Tip to Author ({stars} ⭐)",
+    "invoice_desc": "Tip to the author for creating and maintaining CheapestInference bot ({stars} ⭐ Telegram Stars).",
+    "invoice_label": "Tip {stars} Stars",
     "thanks_title": "🎉 <b>Thank you so much for your support!</b>",
     "thanks_body": "You donated <b>{stars} ⭐ Telegram Stars</b>!\n\n⭐️ Your lifetime support: <b>{total_stars} ⭐</b>\n🚀 <b>Priority Notification Queue activated!</b>\nYou will now receive slot availability alerts among the very first subscribers!",
     "admin_alert": "🌟 <b>New Telegram Stars Donation received!</b>\n━━━━━━━━━━━━━━━━━━━━━━━━\n• <b>User:</b> {user_name} (<code>{telegram_id}</code>)\n• <b>Amount:</b> <b>{stars} ⭐ Stars</b>\n• <b>Lifetime Total:</b> <b>{total_stars} ⭐</b>\n• <b>Charge ID:</b> <code>{charge_id}</code>"
