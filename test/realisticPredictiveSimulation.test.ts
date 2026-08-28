@@ -283,15 +283,15 @@ describe("🌟 Ultimate Realistic Multi-Day Real-World Simulation Test Suite", (
 
       const msgUk = (dispatcher as any).formatAlertMessage(createUser(1, 101, "uk"), event, "P3");
       expect(msgUk.text).toContain("добовий цикл ~24h");
-      expect(msgUk.text).toContain("🟢 Висока точність");
+      expect(msgUk.text).toContain("Висока точність");
 
       const msgEn = (dispatcher as any).formatAlertMessage(createUser(2, 102, "en"), event, "P3");
       expect(msgEn.text).toContain("24h daily cycle");
-      expect(msgEn.text).toContain("🟢 High confidence");
+      expect(msgEn.text).toContain("High confidence");
 
       const msgRu = (dispatcher as any).formatAlertMessage(createUser(3, 103, "ru"), event, "P3");
       expect(msgRu.text).toContain("суточный цикл ~24ч");
-      expect(msgRu.text).toContain("🟢 Высокая точность");
+      expect(msgRu.text).toContain("Высокая точность");
     });
   });
 

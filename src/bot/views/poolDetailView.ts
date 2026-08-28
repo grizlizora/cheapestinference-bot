@@ -12,6 +12,8 @@ import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
 import { escapeHtml, formatRelativeTime } from "../../i18n/index.js";
 import { clampMessageText, formatMonitoringFooter } from "./common.js";
 
+import { icon, getRegionalGlobeIcon } from "./iconTheme.js";
+
 export const DEFAULT_BLOCK_IDS = ["asia", "europe", "americas"];
 export const DEFAULT_BLOCK_HOURS: Record<string, string> = {
   asia: "00:00 – 08:00 UTC",
@@ -20,16 +22,7 @@ export const DEFAULT_BLOCK_HOURS: Record<string, string> = {
 };
 
 export function getBlockIcon(blockId: string): string {
-  switch (blockId) {
-    case "asia":
-      return "🌏";
-    case "europe":
-      return "🌍";
-    case "americas":
-      return "🌎";
-    default:
-      return "🌎";
-  }
+  return getRegionalGlobeIcon(blockId);
 }
 
 export function renderPoolSettingsText(
@@ -99,14 +92,17 @@ export function renderPoolDetailText(
         : null;
 
       const isAvailable = b.status === "available" || b.status === "limited";
-      const statusBadge = isAvailable
+      const statusIcon = isAvailable ? icon("status_available") : icon("status_sold_out");
+      const rawStatusText = (isAvailable
         ? ctx.t("common.status_available")
-        : ctx.t("common.status_sold_out");
+        : ctx.t("common.status_sold_out")
+      ).replace(/^[🟢🟡🔴]\s*/, "");
+      const statusBadge = `${statusIcon} ${rawStatusText}`;
 
-      const icon = getBlockIcon(b.block_id);
+      const blockIcon = getBlockIcon(b.block_id);
 
       let row = ctx.t("pool_detail.block_row", {
-        block_icon: icon,
+        block_icon: blockIcon,
         block_name: blockName,
         hours_utc: b.hours_utc,
         status_badge: statusBadge,
@@ -143,7 +139,7 @@ export function renderPoolDetailText(
     lastUserInteractionAt,
     telemetry?.consecutiveFailures || 0
   );
-  const timeFooter = `\n\n🕒 <i>${ctx.lang === "uk" ? "Дані перевірено" : ctx.lang === "ru" ? "Данные проверены" : "Verified at"}: ${monitoringText}</i>`;
+  const timeFooter = `\n\n${icon("nav_clock")} <i>${ctx.lang === "uk" ? "Дані перевірено" : ctx.lang === "ru" ? "Данные проверены" : "Verified at"}: ${monitoringText}</i>`;
 
   const baseTitle = ctx.t("pool_detail.title", {
     pool_name: escapeHtml(first.pool_name),

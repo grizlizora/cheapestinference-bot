@@ -89,19 +89,19 @@ describe("Persistent LiveSync Dashboard & Keep-Alive Resilience Invariants", () 
 
     // Active user
     const activeFooter = formatMonitoringFooter(now, "uk", now - 5 * 60 * 1000);
-    expect(activeFooter).toContain("UTC (🟢 Live 5s)");
+    expect(activeFooter).toContain("Live 5s");
 
     // Sleeping / Eco user (e.g. 6 hours ago)
     const ecoFooter = formatMonitoringFooter(now, "uk", now - 6 * 60 * 60 * 1000);
-    expect(ecoFooter).toContain("UTC (🟢 Моніторинг активний)");
+    expect(ecoFooter).toContain("Моніторинг активний");
 
     // Standby user (30 hours ago)
     const standbyFooter = formatMonitoringFooter(now, "uk", now - 30 * 60 * 60 * 1000);
-    expect(standbyFooter).toContain("UTC (💤 Режим очікування)");
+    expect(standbyFooter).toContain("Режим очікування");
 
     // English localization
     const enFooter = formatMonitoringFooter(now, "en", now - 2 * 60 * 60 * 1000);
-    expect(enFooter).toContain("UTC (🟢 Monitoring active)");
+    expect(enFooter).toContain("Monitoring active");
   });
 
   it("4. should serve HTTP 200 on all Health check route aliases to prevent 503 and 404", () => {

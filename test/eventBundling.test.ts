@@ -165,7 +165,7 @@ describe("NotificationDispatcher Modern Alert & Bundling Test Suite", () => {
 
     expect(enqueuedMessages).toHaveLength(1);
     const alert = enqueuedMessages[0];
-    expect(alert.text).toContain("🟢 <b>ВІЛЬНИЙ СЛОТ • Frontier Pool</b>");
+    expect(alert.text).toContain("<b>ВІЛЬНИЙ СЛОТ • Frontier Pool</b>");
     expect(alert.text).toContain("━━━━━━━━━━━━━━━━━━━━━━━━");
     expect(alert.text).toContain("<code>(08:00 – 16:00 UTC)</code>");
     expect(alert.text).toContain("<code>deepseek-r1</code>");

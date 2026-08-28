@@ -8,6 +8,7 @@ import { DiffEvent, PriceAnalyticsPayload } from "../../types/domain.js";
 import { translate, escapeHtml, SupportedLanguage } from "../../i18n/index.js";
 import { PackedUserProfile } from "./subscriberIndex.js";
 import { truncateToTelegramLimit } from "./htmlTagBalancer.js";
+import { icon } from "../views/iconTheme.js";
 
 export type BroadcastPriority = "P0" | "P1" | "P2" | "P3";
 
@@ -73,22 +74,20 @@ export function formatPriceRatingBadge(
     pa.avgPrice != null ? (pa.avgPrice % 1 === 0 ? pa.avgPrice.toFixed(0) : pa.avgPrice.toFixed(2)) : "";
 
   if (pa.rating === "all_time_low") {
-    return translate(lang, "alerts.price_all_time_low") || `🔥 <b>Історичний мінімум! Найнижча ціна ($${currStr})</b>`;
+    const rawText = (translate(lang, "alerts.price_all_time_low") || `Історичний мінімум! Найнижча ціна ($${currStr})`).replace(/^[🔥⚡]\s*/u, "");
+    return `${icon("price_all_time_low")} <b>${rawText}</b>`;
   }
   if (pa.rating === "below_average" && pa.avgPrice != null) {
-    return (
-      translate(lang, "alerts.price_below_average", { current: currStr, avg: avgStr }) ||
-      `🟢 <b>Нижче середнього ($${currStr} vs сер. $${avgStr})</b>`
-    );
+    const rawText = (translate(lang, "alerts.price_below_average", { current: currStr, avg: avgStr }) || `Нижче середнього ($${currStr} vs сер. $${avgStr})`).replace(/^[🟢🟡🔴]\s*/u, "");
+    return `${icon("status_available")} <b>${rawText}</b>`;
   }
   if (pa.rating === "above_average" && pa.avgPrice != null) {
-    return (
-      translate(lang, "alerts.price_above_average", { current: currStr, avg: avgStr }) ||
-      `🔴 <b>Вище середнього ($${currStr} vs сер. $${avgStr})</b>`
-    );
+    const rawText = (translate(lang, "alerts.price_above_average", { current: currStr, avg: avgStr }) || `Вище середнього ($${currStr} vs сер. $${avgStr})`).replace(/^[🟢🟡🔴]\s*/u, "");
+    return `${icon("status_sold_out")} <b>${rawText}</b>`;
   }
   if (pa.rating === "fair" && pa.avgPrice != null) {
-    return translate(lang, "alerts.price_fair_value") || "⚖️ <b>Стандартна ціна (в межах норми)</b>";
+    const rawText = (translate(lang, "alerts.price_fair_value") || "Стандартна ціна (в межах норми)").replace(/^⚖️?\s*/u, "");
+    return `${icon("price_fair")} <b>${rawText}</b>`;
   }
   return "";
 }
@@ -124,15 +123,17 @@ export function formatAlertMessage(
 
   if (event.type === "SLOT_APPEARED") {
     const isLimited = event.newStatus === "limited";
-    const statusIcon = isLimited ? "🟡" : "🟢";
-    const statusBadge = isLimited
+    const statusIcon = isLimited ? icon("status_limited") : icon("status_available");
+    const rawStatusText = (isLimited
       ? translate(lang, "common.status_limited")
-      : translate(lang, "common.status_available");
+      : translate(lang, "common.status_available")
+    ).replace(/^[🟢🟡🔴]\s*/u, "");
+    const statusBadge = `${statusIcon} ${rawStatusText}`;
 
     const header = translate(lang, "alerts.slot_appeared_header", {
       status_icon: statusIcon,
       pool_name: escapeHtml(event.poolName),
-    });
+    }).replace(/^[🟢🟡🔴⚡]\s*/u, `${icon("event_slot_drop")} `);
 
     const body = translate(lang, "alerts.slot_appeared_body", {
       pool_name: escapeHtml(event.poolName),
@@ -148,14 +149,16 @@ export function formatAlertMessage(
     text = `${header}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${body}`;
 
     if (event.analytics?.isBatchDrop) {
-      const batchBadge =
+      const rawBatch =
         translate(lang, "alerts.tag_multi_region_drop", { count: event.analytics.totalOpenings || 2 }) ||
-        "🆕 <i>Новий дроп потужностей</i>";
+        "<i>Новий дроп потужностей</i>";
+      const batchBadge = rawBatch.replace(/^[🆕⚡]\s*/u, `${icon("event_batch_drop")} `);
       text = `${batchBadge}\n${text}`;
     } else if (event.analytics?.demandCategory === "hot" && event.analytics.avgLifespanFormatted) {
-      const hotBadge =
+      const rawHot =
         translate(lang, "alerts.tag_hot_slot_drop", { duration: escapeHtml(event.analytics.avgLifespanFormatted) }) ||
-        `🔥 <i>Гарячий слот (розбирають за ${escapeHtml(event.analytics.avgLifespanFormatted)})</i>`;
+        `<i>Гарячий слот (розбирають за ${escapeHtml(event.analytics.avgLifespanFormatted)})</i>`;
+      const hotBadge = rawHot.replace(/^[🔥⚡]\s*/u, `${icon("event_hot_slot")} `);
       text = `${hotBadge}\n${text}`;
     } else if (cachedDurationFormatted) {
       text += translate(lang, "alerts.analytics_duration_tip", {
@@ -173,7 +176,7 @@ export function formatAlertMessage(
   } else if (event.type === "SLOT_DISAPPEARED") {
     const header = translate(lang, "alerts.slot_disappeared_header", {
       pool_name: escapeHtml(event.poolName),
-    });
+    }).replace(/^🔒\s*/u, `${icon("event_slot_sold")} `);
     let body = translate(lang, "alerts.slot_disappeared_body", {
       pool_name: escapeHtml(event.poolName),
       block_name: escapeHtml(blockName),
@@ -185,18 +188,18 @@ export function formatAlertMessage(
       if (eta.isPredictable) {
         let confBadge = translate(lang, "intelligence.conf_low") || "⚪";
         if (eta.confidence === "HIGH") {
-          confBadge = translate(lang, "intelligence.conf_high") || "🟢 Висока точність";
+          confBadge = `${icon("status_available")} ${translate(lang, "intelligence.conf_high")?.replace(/^[🟢🟡🔴]\s*/u, "") || "Висока точність"}`;
         } else if (eta.confidence === "MEDIUM") {
-          confBadge = translate(lang, "intelligence.conf_medium") || "🟡 Середня точність";
+          confBadge = `${icon("status_partially_available")} ${translate(lang, "intelligence.conf_medium")?.replace(/^[🟢🟡🔴]\s*/u, "") || "Середня точність"}`;
         }
         const cadence = eta.detectedCadenceHours === 24
           ? translate(lang, "intelligence.cadence_daily") || "добовий цикл ~24h"
           : eta.detectedCadenceHours
           ? `~${eta.detectedCadenceHours}h cycle`
           : eta.formattedEtaWindow;
-        body += `\n\n🔮 <b>${translate(lang, "intelligence.eta_title") || "Очікувана поява"}:</b> <code>${escapeHtml(cadence)}</code> [${confBadge}]`;
+        body += `\n\n${icon("prediction_crystal")} <b>${translate(lang, "intelligence.eta_title") || "Очікувана поява"}:</b> <code>${escapeHtml(cadence)}</code> [${confBadge}]`;
       } else {
-        body += `\n\n🔮 <b>${translate(lang, "intelligence.eta_title") || "Прогноз"}:</b> <i>${
+        body += `\n\n${icon("prediction_crystal")} <b>${translate(lang, "intelligence.eta_title") || "Прогноз"}:</b> <i>${
           translate(lang, "intelligence.eta_gathering_data", {
             count: eta.sampleCount,
             min: eta.minRequired,
@@ -209,7 +212,7 @@ export function formatAlertMessage(
   } else if (event.type === "MODEL_UPGRADE_EVENT") {
     const header = translate(lang, "alerts.model_upgrade_header", {
       pool_name: escapeHtml(event.poolName),
-    });
+    }).replace(/^🚀\s*/u, `${icon("event_model_upgrade")} `);
     const diffLines: string[] = [];
 
     if (event.modelUpgrade) {
@@ -256,11 +259,11 @@ export function formatAlertMessage(
     );
   } else if (event.type === "SLOT_PRICE_CHANGED") {
     const isDiscount = (event.slotPrice?.priceDelta || 0) < 0;
-    const trendIcon = isDiscount ? "📉" : "📈";
+    const trendIcon = isDiscount ? icon("event_price_drop") : icon("event_price_hike");
     const header = translate(lang, "alerts.slot_price_changed_header", {
       trend_icon: trendIcon,
       pool_name: escapeHtml(event.poolName),
-    });
+    }).replace(/^[📉📈]\s*/, `${trendIcon} `);
 
     const deltaBadge = event.slotPrice
       ? formatPriceDeltaBadge(event.slotPrice.priceDelta, event.slotPrice.percentageDelta, lang)
@@ -291,11 +294,11 @@ export function formatAlertMessage(
     keyboard = new InlineKeyboard().url(btnLabel, checkoutUrl);
   } else if (event.type === "POOL_BASE_PRICE_CHANGED" || event.type === "PRICE_CHANGED") {
     const isDiscount = (event.basePrice?.priceDelta || 0) < 0;
-    const trendIcon = isDiscount ? "📉" : "📈";
+    const trendIcon = isDiscount ? icon("event_price_drop") : icon("event_price_hike");
     const header = translate(lang, "alerts.pool_base_price_header", {
       trend_icon: trendIcon,
       pool_name: escapeHtml(event.poolName),
-    });
+    }).replace(/^[📉📈]\s*/, `${trendIcon} `);
 
     const deltaBadge = event.basePrice
       ? formatPriceDeltaBadge(event.basePrice.priceDelta, event.basePrice.percentageDelta, lang)
@@ -322,7 +325,7 @@ export function formatAlertMessage(
   } else if (event.type === "TIER_UPDATED_EVENT") {
     const header = translate(lang, "alerts.tier_updated_header", {
       pool_name: escapeHtml(event.poolName),
-    });
+    }).replace(/^📝\s*/, `${icon("event_tier_update")} `);
     const diffLines: string[] = [];
     if (event.tierUpdate?.newDescription) {
       diffLines.push(
@@ -379,7 +382,7 @@ export function formatAlertMessage(
   } else if (event.type === "NEW_POOL_EVENT") {
     const header = translate(lang, "alerts.new_pool_header", {
       pool_name: escapeHtml(event.poolName),
-    });
+    }).replace(/^✨\s*/, `${icon("event_new_pool")} `);
     const body = translate(lang, "alerts.new_pool_body", {
       pool_name: escapeHtml(event.poolName),
       models: (event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", "),
@@ -422,9 +425,10 @@ export function formatBundledAlertMessage(
   const timeFormatted = new Date().toISOString().replace("T", " ").substring(0, 19);
   const currencyMonth = translate(lang, "common.currency_month") || "mo";
 
-  const title =
+  const rawTitle =
     translate(lang, "alerts.batch_title", { count }) ||
-    `⚡ <b>CheapestInference — Slot Updates (${count})</b>`;
+    `<b>CheapestInference — Slot Updates (${count})</b>`;
+  const title = rawTitle.replace(/^[⚡📦]\s*/, `${icon("event_batch_drop")} `);
 
   const sectionLines: string[] = [];
   const keyboard = new InlineKeyboard();
@@ -447,10 +451,10 @@ export function formatBundledAlertMessage(
     if (event.type === "SLOT_APPEARED") {
       const cleanPrice = cleanPriceString(event.newPrice);
       const lifespanBadge = event.analytics?.avgLifespanFormatted
-        ? ` ${event.analytics.demandCategory === "hot" ? "🔥" : "⚡"} <code>${escapeHtml(event.analytics.avgLifespanFormatted)}</code>`
+        ? ` ${event.analytics.demandCategory === "hot" ? icon("event_hot_slot") : icon("event_slot_drop")} <code>${escapeHtml(event.analytics.avgLifespanFormatted)}</code>`
         : "";
       sectionLines.push(
-        `🟢 <b>${escapeHtml(event.poolName)} • ${escapeHtml(blockName)}</b>${lifespanBadge}\n` +
+        `${icon("status_available")} <b>${escapeHtml(event.poolName)} • ${escapeHtml(blockName)}</b>${lifespanBadge}\n` +
         `💰 <code>$${escapeHtml(cleanPrice)}/${currencyMonth}</code> | 🕒 <code>${escapeHtml(event.hoursUtc)}</code>\n` +
         `🤖 ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
       );
@@ -462,7 +466,7 @@ export function formatBundledAlertMessage(
       }
     } else if (event.type === "SLOT_DISAPPEARED") {
       sectionLines.push(
-        `🔒 <b>${escapeHtml(event.poolName)} • ${escapeHtml(blockName)}</b> — <i>${translate(lang, "common.status_sold_out")}</i>`
+        `${icon("event_slot_sold")} <b>${escapeHtml(event.poolName)} • ${escapeHtml(blockName)}</b> — <i>${translate(lang, "common.status_sold_out")}</i>`
       );
       if (buttonCount < 3) {
         const btnLabel = `🔍 ${event.poolSlug.toUpperCase()}`;
@@ -472,7 +476,7 @@ export function formatBundledAlertMessage(
     } else if (event.type === "MODEL_UPGRADE_EVENT") {
       const upgradeTitle = translate(lang, "alerts.bundle_title_models") || "Model Upgrade";
       sectionLines.push(
-        `🚀 <b>${escapeHtml(event.poolName)} • ${upgradeTitle}</b>\n` +
+        `${icon("event_model_upgrade")} <b>${escapeHtml(event.poolName)} • ${upgradeTitle}</b>\n` +
         `🤖 ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
       );
     } else if (event.type === "SLOT_PRICE_CHANGED") {
@@ -483,7 +487,7 @@ export function formatBundledAlertMessage(
       const cleanNew = cleanPriceString(event.newPrice);
       const hoursStr = event.hoursUtc ? ` | 🕒 <code>${escapeHtml(event.hoursUtc)}</code>` : "";
       sectionLines.push(
-        `🏷 <b>${escapeHtml(event.poolName)} • ${escapeHtml(blockName)}</b>\n` +
+        `${icon("price_tag")} <b>${escapeHtml(event.poolName)} • ${escapeHtml(blockName)}</b>\n` +
         `💰 <s>$${escapeHtml(cleanOld)}</s> ➔ <b>$${escapeHtml(cleanNew)}/${currencyMonth}</b>${deltaStr}${hoursStr}`
       );
       if (buttonCount < 3) {
@@ -499,7 +503,7 @@ export function formatBundledAlertMessage(
       const cleanNew = cleanPriceString(event.newPrice);
       const tariffBadge = translate(lang, "alerts.bundle_title_base_price") || "Base Tariff";
       sectionLines.push(
-        `💰 <b>${escapeHtml(event.poolName)} • ${tariffBadge}</b>\n` +
+        `${icon("price_money")} <b>${escapeHtml(event.poolName)} • ${tariffBadge}</b>\n` +
         `💵 <s>$${escapeHtml(cleanOld)}</s> ➔ <b>$${escapeHtml(cleanNew)}/${currencyMonth}</b>${deltaStr}\n` +
         `🤖 ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
       );
@@ -510,11 +514,11 @@ export function formatBundledAlertMessage(
       }
     } else if (event.type === "TIER_UPDATED_EVENT") {
       const tierTitle = translate(lang, "alerts.bundle_title_tier") || "Tier Specification Updated";
-      sectionLines.push(`📝 <b>${escapeHtml(event.poolName)} • ${tierTitle}</b>`);
+      sectionLines.push(`${icon("event_tier_update")} <b>${escapeHtml(event.poolName)} • ${tierTitle}</b>`);
     } else if (event.type === "NEW_POOL_EVENT") {
       const newPoolTitle = translate(lang, "alerts.bundle_title_new_pool") || "New Pool Launched";
       sectionLines.push(
-        `✨ <b>${escapeHtml(event.poolName)} • ${newPoolTitle}</b>\n` +
+        `${icon("event_new_pool")} <b>${escapeHtml(event.poolName)} • ${newPoolTitle}</b>\n` +
         `🤖 ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
       );
     } else {
@@ -529,10 +533,10 @@ export function formatBundledAlertMessage(
 
   const footer =
     lang === "uk"
-      ? `🕒 <i>Час оновлення: ${timeFormatted} UTC</i>`
+      ? `${icon("nav_clock")} <i>Час оновлення: ${timeFormatted} UTC</i>`
       : lang === "ru"
-      ? `🕒 <i>Время обновления: ${timeFormatted} UTC</i>`
-      : `🕒 <i>Updated at: ${timeFormatted} UTC</i>`;
+      ? `${icon("nav_clock")} <i>Время обновления: ${timeFormatted} UTC</i>`
+      : `${icon("nav_clock")} <i>Updated at: ${timeFormatted} UTC</i>`;
 
   const text = `${title}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${sectionLines.join("\n───\n")}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${footer}`;
   const firstEvent = matchedEvents[0].event;

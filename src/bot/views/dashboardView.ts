@@ -1,30 +1,39 @@
-/**
- * src/bot/views/dashboardView.ts
- * Pure Dashboard Presentation & Status Formatting
- */
-
 import { BotContext } from "../../types/context.js";
 import { PoolStateDAO } from "../../db/dao/poolState.js";
 import { SlotHistoryDAO } from "../../db/dao/slotHistory.js";
 import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
 import { escapeHtml, formatRelativeTime } from "../../i18n/index.js";
 import { clampMessageText, formatMonitoringFooter } from "./common.js";
+import { icon, getRawUnicode, IconKey } from "./iconTheme.js";
 
 export interface PoolBadgeInfo {
-  icon: "🟢" | "🟡" | "🔴";
+  icon: string;
+  iconHtml: string;
   shortStatus: string;
   statusBadgeKey: string;
+  iconKey: IconKey;
 }
 
 export function computePoolBadgeInfo(availableCount: number, totalBlocks: number): PoolBadgeInfo {
   const total = totalBlocks || 3;
+  let iconKey: IconKey = "status_sold_out";
+  let statusBadgeKey = "common.status_sold_out";
+
   if (availableCount >= total && total > 0) {
-    return { icon: "🟢", shortStatus: `${availableCount}/${total}`, statusBadgeKey: "common.status_available" };
+    iconKey = "status_available";
+    statusBadgeKey = "common.status_available";
   } else if (availableCount > 0) {
-    return { icon: "🟡", shortStatus: `${availableCount}/${total}`, statusBadgeKey: "common.status_partially_available" };
-  } else {
-    return { icon: "🔴", shortStatus: `${availableCount}/${total}`, statusBadgeKey: "common.status_sold_out" };
+    iconKey = "status_partially_available";
+    statusBadgeKey = "common.status_partially_available";
   }
+
+  return {
+    icon: getRawUnicode(iconKey),
+    iconHtml: icon(iconKey),
+    shortStatus: `${availableCount}/${total}`,
+    statusBadgeKey,
+    iconKey,
+  };
 }
 
 export function renderDashboardText(
@@ -56,11 +65,12 @@ export function renderDashboardText(
   const poolSummariesText = summaries
     .map((p) => {
       const badgeInfo = computePoolBadgeInfo(p.available_count, p.total_blocks);
-      const statusBadge = ctx.t(badgeInfo.statusBadgeKey);
+      const rawStatusText = ctx.t(badgeInfo.statusBadgeKey).replace(/^[🟢🟡🔴]\s*/, "");
+      const statusBadge = `${badgeInfo.iconHtml} ${rawStatusText}`;
       const rawModels = (p.models || []).slice(0, 10).join(", ");
       const modelsText = escapeHtml(rawModels) || ctx.t("common.custom_models");
 
-      return ctx.t("menu.pool_summary_card", {
+      const card = ctx.t("menu.pool_summary_card", {
         pool_name: escapeHtml(p.name),
         status_badge: statusBadge,
         models: modelsText,
@@ -69,6 +79,9 @@ export function renderDashboardText(
         total_blocks: p.total_blocks || 3,
         url: `https://cheapestinference.com/pools/${p.slug}`,
       });
+
+      // Elevate pool box icon to animated custom emoji if available
+      return card.replace(/^📦\s*/, `${icon("pool_generic")} `);
     })
     .join("\n\n");
 

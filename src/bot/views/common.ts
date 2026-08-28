@@ -5,6 +5,7 @@
 
 import { BotContext } from "../../types/context.js";
 import { truncateToTelegramLimit } from "../notifier/htmlTagBalancer.js";
+import { icon } from "./iconTheme.js";
 
 /**
  * Hard limit safety threshold for Telegram message text (Limit: 4096 chars).
@@ -65,20 +66,23 @@ export function formatMonitoringFooter(
   
   let modeTag = "";
   if (idleMs <= 30 * 60 * 1000) {
-    modeTag = "🟢 Live 5s";
+    modeTag = `${icon("status_live")} Live 5s`;
   } else if (idleMs <= 24 * 60 * 60 * 1000) {
-    modeTag = lang === "uk" ? "🟢 Моніторинг активний" : lang === "ru" ? "🟢 Мониторинг активен" : "🟢 Monitoring active";
+    const activeText = lang === "uk" ? "Моніторинг активний" : lang === "ru" ? "Мониторинг активен" : "Monitoring active";
+    modeTag = `${icon("status_available")} ${activeText}`;
   } else {
-    modeTag = lang === "uk" ? "💤 Режим очікування" : lang === "ru" ? "💤 Режим ожидания" : "💤 Standby";
+    const standbyText = lang === "uk" ? "Режим очікування" : lang === "ru" ? "Режим ожидания" : "Standby";
+    modeTag = `${icon("status_standby")} ${standbyText}`;
   }
 
   let delayTag = "";
   if (consecutiveFailures > 0) {
-    delayTag = lang === "uk" 
-      ? ` ⚠️ [затримка мережі, спроба ${consecutiveFailures}]`
+    const warnText = lang === "uk" 
+      ? `[затримка мережі, спроба ${consecutiveFailures}]`
       : lang === "ru"
-      ? ` ⚠️ [задержка сети, попытка ${consecutiveFailures}]`
-      : ` ⚠️ [network delay, retry ${consecutiveFailures}]`;
+      ? `[задержка сети, попытка ${consecutiveFailures}]`
+      : `[network delay, retry ${consecutiveFailures}]`;
+    delayTag = ` ${icon("status_delay")} ${warnText}`;
   }
 
   return `${utcDateStr} (${modeTag})${delayTag}`;
