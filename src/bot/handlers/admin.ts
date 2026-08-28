@@ -63,10 +63,10 @@ export function renderAdminText(
 
   const hasTor = proxyStatus.proxies.some((p) => p.type === "tor");
   const proxyModeStr = hasTor
-    ? `🧅 Tor Active (${proxyStatus.available}/${proxyStatus.total} alive)`
+    ? `${icon("nav_language")} Tor Active (${proxyStatus.available}/${proxyStatus.total} alive)`
     : proxyStatus.total > 0
-    ? `🌐 Proxies (${proxyStatus.available}/${proxyStatus.total} alive)`
-    : "⚡ Direct Connection";
+    ? `${icon("nav_language")} Proxies (${proxyStatus.available}/${proxyStatus.total} alive)`
+    : `${icon("pool_frontier")} Direct Fast-Path`;
 
   const adminUser = ctx.from ? userDao.getByTelegramId(ctx.from.id) : undefined;
   const newUsersEnabled = (adminUser?.notify_admin_new_users ?? 1) === 1;

@@ -270,8 +270,8 @@ export function createPoolDetailMenu(
           const totalE2E = Date.now() - startTime;
           const username = c.from?.username ? `@${c.from.username}` : `ID:${c.from?.id}`;
           const proxyTag = telemetry?.lastUsedProxy
-            ? (telemetry.lastUsedProxy.includes("9050") ? "🧅 Tor SOCKS5" : "🌐 Proxy")
-            : "⚡ Direct";
+            ? (telemetry.lastUsedProxy.includes("9050") ? "Tor SOCKS5" : "Proxy")
+            : "Direct";
           console.log(`🔄 [Manual Refresh] User ${username} in pool '${slug}' -> Scrape: ${scrapeLatency}ms (${proxyTag}) | TG Edit: ${tgEditLatency}ms | Total E2E: ${totalE2E}ms (source: ${telemetry?.lastSource || "cache"})`);
           if (c.chat) {
             const msgId = c.callbackQuery?.message?.message_id;
