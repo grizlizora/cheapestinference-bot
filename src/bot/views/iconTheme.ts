@@ -9,6 +9,8 @@
  * 4. Safe string-length balancing compatible with htmlTagBalancer
  */
 
+import { ModelSemanticMatcher } from "../../engine/modelSemanticMatcher.js";
+
 export type IconKey =
   // Status & Health
   | "status_available"
@@ -528,3 +530,27 @@ export function getCapacityOrbIcon(availableCount: number, totalBlocks: number =
     return icon("status_sold_out");
   }
 }
+
+/**
+ * Helper to automatically retrieve 3D animated custom emoji for any neural network model
+ */
+export function getModel3DIcon(modelName: string): string {
+  const parsed = ModelSemanticMatcher.parseModel(modelName);
+  switch (parsed.family) {
+    case "deepseek":
+      return icon("ai_deepseek");
+    case "qwen":
+      return icon("ai_qwen");
+    case "glm":
+      return icon("ai_glm");
+    case "llama":
+      return icon("ai_llama");
+    case "mistral":
+      return icon("ai_mistral");
+    case "claude":
+      return icon("ai_claude");
+    default:
+      return icon("ai_robot");
+  }
+}
+

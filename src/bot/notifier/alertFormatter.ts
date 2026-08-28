@@ -8,7 +8,7 @@ import { DiffEvent, PriceAnalyticsPayload } from "../../types/domain.js";
 import { translate, escapeHtml, SupportedLanguage, stripLeadingEmoji } from "../../i18n/index.js";
 import { PackedUserProfile } from "./subscriberIndex.js";
 import { truncateToTelegramLimit } from "./htmlTagBalancer.js";
-import { icon } from "../views/iconTheme.js";
+import { icon, getModel3DIcon } from "../views/iconTheme.js";
 
 export type BroadcastPriority = "P0" | "P1" | "P2" | "P3";
 
@@ -277,7 +277,7 @@ export function formatAlertMessage(
       }
     }
 
-    const allModelsList = (event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ");
+    const allModelsList = (event.models || []).map((m) => `${getModel3DIcon(m)} <code>${escapeHtml(m)}</code>`).join(", ");
     const updatedModelsTitle = lang === "uk"
       ? `У пулі оновлено конфігурацію нейромереж:`
       : lang === "ru"
@@ -374,7 +374,7 @@ export function formatAlertMessage(
       : "Applies to all new subscriptions for this pool!";
 
     const cleanOld = cleanPriceString(event.previousPrice);
-    const modelsList = (event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ");
+    const modelsList = (event.models || []).map((m) => `${getModel3DIcon(m)} <code>${escapeHtml(m)}</code>`).join(", ");
 
     const body = `${icon("price_money")} <b>${baseLabel}:</b> <s>$${cleanOld}</s> ➔ <b>$${cleanNewPrice}/${currencyMonth}</b>\n` +
       `${deltaBadge}${ratingBadge ? `\n${ratingBadge}` : ""}\n` +
@@ -462,7 +462,7 @@ export function formatAlertMessage(
       ? "Пул автоматически подключен к мониторингу и меню уведомлений!"
       : "Pool is automatically connected to live monitoring and alerts!";
 
-    const modelsList = (event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ");
+    const modelsList = (event.models || []).map((m) => `${getModel3DIcon(m)} <code>${escapeHtml(m)}</code>`).join(", ");
 
     const body = `${newPoolDesc}\n\n` +
       `${icon("ai_robot")} <b>${modelsLabel}:</b> ${modelsList}\n` +

@@ -12,7 +12,7 @@ import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
 import { escapeHtml, formatRelativeTime, stripLeadingEmoji } from "../../i18n/index.js";
 import { clampMessageText, formatMonitoringFooter } from "./common.js";
 
-import { icon, getRegionalGlobeIcon } from "./iconTheme.js";
+import { icon, getRegionalGlobeIcon, getModel3DIcon } from "./iconTheme.js";
 import { formatBlockHoursWithLocal, getShiftPersonification } from "./timezoneHelper.js";
 import { POOL_RANKS } from "./poolRanks.js";
 import { renderCapacityBar } from "./capacityBar.js";
@@ -116,7 +116,7 @@ export function renderPoolDetailText(
   const maxModels = 15;
   const displayedModels = models.slice(0, maxModels);
   let modelsList = displayedModels
-    .map((m) => ctx.t("pool_detail.model_item", { model_name: escapeHtml(m) }))
+    .map((m) => `  • ${getModel3DIcon(m)} <code>${escapeHtml(m)}</code>`)
     .join("\n");
   if (models.length > maxModels) {
     modelsList += `\n  • <i>... +${models.length - maxModels} more</i>`;
