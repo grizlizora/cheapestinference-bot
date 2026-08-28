@@ -352,12 +352,27 @@ export class NotificationDispatcher {
 
       const sanitizedText = toValidUtf8(msg.text);
 
-      await this.bot.api.sendMessage(msg.telegramId, sanitizedText, {
-        parse_mode: "HTML",
-        reply_markup: msg.keyboard,
-        disable_notification: msg.isMuted,
-        link_preview_options: { is_disabled: true },
-      });
+      try {
+        await this.bot.api.sendMessage(msg.telegramId, sanitizedText, {
+          parse_mode: "HTML",
+          reply_markup: msg.keyboard,
+          disable_notification: msg.isMuted,
+          link_preview_options: { is_disabled: true },
+        });
+      } catch (sendErr: any) {
+        const desc = sendErr?.description || sendErr?.message || "";
+        if (desc.includes("DOCUMENT_INVALID") || desc.includes("CUSTOM_EMOJI_INVALID")) {
+          const stripped = sanitizedText.replace(/<tg-emoji[^>]*>(.*?)<\/tg-emoji>/gi, "$1");
+          await this.bot.api.sendMessage(msg.telegramId, stripped, {
+            parse_mode: "HTML",
+            reply_markup: msg.keyboard,
+            disable_notification: msg.isMuted,
+            link_preview_options: { is_disabled: true },
+          });
+        } else {
+          throw sendErr;
+        }
+      }
 
       this.logDao.logNotification(msg.userId, msg.poolSlug, msg.blockId, msg.eventType);
     } catch (err: any) {

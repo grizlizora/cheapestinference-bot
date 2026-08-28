@@ -25,7 +25,36 @@ export function clampMessageText(text: string, maxLength: number = TELEGRAM_MAX_
 }
 
 /**
- * Safely edit message text ignoring Telegram 400 "message is not modified"
+ * Strip Telegram <tg-emoji> tags to plain unicode fallback.
+ */
+export function stripTgEmoji(text: string): string {
+  return text.replace(/<tg-emoji[^>]*>(.*?)<\/tg-emoji>/gi, "$1");
+}
+
+/**
+ * Safely reply to a message with automatic fallback if custom emoji IDs are invalid (DOCUMENT_INVALID).
+ */
+export async function safeReply(
+  ctx: BotContext,
+  text: string,
+  extra: any = { parse_mode: "HTML", link_preview_options: { is_disabled: true } }
+): Promise<any> {
+  const safeText = clampMessageText(toValidUtf8(text));
+  try {
+    return await ctx.reply(safeText, extra);
+  } catch (err: any) {
+    const desc = err?.description || err?.message || "";
+    if (desc.includes("DOCUMENT_INVALID") || desc.includes("CUSTOM_EMOJI_INVALID")) {
+      const stripped = stripTgEmoji(safeText);
+      return await ctx.reply(stripped, extra);
+    }
+    throw err;
+  }
+}
+
+/**
+ * Safely edit message text ignoring Telegram 400 "message is not modified",
+ * with automatic fallback if custom emoji IDs are invalid (DOCUMENT_INVALID).
  */
 export async function safeEditMessageText(
   ctx: BotContext,
@@ -39,7 +68,17 @@ export async function safeEditMessageText(
       } catch {}
     }
     const safeText = clampMessageText(toValidUtf8(text));
-    await ctx.editMessageText(safeText, extra);
+    try {
+      await ctx.editMessageText(safeText, extra);
+    } catch (err: any) {
+      const desc = err?.description || err?.message || "";
+      if (desc.includes("DOCUMENT_INVALID") || desc.includes("CUSTOM_EMOJI_INVALID")) {
+        const stripped = stripTgEmoji(safeText);
+        await ctx.editMessageText(stripped, extra);
+        return;
+      }
+      throw err;
+    }
   } catch (err: any) {
     const desc = err?.description || err?.message || "";
     if (desc.includes("message is not modified") || desc.includes("query is too old")) {

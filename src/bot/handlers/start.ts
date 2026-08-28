@@ -6,6 +6,7 @@ import { SlotHistoryDAO } from "../../db/dao/slotHistory.js";
 import { renderDashboardText } from "../menus/mainDashboard.js";
 import { renderPoolDetailText } from "../menus/poolDetail.js";
 import { renderSubscriptionsText } from "../menus/subscriptions.js";
+import { safeReply } from "../views/common.js";
 
 import { LiveDashboardManager } from "../liveSync/liveDashboardManager.js";
 import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
@@ -35,7 +36,7 @@ export function createStartHandler(
       if (match && typeof match === "string") {
         (ctx.session as any).pendingDeepLink = match;
       }
-      await ctx.reply(ctx.t("onboarding.welcome_title"), {
+      await safeReply(ctx, ctx.t("onboarding.welcome_title"), {
         reply_markup: languageMenu,
         parse_mode: "HTML",
         link_preview_options: { is_disabled: true },
@@ -46,7 +47,7 @@ export function createStartHandler(
       if (match.startsWith("pool_") && poolDetailMenu) {
         const slug = match.replace("pool_", "");
         ctx.session.tempPoolSlug = slug;
-        const msg = await ctx.reply(renderPoolDetailText(ctx, poolStateDao, historyDao, scraper), {
+        const msg = await safeReply(ctx, renderPoolDetailText(ctx, poolStateDao, historyDao, scraper), {
           reply_markup: poolDetailMenu,
           parse_mode: "HTML",
           link_preview_options: { is_disabled: true },
@@ -55,7 +56,7 @@ export function createStartHandler(
         return;
       }
       if ((match === "alerts" || match === "subscriptions") && subDao && subscriptionsMenu) {
-        const msg = await ctx.reply(renderSubscriptionsText(ctx, subDao), {
+        const msg = await safeReply(ctx, renderSubscriptionsText(ctx, subDao), {
           reply_markup: subscriptionsMenu,
           parse_mode: "HTML",
           link_preview_options: { is_disabled: true },
@@ -65,7 +66,7 @@ export function createStartHandler(
       }
     }
 
-    const msg = await ctx.reply(renderDashboardText(ctx, poolStateDao, historyDao, scraper), {
+    const msg = await safeReply(ctx, renderDashboardText(ctx, poolStateDao, historyDao, scraper), {
       reply_markup: mainDashboardMenu,
       parse_mode: "HTML",
       link_preview_options: { is_disabled: true },
