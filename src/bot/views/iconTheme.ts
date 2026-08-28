@@ -20,6 +20,7 @@ export type IconKey =
   | "status_live"
   | "status_standby"
   | "status_delay"
+  | "onboarding_wave"
   // Compute Pools & Tiers
   | "pool_flagship"
   | "pool_frontier"
@@ -132,6 +133,11 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     customEmojiId: "5251305755172169919",
     unicodeFallback: "⚠️",
     name: "Animated Warning Orb",
+  },
+  onboarding_wave: {
+    customEmojiId: "5385627258385966459",
+    unicodeFallback: "👋",
+    name: "3D Waving Hand",
   },
 
   // Pools

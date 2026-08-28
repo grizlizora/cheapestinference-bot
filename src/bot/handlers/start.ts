@@ -12,6 +12,7 @@ import { LiveDashboardManager } from "../liveSync/liveDashboardManager.js";
 import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
 
 import { isUserAdmin } from "../../config/env.js";
+import { icon } from "../views/iconTheme.js";
 
 export function createStartHandler(
   userDao: UserDAO,
@@ -41,7 +42,7 @@ export function createStartHandler(
       if (match && typeof match === "string") {
         (ctx.session as any).pendingDeepLink = match;
       }
-      await safeReply(ctx, ctx.t("onboarding.welcome_title"), {
+      await safeReply(ctx, ctx.t("onboarding.welcome_title", { wave_icon: icon("onboarding_wave") }), {
         reply_markup: languageMenu,
         parse_mode: "HTML",
         link_preview_options: { is_disabled: true },

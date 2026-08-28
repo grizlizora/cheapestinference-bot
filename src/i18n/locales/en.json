@@ -25,7 +25,7 @@
     "unknown": "Unknown"
   },
   "onboarding": {
-    "welcome_title": "👋 <b>Welcome to CheapestInference Slot Monitor!</b>\n\nThis bot tracks live availability and slot drops across <b>Flagship, Frontier, and Core</b> compute pools on <a href=\"https://cheapestinference.com/pools\">cheapestinference.com</a>.\n\nPlease select your preferred language:",
+    "welcome_title": "{wave_icon} <b>Welcome to CheapestInference Slot Monitor!</b>\n\nThis bot tracks live availability and slot drops across <b>Flagship, Frontier, and Core</b> compute pools on <a href=\"https://cheapestinference.com/pools\">cheapestinference.com</a>.\n\nPlease select your preferred language:",
     "change_language_prompt": "🌐 <b>Change Interface Language</b>\n\nPlease select your preferred language:",
     "language_selected": "✅ Language set: <b>English 🇬🇧</b>"
   },

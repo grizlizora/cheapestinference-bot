@@ -25,7 +25,7 @@
     "unknown": "Невідомо"
   },
   "onboarding": {
-    "welcome_title": "👋 <b>Ласкаво просимо до CheapestInference Slot Monitor!</b>\n\nЦей бот у реальному часі відстежує появу та зникнення вільних слотів у тарифах <b>Flagship, Frontier та Core</b> на сайті <a href=\"https://cheapestinference.com/pools\">cheapestinference.com</a>.\n\nБудь ласка, оберіть зручну мову для продовження:",
+    "welcome_title": "{wave_icon} <b>Ласкаво просимо до CheapestInference Slot Monitor!</b>\n\nЦей бот у реальному часі відстежує появу та зникнення вільних слотів у тарифах <b>Flagship, Frontier та Core</b> на сайті <a href=\"https://cheapestinference.com/pools\">cheapestinference.com</a>.\n\nБудь ласка, оберіть зручну мову для продовження:",
     "change_language_prompt": "🌐 <b>Зміна мови інтерфейсу</b>\n\nОберіть зручну мову для роботи з ботом:",
     "language_selected": "✅ Мову встановлено: <b>Українська 🇺🇦</b>"
   },
