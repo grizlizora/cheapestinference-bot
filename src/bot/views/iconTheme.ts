@@ -374,7 +374,7 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
 
 // Internal active configuration state
 let activeOverrides: Partial<Record<IconKey, string>> = {};
-let activeRenderMode: IconRenderMode = "unicode_only";
+let activeRenderMode: IconRenderMode = "custom_emoji";
 
 // Pre-compiled string cache for zero-latency lookups
 const precompiledHtmlCache = new Map<IconKey, string>();
