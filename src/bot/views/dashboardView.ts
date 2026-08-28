@@ -74,23 +74,22 @@ export function renderDashboardText(
       const rawModels = (p.models || []).slice(0, 10).join(", ");
       const modelsText = escapeHtml(rawModels) || ctx.t("common.custom_models");
 
-      const card = ctx.t("menu.pool_summary_card", {
-        pool_name: escapeHtml(p.name),
-        status_badge: statusBadge,
-        models: modelsText,
-        min_price: p.min_price,
-        available_count: p.available_count,
-        total_blocks: p.total_blocks || 3,
-        url: `https://cheapestinference.com/pools/${p.slug}`,
-      });
-
-      // Elevate pool icon to specific animated custom emoji
       let poolIcon = icon("pool_generic");
       if (p.slug.includes("flagship")) poolIcon = icon("pool_flagship");
       else if (p.slug.includes("core")) poolIcon = icon("pool_core");
       else if (p.slug.includes("frontier")) poolIcon = icon("pool_frontier");
 
-      return `${poolIcon} ${stripLeadingEmoji(card)}`;
+      const statusLabel = ctx.lang === "uk" ? "Статус" : ctx.lang === "ru" ? "Статус" : "Status";
+      const blocksFreeText = ctx.lang === "uk" ? "блоків вільно" : ctx.lang === "ru" ? "блоков свободно" : "blocks free";
+      const modelsLabel = ctx.lang === "uk" ? "Моделі" : ctx.lang === "ru" ? "Модели" : "Models";
+      const basePriceLabel = ctx.lang === "uk" ? "Базовий тариф: від" : ctx.lang === "ru" ? "Базовый тариф: от" : "Base price: from";
+      const urlText = ctx.lang === "uk" ? "Сторінка тарифу на сайті" : ctx.lang === "ru" ? "Страница тарифа на сайте" : "Plan page on website";
+
+      return `${poolIcon} <b>${escapeHtml(p.name)}</b>\n` +
+        `• ${statusLabel}: ${statusBadge} <i>(${p.available_count}/${p.total_blocks || 3} ${blocksFreeText})</i>\n` +
+        `• ${modelsLabel}: <code>${modelsText}</code>\n` +
+        `• ${basePriceLabel} <b>$${p.min_price}/міс</b>\n` +
+        `${icon("nav_link")} <a href="https://cheapestinference.com/pools/${p.slug}">${urlText}</a>`;
     })
     .join("\n\n");
 

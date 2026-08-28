@@ -262,9 +262,9 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     name: "3D Sync Refresh",
   },
   nav_settings: {
-    customEmojiId: "5334882760735598374",
+    customEmojiId: "5341715473882955310",
     unicodeFallback: "⚙️",
-    name: "3D Settings Memo",
+    name: "Animated 3D Spinning Gear",
   },
   nav_admin: {
     customEmojiId: "5467406098367521267",

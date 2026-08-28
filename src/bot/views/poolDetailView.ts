@@ -62,7 +62,7 @@ export function renderPoolSettingsText(
     `• ${icon("event_slot_sold")} ${soldLabel}: ${flags.soldOut ? onText : offText}\n` +
     `• ${icon("event_batch_drop")} ${modelsLabel}: ${flags.models ? onText : offText}\n` +
     `• ${icon("price_tag")} ${pricesLabel}: ${flags.prices ? onText : offText}\n\n` +
-    `${poolIcon} <b>${subStatusLabel}:</b> ${poolStatus}`;
+    `${icon("pool_generic")} <b>${subStatusLabel}:</b> ${poolStatus}`;
 }
 
 export function renderPoolDetailText(
