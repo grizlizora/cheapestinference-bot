@@ -128,9 +128,11 @@ export function renderSettingsText(ctx: BotContext): string {
   const langLabel = ctx.lang === "uk" ? "Поточна мова" : ctx.lang === "ru" ? "Текущий язык" : "Current language";
   const idLabel = ctx.lang === "uk" ? "Ваш Telegram ID" : ctx.lang === "ru" ? "Ваш Telegram ID" : "Your Telegram ID";
 
+  const idIcon = `<tg-emoji emoji-id="5422683699130933153">🪪</tg-emoji>`;
+
   const rendered = `${icon("nav_settings")} ${headerTitle}\n\n` +
     `${icon("nav_language")} ${langLabel}: <b>${currentLang}</b>\n` +
-    `🆔 ${idLabel}: <code>${ctx.from?.id || "N/A"}</code>`;
+    `${idIcon} ${idLabel}: <code>${ctx.from?.id || "N/A"}</code>`;
 
   return clampMessageText(rendered);
 }
