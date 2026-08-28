@@ -25,6 +25,7 @@ import { renderDonateText } from "../views/donateView.js";
 import { renderPoolDetailText } from "../views/poolDetailView.js";
 import { safeEditMessageText } from "../views/common.js";
 import { POOL_RANKS } from "../views/poolRanks.js";
+import { icon } from "../views/iconTheme.js";
 
 export function createMainMenuHierarchy(
   poolStateDao: PoolStateDAO,
@@ -286,7 +287,7 @@ export function createMainMenuHierarchy(
           ctx.t("common.back"),
           "donate_cancel_custom"
         );
-        await safeEditMessageText(ctx, ctx.t("donate.prompt_custom_stars"), cancelKeyboard);
+        await safeEditMessageText(ctx, ctx.t("donate.prompt_custom_stars", { star_icon: icon("star") }), cancelKeyboard);
       }
     )
     .row();

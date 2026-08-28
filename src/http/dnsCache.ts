@@ -40,8 +40,12 @@ export class InMemoryDnsCache {
         if (opts.all) {
           effectiveCb(null, records);
         } else {
-          const first = records[0] || { address: "127.0.0.1", family: 4 };
-          effectiveCb(null, first.address, first.family);
+          const first = records[0];
+          if (!first) {
+            effectiveCb(new Error(`ENOTFOUND ${hostname}`), "", 4);
+          } else {
+            effectiveCb(null, first.address, first.family);
+          }
         }
       })
       .catch((err) => effectiveCb(err, "", 4));

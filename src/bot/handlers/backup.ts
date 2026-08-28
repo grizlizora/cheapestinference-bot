@@ -115,14 +115,33 @@ export function createUsersExportHandler(
       const stats = userDao.getUserStats();
       const activeSubsCount = subDao.getTotalActiveSubscriptions();
 
+      const lang = ctx.lang || "en";
+      const title = lang === "uk"
+        ? `${icon("nav_admin")} <b>CheapestInference — Звіт користувачів (Excel/CSV)</b>`
+        : lang === "ru"
+        ? `${icon("nav_admin")} <b>CheapestInference — Отчёт пользователей (Excel/CSV)</b>`
+        : `${icon("nav_admin")} <b>CheapestInference — Users Report (Excel/CSV)</b>`;
+
+      const dateLabel = lang === "uk" ? "Дата вивантаження:" : lang === "ru" ? "Дата выгрузки:" : "Export Date:";
+      const totalUsersLabel = lang === "uk" ? "Всього користувачів:" : lang === "ru" ? "Всего пользователей:" : "Total Users:";
+      const activeLabel = lang === "uk" ? "Активні" : lang === "ru" ? "Активные" : "Active";
+      const blockedLabel = lang === "uk" ? "Заблокували" : lang === "ru" ? "Заблокировали" : "Blocked";
+      const rulesLabel = lang === "uk" ? "Всього правил підписок:" : lang === "ru" ? "Всего правил подписок:" : "Total Subscriptions:";
+      const formatLabel = lang === "uk" ? "Формат:" : lang === "ru" ? "Формат:" : "Format:";
+      const tipText = lang === "uk"
+        ? "\n💡 <i>Файл можна відкрити в Microsoft Excel, Google Таблицях або Apple Numbers.</i>"
+        : lang === "ru"
+        ? "\n💡 <i>Файл можно открыть в Microsoft Excel, Google Таблицах или Apple Numbers.</i>"
+        : "\n💡 <i>File can be opened in Microsoft Excel, Google Sheets, or Apple Numbers.</i>";
+
       const caption = [
-        `${icon("nav_admin")} <b>CheapestInference — Звіт користувачів (Excel/CSV)</b>`,
+        title,
         `━━━━━━━━━━━━━━━━━━━━━━━━`,
-        `${icon("nav_clock")} <b>Дата вивантаження:</b> <code>${new Date().toISOString()}</code>`,
-        `<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> <b>Всього користувачів:</b> <code>${stats.total}</code> (Активні: ${stats.active}, Заблокували: ${stats.blocked})`,
-        `${icon("notify_bell_on")} <b>Всього правил підписок:</b> <code>${activeSubsCount}</code>`,
-        `${icon("nav_chart")} <b>Формат:</b> <code>CSV UTF-8 (Excel-Ready)</code>`,
-        `\n💡 <i>Файл можна відкрити в Microsoft Excel, Google Таблицях або Apple Numbers.</i>`,
+        `${icon("nav_clock")} <b>${dateLabel}</b> <code>${new Date().toISOString()}</code>`,
+        `<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> <b>${totalUsersLabel}</b> <code>${stats.total}</code> (${activeLabel}: ${stats.active}, ${blockedLabel}: ${stats.blocked})`,
+        `${icon("notify_bell_on")} <b>${rulesLabel}</b> <code>${activeSubsCount}</code>`,
+        `${icon("nav_chart")} <b>${formatLabel}</b> <code>CSV UTF-8 (Excel-Ready)</code>`,
+        tipText,
       ].join("\n");
 
       await ctx.replyWithDocument(new InputFile(csvBuffer, filename), {
@@ -278,14 +297,36 @@ export function createHistoryExportHandler(
       const timestamp = new Date().toISOString().slice(0, 10);
       const filename = `history_cheapestinference_${timestamp}.csv`;
 
+      const lang = ctx.lang || "en";
+      const title = lang === "uk"
+        ? `${icon("event_tier_update")} <b>CheapestInference — Повна історія всіх змін (Excel/CSV)</b>`
+        : lang === "ru"
+        ? `${icon("event_tier_update")} <b>CheapestInference — Полная история всех изменений (Excel/CSV)</b>`
+        : `${icon("event_tier_update")} <b>CheapestInference — Full Change History (Excel/CSV)</b>`;
+
+      const dateLabel = lang === "uk" ? "Дата вивантаження:" : lang === "ru" ? "Дата выгрузки:" : "Export Date:";
+      const totalRecLabel = lang === "uk" ? "Всього історичних записів:" : lang === "ru" ? "Всего исторических записей:" : "Total Historic Records:";
+      const includesLabel = lang === "uk" ? "Включає:" : lang === "ru" ? "Включает:" : "Includes:";
+      const includesDesc = lang === "uk"
+        ? "відкриття/закриття слотів, час життя в наявності, історія змін цін, оновлення моделей ШІ."
+        : lang === "ru"
+        ? "открытие/закрытие слотов, время жизни в наличии, история изменений цен, обновления моделей ИИ."
+        : "slot open/close events, active lifespan, price change history, and AI model upgrades.";
+      const formatLabel = lang === "uk" ? "Формат:" : lang === "ru" ? "Формат:" : "Format:";
+      const tipText = lang === "uk"
+        ? "\n💡 <i>Файл зручно аналізувати та будувати графіки в Excel або Google Таблицях.</i>"
+        : lang === "ru"
+        ? "\n💡 <i>Файл удобно анализировать и строить графики в Excel или Google Таблицах.</i>"
+        : "\n💡 <i>Convenient for analysis and charts in Microsoft Excel or Google Sheets.</i>";
+
       const caption = [
-        `${icon("event_tier_update")} <b>CheapestInference — Повна історія всіх змін (Excel/CSV)</b>`,
+        title,
         `━━━━━━━━━━━━━━━━━━━━━━━━`,
-        `${icon("nav_clock")} <b>Дата вивантаження:</b> <code>${new Date().toISOString()}</code>`,
-        `${icon("nav_chart")} <b>Всього історичних записів:</b> <code>${combined.length}</code>`,
-        `${icon("event_slot_drop")} <b>Включає:</b> відкриття/закриття слотів, час життя в наявності, історія змін цін, оновлення моделей ШІ.`,
-        `${icon("pool_generic")} <b>Формат:</b> <code>CSV UTF-8 (Excel-Ready)</code>`,
-        `\n💡 <i>Файл зручно аналізувати та будувати графіки в Excel або Google Таблицях.</i>`,
+        `${icon("nav_clock")} <b>${dateLabel}</b> <code>${new Date().toISOString()}</code>`,
+        `${icon("nav_chart")} <b>${totalRecLabel}</b> <code>${combined.length}</code>`,
+        `${icon("event_slot_drop")} <b>${includesLabel}</b> ${includesDesc}`,
+        `${icon("pool_generic")} <b>${formatLabel}</b> <code>CSV UTF-8 (Excel-Ready)</code>`,
+        tipText,
       ].join("\n");
 
       await ctx.replyWithDocument(new InputFile(csvBuffer, filename), {
@@ -364,14 +405,28 @@ export function createBackupHandler(
       const userStats = userDao.getUserStats();
       const activeSubs = subDao.getTotalActiveSubscriptions();
 
+      const lang = ctx.lang || "en";
+      const backupTitle = lang === "uk"
+        ? `${icon("pool_core")} <b>CheapestInference — Знімок бази даних SQLite (.db)</b>`
+        : lang === "ru"
+        ? `${icon("pool_core")} <b>CheapestInference — Снимок базы данных SQLite (.db)</b>`
+        : `${icon("pool_core")} <b>CheapestInference SQLite Database Snapshot</b>`;
+
+      const dateLabel = lang === "uk" ? "Дата:" : lang === "ru" ? "Дата:" : "Date:";
+      const sizeLabel = lang === "uk" ? "Розмір файлу:" : lang === "ru" ? "Размер файла:" : "File Size:";
+      const timeLabel = lang === "uk" ? "Час створення:" : lang === "ru" ? "Время создания:" : "Snapshot Time:";
+      const usersLabel = lang === "uk" ? "Всього користувачів:" : lang === "ru" ? "Всего пользователей:" : "Total Users:";
+      const activeLabel = lang === "uk" ? "Активні" : lang === "ru" ? "Активные" : "Active";
+      const subsLabel = lang === "uk" ? "Активні підписки:" : lang === "ru" ? "Активные подписки:" : "Active Subscriptions:";
+
       const caption = [
-        `${icon("pool_core")} <b>CheapestInference SQLite Database Snapshot</b>`,
+        backupTitle,
         `━━━━━━━━━━━━━━━━━━━━━━━━`,
-        `${icon("nav_clock")} <b>Date:</b> <code>${new Date().toISOString()}</code>`,
-        `${icon("pool_generic")} <b>File Size:</b> <code>${sizeMb} MB</code> (${fileStats.size.toLocaleString()} bytes)`,
-        `${icon("event_slot_drop")} <b>Snapshot Time:</b> <code>${durationMs}ms</code>`,
-        `<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> <b>Total Users:</b> <code>${userStats.total}</code> (Active: ${userStats.active})`,
-        `${icon("notify_bell_on")} <b>Active Subscriptions:</b> <code>${activeSubs}</code>`,
+        `${icon("nav_clock")} <b>${dateLabel}</b> <code>${new Date().toISOString()}</code>`,
+        `${icon("pool_generic")} <b>${sizeLabel}</b> <code>${sizeMb} MB</code> (${fileStats.size.toLocaleString()} bytes)`,
+        `${icon("event_slot_drop")} <b>${timeLabel}</b> <code>${durationMs}ms</code>`,
+        `<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> <b>${usersLabel}</b> <code>${userStats.total}</code> (${activeLabel}: ${userStats.active})`,
+        `${icon("notify_bell_on")} <b>${subsLabel}</b> <code>${activeSubs}</code>`,
         `${icon("event_slot_sold")} <b>SHA-256:</b> <code>${sha256Hash.substring(0, 16)}...${sha256Hash.substring(48)}</code>`,
       ].join("\n");
 

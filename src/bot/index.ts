@@ -537,7 +537,7 @@ export function createTelegramBot(
           ctx.t("common.back"),
           "donate_cancel_custom"
         );
-        await ctx.reply(ctx.t("donate.error_invalid_custom_stars"), {
+        await ctx.reply(ctx.t("donate.error_invalid_custom_stars", { star_icon: icon("star") }), {
           parse_mode: "HTML",
           reply_markup: cancelKeyboard,
         });
@@ -547,7 +547,7 @@ export function createTelegramBot(
       ctx.session.waitingForCustomStars = false;
       ctx.session.pendingCustomStars = num;
 
-      const confirmText = ctx.t("donate.confirm_custom_stars_title", { stars: String(num) });
+      const confirmText = ctx.t("donate.confirm_custom_stars_title", { stars: String(num), star_icon: icon("star") });
       const keyboard = new InlineKeyboard()
         .text(ctx.t("donate.btn_confirm_pay"), `confirm_custom_stars:${num}`)
         .row()
