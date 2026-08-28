@@ -87,29 +87,29 @@ export type IconRenderMode = "custom_emoji" | "unicode_only" | "markdown_v2";
 export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
   // Status & Health
   status_available: {
-    customEmojiId: "5427009714745517609",
+    customEmojiId: "5416081784641168838",
     unicodeFallback: "🟢",
-    name: "3D Emerald Checkmark",
+    name: "Animated Green Status Orb",
   },
   status_partially_available: {
-    customEmojiId: "5361748661640372834",
+    customEmojiId: "5251305755172169919",
     unicodeFallback: "🟡",
-    name: "3D Trend Indicator",
+    name: "Animated Yellow Status Orb",
   },
   status_limited: {
-    customEmojiId: "5361748661640372834",
+    customEmojiId: "5251305755172169919",
     unicodeFallback: "🟡",
-    name: "3D Trend Indicator",
+    name: "Animated Yellow Status Orb",
   },
   status_sold_out: {
-    customEmojiId: "5465665476971471368",
+    customEmojiId: "5411225014148014586",
     unicodeFallback: "🔴",
-    name: "3D Crimson Cross",
+    name: "Animated Red Status Orb",
   },
   status_live: {
-    customEmojiId: "5264727218734524899",
+    customEmojiId: "5416081784641168838",
     unicodeFallback: "🟢",
-    name: "3D Sync Spin",
+    name: "Animated Live Green Ping",
   },
   status_standby: {
     customEmojiId: "5451959871257713464",
@@ -117,9 +117,9 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     name: "3D Slumber Zzz",
   },
   status_delay: {
-    customEmojiId: "5465665476971471368",
+    customEmojiId: "5251305755172169919",
     unicodeFallback: "⚠️",
-    name: "3D Warning",
+    name: "Animated Warning Orb",
   },
 
   // Pools
@@ -129,9 +129,9 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     name: "3D Hyperdrive Rocket",
   },
   pool_frontier: {
-    customEmojiId: "5420315771991497307",
+    customEmojiId: "5456140674028019486",
     unicodeFallback: "⚡",
-    name: "3D Plasma Fire",
+    name: "Animated Electric Cyan Bolt",
   },
   pool_core: {
     customEmojiId: "5237799019329105246",
@@ -139,9 +139,9 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     name: "3D Cyber Brain",
   },
   pool_generic: {
-    customEmojiId: "5472164874886846699",
+    customEmojiId: "5854908544712707500",
     unicodeFallback: "📦",
-    name: "3D Quantum Sparkle",
+    name: "Animated Moving 3D Box",
   },
 
   // Regions
@@ -168,14 +168,14 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
 
   // Events
   event_slot_drop: {
-    customEmojiId: "5420315771991497307",
+    customEmojiId: "5456140674028019486",
     unicodeFallback: "⚡",
-    name: "3D Slot Drop Fire",
+    name: "Animated Slot Drop Lightning",
   },
   event_slot_sold: {
-    customEmojiId: "5465665476971471368",
+    customEmojiId: "5296369303661067030",
     unicodeFallback: "🔒",
-    name: "3D Slot Sold Cross",
+    name: "Animated Shut Padlock",
   },
   event_price_drop: {
     customEmojiId: "5361748661640372834",
@@ -245,9 +245,9 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     name: "3D Cyber Llama",
   },
   ai_mistral: {
-    customEmojiId: "5420315771991497307",
+    customEmojiId: "6332347924063717264",
     unicodeFallback: "🌪️",
-    name: "3D Mistral Fire",
+    name: "Animated Mistral Vortex",
   },
 
   // Navigation
