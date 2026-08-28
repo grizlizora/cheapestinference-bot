@@ -12,15 +12,41 @@ export interface TruncateOptions {
 const VOID_TAGS = new Set(["br", "hr", "img", "input", "meta", "link"]);
 
 /**
+ * Ensures a string contains 100% valid UTF-8 / well-formed UTF-16 code units.
+ * Eliminates any lone surrogates (U+D800..U+DFFF) and raw surrogate escapes.
+ */
+export function toValidUtf8(text: string): string {
+  if (!text) return "";
+  const wellFormed = typeof (text as any).toWellFormed === "function" ? (text as any).toWellFormed() : text;
+  return wellFormed.replace(/\uFFFD/g, "").replace(/\\u[dD][89a-fA-F][0-9a-fA-F]{2}/g, "");
+}
+
+/**
+ * Slices a string safely without bisecting UTF-16 surrogate pairs.
+ */
+export function safeUnicodeSlice(text: string, start: number, end: number): string {
+  if (!text) return "";
+  let sliceEnd = Math.min(text.length, end);
+  if (sliceEnd > 0 && sliceEnd < text.length) {
+    const charCode = text.charCodeAt(sliceEnd - 1);
+    if (charCode >= 0xd800 && charCode <= 0xdbff) {
+      sliceEnd -= 1;
+    }
+  }
+  return text.slice(start, sliceEnd);
+}
+
+/**
  * Balances unclosed HTML tags in a string using a strict LIFO stack.
  */
 export function balanceHtmlTags(html: string): string {
   if (!html) return "";
 
+  const sanitized = toValidUtf8(html);
   const stack: string[] = [];
   const tagRegex = /<\/?([a-z0-9_-]+)[^>]*>/gi;
 
-  for (const match of html.matchAll(tagRegex)) {
+  for (const match of sanitized.matchAll(tagRegex)) {
     const fullTag = match[0];
     const tagName = match[1].toLowerCase();
 
@@ -38,7 +64,7 @@ export function balanceHtmlTags(html: string): string {
     }
   }
 
-  let result = html;
+  let result = sanitized;
   while (stack.length > 0) {
     const tagToClose = stack.pop();
     result += `</${tagToClose}>`;
@@ -56,18 +82,19 @@ export function truncateToTelegramLimit(
 ): string {
   if (!text) return "";
 
-  if (text.length <= maxLen) {
-    return balanceHtmlTags(text);
+  const sanitized = toValidUtf8(text);
+  if (sanitized.length <= maxLen) {
+    return balanceHtmlTags(sanitized);
   }
 
   const reserve = options?.reserveLength ?? 30;
   const ellipsis = options?.ellipsis ?? "\n\n<i>...[truncated]</i>";
 
-  let truncated = text.substring(0, maxLen - reserve);
+  let truncated = safeUnicodeSlice(sanitized, 0, maxLen - reserve);
   const lastNewline = truncated.lastIndexOf("\n");
   const minCutoff = maxLen - reserve - 400;
   if (lastNewline > minCutoff && lastNewline > 0) {
-    truncated = truncated.substring(0, lastNewline);
+    truncated = safeUnicodeSlice(truncated, 0, lastNewline);
   }
 
   // Strip broken opening tag truncated mid-attribute and cut entities

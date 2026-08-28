@@ -9,7 +9,7 @@ import { SubscriptionDAO } from "../../db/dao/subscriptions.js";
 import { SlotHistoryDAO } from "../../db/dao/slotHistory.js";
 import { AvailabilityIntelligenceEngine } from "../../engine/intelligenceEngine.js";
 import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
-import { escapeHtml, formatRelativeTime } from "../../i18n/index.js";
+import { escapeHtml, formatRelativeTime, stripLeadingEmoji } from "../../i18n/index.js";
 import { clampMessageText, formatMonitoringFooter } from "./common.js";
 
 import { icon, getRegionalGlobeIcon } from "./iconTheme.js";
@@ -93,10 +93,11 @@ export function renderPoolDetailText(
 
       const isAvailable = b.status === "available" || b.status === "limited";
       const statusIcon = isAvailable ? icon("status_available") : icon("status_sold_out");
-      const rawStatusText = (isAvailable
-        ? ctx.t("common.status_available")
-        : ctx.t("common.status_sold_out")
-      ).replace(/^[🟢🟡🔴]\s*/, "");
+      const textKey = isAvailable ? "common.status_available_text" : "common.status_sold_out_text";
+      const directText = ctx.t(textKey);
+      const rawStatusText = (directText && directText !== textKey)
+        ? directText
+        : stripLeadingEmoji(isAvailable ? ctx.t("common.status_available") : ctx.t("common.status_sold_out"));
       const statusBadge = `${statusIcon} ${rawStatusText}`;
 
       const blockIcon = getBlockIcon(b.block_id);

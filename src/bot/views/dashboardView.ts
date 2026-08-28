@@ -2,7 +2,7 @@ import { BotContext } from "../../types/context.js";
 import { PoolStateDAO } from "../../db/dao/poolState.js";
 import { SlotHistoryDAO } from "../../db/dao/slotHistory.js";
 import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
-import { escapeHtml, formatRelativeTime } from "../../i18n/index.js";
+import { escapeHtml, formatRelativeTime, stripLeadingEmoji } from "../../i18n/index.js";
 import { clampMessageText, formatMonitoringFooter } from "./common.js";
 import { icon, getRawUnicode, IconKey } from "./iconTheme.js";
 
@@ -65,7 +65,11 @@ export function renderDashboardText(
   const poolSummariesText = summaries
     .map((p) => {
       const badgeInfo = computePoolBadgeInfo(p.available_count, p.total_blocks);
-      const rawStatusText = ctx.t(badgeInfo.statusBadgeKey).replace(/^[🟢🟡🔴]\s*/, "");
+      const textKey = `${badgeInfo.statusBadgeKey}_text`;
+      const directText = ctx.t(textKey);
+      const rawStatusText = (directText && directText !== textKey)
+        ? directText
+        : stripLeadingEmoji(ctx.t(badgeInfo.statusBadgeKey));
       const statusBadge = `${badgeInfo.iconHtml} ${rawStatusText}`;
       const rawModels = (p.models || []).slice(0, 10).join(", ");
       const modelsText = escapeHtml(rawModels) || ctx.t("common.custom_models");
@@ -80,8 +84,8 @@ export function renderDashboardText(
         url: `https://cheapestinference.com/pools/${p.slug}`,
       });
 
-      // Elevate pool box icon to animated custom emoji if available
-      return card.replace(/^📦\s*/, `${icon("pool_generic")} `);
+      // Elevate pool box icon to animated custom emoji safely
+      return `${icon("pool_generic")} ${stripLeadingEmoji(card)}`;
     })
     .join("\n\n");
 

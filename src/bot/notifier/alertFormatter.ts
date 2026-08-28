@@ -5,7 +5,7 @@
 
 import { InlineKeyboard } from "grammy";
 import { DiffEvent, PriceAnalyticsPayload } from "../../types/domain.js";
-import { translate, escapeHtml, SupportedLanguage } from "../../i18n/index.js";
+import { translate, escapeHtml, SupportedLanguage, stripLeadingEmoji } from "../../i18n/index.js";
 import { PackedUserProfile } from "./subscriberIndex.js";
 import { truncateToTelegramLimit } from "./htmlTagBalancer.js";
 import { icon } from "../views/iconTheme.js";
@@ -74,19 +74,19 @@ export function formatPriceRatingBadge(
     pa.avgPrice != null ? (pa.avgPrice % 1 === 0 ? pa.avgPrice.toFixed(0) : pa.avgPrice.toFixed(2)) : "";
 
   if (pa.rating === "all_time_low") {
-    const rawText = (translate(lang, "alerts.price_all_time_low") || `Історичний мінімум! Найнижча ціна ($${currStr})`).replace(/^[🔥⚡]\s*/u, "");
+    const rawText = stripLeadingEmoji(translate(lang, "alerts.price_all_time_low") || `Історичний мінімум! Найнижча ціна ($${currStr})`);
     return `${icon("price_all_time_low")} ${rawText.startsWith("<b>") ? rawText : `<b>${rawText}</b>`}`;
   }
   if (pa.rating === "below_average" && pa.avgPrice != null) {
-    const rawText = (translate(lang, "alerts.price_below_average", { current: currStr, avg: avgStr }) || `Нижче середнього ($${currStr} vs сер. $${avgStr})`).replace(/^[🟢🟡🔴]\s*/u, "");
+    const rawText = stripLeadingEmoji(translate(lang, "alerts.price_below_average", { current: currStr, avg: avgStr }) || `Нижче середнього ($${currStr} vs сер. $${avgStr})`);
     return `${icon("status_available")} ${rawText.startsWith("<b>") ? rawText : `<b>${rawText}</b>`}`;
   }
   if (pa.rating === "above_average" && pa.avgPrice != null) {
-    const rawText = (translate(lang, "alerts.price_above_average", { current: currStr, avg: avgStr }) || `Вище середнього ($${currStr} vs сер. $${avgStr})`).replace(/^[🟢🟡🔴]\s*/u, "");
+    const rawText = stripLeadingEmoji(translate(lang, "alerts.price_above_average", { current: currStr, avg: avgStr }) || `Вище середнього ($${currStr} vs сер. $${avgStr})`);
     return `${icon("status_sold_out")} ${rawText.startsWith("<b>") ? rawText : `<b>${rawText}</b>`}`;
   }
   if (pa.rating === "fair" && pa.avgPrice != null) {
-    const rawText = (translate(lang, "alerts.price_fair_value") || "Стандартна ціна (в межах норми)").replace(/^⚖️?\s*/u, "");
+    const rawText = stripLeadingEmoji(translate(lang, "alerts.price_fair_value") || "Стандартна ціна (в межах норми)");
     return `${icon("price_fair")} ${rawText.startsWith("<b>") ? rawText : `<b>${rawText}</b>`}`;
   }
   return "";
@@ -124,16 +124,17 @@ export function formatAlertMessage(
   if (event.type === "SLOT_APPEARED") {
     const isLimited = event.newStatus === "limited";
     const statusIcon = isLimited ? icon("status_limited") : icon("status_available");
-    const rawStatusText = (isLimited
+    const rawStatusText = stripLeadingEmoji(isLimited
       ? translate(lang, "common.status_limited")
       : translate(lang, "common.status_available")
-    ).replace(/^[🟢🟡🔴]\s*/u, "");
+    );
     const statusBadge = `${statusIcon} ${rawStatusText}`;
 
-    const header = translate(lang, "alerts.slot_appeared_header", {
+    const rawHeader = translate(lang, "alerts.slot_appeared_header", {
       status_icon: statusIcon,
       pool_name: escapeHtml(event.poolName),
-    }).replace(/^[🟢🟡🔴⚡]\s*/u, `${icon("event_slot_drop")} `);
+    });
+    const header = `${icon("event_slot_drop")} ${stripLeadingEmoji(rawHeader)}`;
 
     const body = translate(lang, "alerts.slot_appeared_body", {
       pool_name: escapeHtml(event.poolName),
@@ -152,13 +153,13 @@ export function formatAlertMessage(
       const rawBatch =
         translate(lang, "alerts.tag_multi_region_drop", { count: event.analytics.totalOpenings || 2 }) ||
         "<i>Новий дроп потужностей</i>";
-      const batchBadge = rawBatch.replace(/^[🆕⚡]\s*/u, `${icon("event_batch_drop")} `);
+      const batchBadge = `${icon("event_batch_drop")} ${stripLeadingEmoji(rawBatch)}`;
       text = `${batchBadge}\n${text}`;
     } else if (event.analytics?.demandCategory === "hot" && event.analytics.avgLifespanFormatted) {
       const rawHot =
         translate(lang, "alerts.tag_hot_slot_drop", { duration: escapeHtml(event.analytics.avgLifespanFormatted) }) ||
         `<i>Гарячий слот (розбирають за ${escapeHtml(event.analytics.avgLifespanFormatted)})</i>`;
-      const hotBadge = rawHot.replace(/^[🔥⚡]\s*/u, `${icon("event_hot_slot")} `);
+      const hotBadge = `${icon("event_hot_slot")} ${stripLeadingEmoji(rawHot)}`;
       text = `${hotBadge}\n${text}`;
     } else if (cachedDurationFormatted) {
       text += translate(lang, "alerts.analytics_duration_tip", {
@@ -174,9 +175,10 @@ export function formatAlertMessage(
 
     keyboard = new InlineKeyboard().url(btnLabel, checkoutUrl);
   } else if (event.type === "SLOT_DISAPPEARED") {
-    const header = translate(lang, "alerts.slot_disappeared_header", {
+    const rawHeader = translate(lang, "alerts.slot_disappeared_header", {
       pool_name: escapeHtml(event.poolName),
-    }).replace(/^🔒\s*/u, `${icon("event_slot_sold")} `);
+    });
+    const header = `${icon("event_slot_sold")} ${stripLeadingEmoji(rawHeader)}`;
     let body = translate(lang, "alerts.slot_disappeared_body", {
       pool_name: escapeHtml(event.poolName),
       block_name: escapeHtml(blockName),
@@ -188,9 +190,9 @@ export function formatAlertMessage(
       if (eta.isPredictable) {
         let confBadge = translate(lang, "intelligence.conf_low") || "⚪";
         if (eta.confidence === "HIGH") {
-          confBadge = `${icon("status_available")} ${translate(lang, "intelligence.conf_high")?.replace(/^[🟢🟡🔴]\s*/u, "") || "Висока точність"}`;
+          confBadge = `${icon("status_available")} ${stripLeadingEmoji(translate(lang, "intelligence.conf_high") || "Висока точність")}`;
         } else if (eta.confidence === "MEDIUM") {
-          confBadge = `${icon("status_partially_available")} ${translate(lang, "intelligence.conf_medium")?.replace(/^[🟢🟡🔴]\s*/u, "") || "Середня точність"}`;
+          confBadge = `${icon("status_partially_available")} ${stripLeadingEmoji(translate(lang, "intelligence.conf_medium") || "Середня точність")}`;
         }
         const cadence = eta.detectedCadenceHours === 24
           ? translate(lang, "intelligence.cadence_daily") || "добовий цикл ~24h"
@@ -210,9 +212,10 @@ export function formatAlertMessage(
 
     text = `${header}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${body}`;
   } else if (event.type === "MODEL_UPGRADE_EVENT") {
-    const header = translate(lang, "alerts.model_upgrade_header", {
+    const rawHeader = translate(lang, "alerts.model_upgrade_header", {
       pool_name: escapeHtml(event.poolName),
-    }).replace(/^🚀\s*/u, `${icon("event_model_upgrade")} `);
+    });
+    const header = `${icon("event_model_upgrade")} ${stripLeadingEmoji(rawHeader)}`;
     const diffLines: string[] = [];
 
     if (event.modelUpgrade) {
@@ -260,10 +263,11 @@ export function formatAlertMessage(
   } else if (event.type === "SLOT_PRICE_CHANGED") {
     const isDiscount = (event.slotPrice?.priceDelta || 0) < 0;
     const trendIcon = isDiscount ? icon("event_price_drop") : icon("event_price_hike");
-    const header = translate(lang, "alerts.slot_price_changed_header", {
+    const rawHeader = translate(lang, "alerts.slot_price_changed_header", {
       trend_icon: trendIcon,
       pool_name: escapeHtml(event.poolName),
-    }).replace(/^[📉📈]\s*/, `${trendIcon} `);
+    });
+    const header = `${trendIcon} ${stripLeadingEmoji(rawHeader)}`;
 
     const deltaBadge = event.slotPrice
       ? formatPriceDeltaBadge(event.slotPrice.priceDelta, event.slotPrice.percentageDelta, lang)
@@ -295,10 +299,11 @@ export function formatAlertMessage(
   } else if (event.type === "POOL_BASE_PRICE_CHANGED" || event.type === "PRICE_CHANGED") {
     const isDiscount = (event.basePrice?.priceDelta || 0) < 0;
     const trendIcon = isDiscount ? icon("event_price_drop") : icon("event_price_hike");
-    const header = translate(lang, "alerts.pool_base_price_header", {
+    const rawHeader = translate(lang, "alerts.pool_base_price_header", {
       trend_icon: trendIcon,
       pool_name: escapeHtml(event.poolName),
-    }).replace(/^[📉📈]\s*/, `${trendIcon} `);
+    });
+    const header = `${trendIcon} ${stripLeadingEmoji(rawHeader)}`;
 
     const deltaBadge = event.basePrice
       ? formatPriceDeltaBadge(event.basePrice.priceDelta, event.basePrice.percentageDelta, lang)
@@ -323,9 +328,10 @@ export function formatAlertMessage(
       poolUrl
     );
   } else if (event.type === "TIER_UPDATED_EVENT") {
-    const header = translate(lang, "alerts.tier_updated_header", {
+    const rawHeader = translate(lang, "alerts.tier_updated_header", {
       pool_name: escapeHtml(event.poolName),
-    }).replace(/^📝\s*/, `${icon("event_tier_update")} `);
+    });
+    const header = `${icon("event_tier_update")} ${stripLeadingEmoji(rawHeader)}`;
     const diffLines: string[] = [];
     if (event.tierUpdate?.newDescription) {
       diffLines.push(
@@ -380,9 +386,10 @@ export function formatAlertMessage(
       poolUrl
     );
   } else if (event.type === "NEW_POOL_EVENT") {
-    const header = translate(lang, "alerts.new_pool_header", {
+    const rawHeader = translate(lang, "alerts.new_pool_header", {
       pool_name: escapeHtml(event.poolName),
-    }).replace(/^✨\s*/, `${icon("event_new_pool")} `);
+    });
+    const header = `${icon("event_new_pool")} ${stripLeadingEmoji(rawHeader)}`;
     const body = translate(lang, "alerts.new_pool_body", {
       pool_name: escapeHtml(event.poolName),
       models: (event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", "),
@@ -428,7 +435,7 @@ export function formatBundledAlertMessage(
   const rawTitle =
     translate(lang, "alerts.batch_title", { count }) ||
     `<b>CheapestInference — Slot Updates (${count})</b>`;
-  const title = rawTitle.replace(/^[⚡📦]\s*/, `${icon("event_batch_drop")} `);
+  const title = `${icon("event_batch_drop")} ${stripLeadingEmoji(rawTitle)}`;
 
   const sectionLines: string[] = [];
   const keyboard = new InlineKeyboard();

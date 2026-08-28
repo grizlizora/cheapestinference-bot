@@ -1,6 +1,6 @@
 import { SlotHistoryDAO, SlotAnalytics } from "../db/dao/slotHistory.js";
 import { PredictiveAnalyticsEngine } from "./predictiveEngine.js";
-import { SupportedLanguage, translate } from "../i18n/index.js";
+import { SupportedLanguage, translate, stripLeadingEmoji } from "../i18n/index.js";
 import { icon } from "../bot/views/iconTheme.js";
 
 export interface SmartStatusResult {
@@ -44,10 +44,10 @@ export class AvailabilityIntelligenceEngine {
       if (enhanced.eta.isPredictable) {
         let confBadge = translate(lang, "intelligence.conf_low") || "⚪";
         if (enhanced.eta.confidence === "HIGH") {
-          const rawConf = (translate(lang, "intelligence.conf_high") || "Висока точність").replace(/^[🟢🟡🔴]\s*/u, "");
+          const rawConf = stripLeadingEmoji(translate(lang, "intelligence.conf_high") || "Висока точність");
           confBadge = `${icon("status_available")} ${rawConf}`;
         } else if (enhanced.eta.confidence === "MEDIUM") {
-          const rawConf = (translate(lang, "intelligence.conf_medium") || "Середня точність").replace(/^[🟢🟡🔴]\s*/u, "");
+          const rawConf = stripLeadingEmoji(translate(lang, "intelligence.conf_medium") || "Середня точність");
           confBadge = `${icon("status_partially_available")} ${rawConf}`;
         }
 
@@ -83,10 +83,10 @@ export class AvailabilityIntelligenceEngine {
     let tip = "";
     if (enhanced.avgDurationFormatted) {
       if (isHot) {
-        const rawHot = (translate(lang, "intelligence.tag_sells_out_in", { duration: enhanced.avgDurationFormatted }) || `Розбирають за ${enhanced.avgDurationFormatted}`).replace(/^[⚡🔥]\s*/u, "");
+        const rawHot = stripLeadingEmoji(translate(lang, "intelligence.tag_sells_out_in", { duration: enhanced.avgDurationFormatted }) || `Розбирають за ${enhanced.avgDurationFormatted}`);
         tip = `${icon("event_hot_slot")} <i>${rawHot}</i>`;
       } else {
-        const rawAvg = (translate(lang, "intelligence.tag_avg_uptime", { duration: enhanced.avgDurationFormatted }) || `Середній час наявності: ${enhanced.avgDurationFormatted}`).replace(/^[⏱🕒]\s*/u, "");
+        const rawAvg = stripLeadingEmoji(translate(lang, "intelligence.tag_avg_uptime", { duration: enhanced.avgDurationFormatted }) || `Середній час наявності: ${enhanced.avgDurationFormatted}`);
         tip = `${icon("nav_clock")} <i>${rawAvg}</i>`;
       }
     }

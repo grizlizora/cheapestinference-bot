@@ -21,6 +21,15 @@ export function escapeHtml(str: string): string {
     .replace(/>/g, "&gt;");
 }
 
+/**
+ * Safely removes leading emoji, variation selectors (\uFE0F), skin tones,
+ * and zero-width joiners (\u200D) without bisecting surrogate pairs.
+ */
+export function stripLeadingEmoji(text: string): string {
+  if (!text) return "";
+  return text.replace(/^[\p{Extended_Pictographic}\uFE0F\u200D\s]+/u, "").trim();
+}
+
 export function resolveDefaultLanguage(rawLangCode?: string | null): SupportedLanguage {
   if (!rawLangCode) return "en";
 

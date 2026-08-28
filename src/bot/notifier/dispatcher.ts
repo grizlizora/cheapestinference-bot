@@ -13,6 +13,7 @@ import { SubscriberInvertedIndex, PackedUserProfile } from "./subscriberIndex.js
 import { CircularRingBuffer } from "./circularRingBuffer.js";
 import { SupportedLanguage } from "../../i18n/index.js";
 import { NotificationRateLimiter } from "./rateLimiter.js";
+import { toValidUtf8 } from "./htmlTagBalancer.js";
 import {
   BroadcastPriority,
   OutgoingAlertMessage,
@@ -349,7 +350,9 @@ export class NotificationDispatcher {
     try {
       this.rateLimiter.recordUserDispatch(msg.telegramId, Date.now());
 
-      await this.bot.api.sendMessage(msg.telegramId, msg.text, {
+      const sanitizedText = toValidUtf8(msg.text);
+
+      await this.bot.api.sendMessage(msg.telegramId, sanitizedText, {
         parse_mode: "HTML",
         reply_markup: msg.keyboard,
         disable_notification: msg.isMuted,

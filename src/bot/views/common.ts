@@ -4,7 +4,7 @@
  */
 
 import { BotContext } from "../../types/context.js";
-import { truncateToTelegramLimit } from "../notifier/htmlTagBalancer.js";
+import { truncateToTelegramLimit, toValidUtf8 } from "../notifier/htmlTagBalancer.js";
 import { icon } from "./iconTheme.js";
 
 /**
@@ -18,7 +18,7 @@ export const TELEGRAM_MAX_TEXT_LENGTH = 3900;
  * balancing all unclosed HTML tags and entities in strict LIFO order.
  */
 export function clampMessageText(text: string, maxLength: number = TELEGRAM_MAX_TEXT_LENGTH): string {
-  return truncateToTelegramLimit(text, maxLength, {
+  return truncateToTelegramLimit(toValidUtf8(text), maxLength, {
     ellipsis: "\n\n<i>... [text truncated for display limit]</i>",
     reserveLength: 45,
   });
@@ -38,7 +38,7 @@ export async function safeEditMessageText(
         (ctx as any).menu.update();
       } catch {}
     }
-    const safeText = clampMessageText(text);
+    const safeText = clampMessageText(toValidUtf8(text));
     await ctx.editMessageText(safeText, extra);
   } catch (err: any) {
     const desc = err?.description || err?.message || "";
