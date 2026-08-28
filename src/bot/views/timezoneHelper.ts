@@ -55,22 +55,31 @@ export function formatBlockHoursWithLocal(
   return `${hoursUtc} (${localStart} – ${localEnd} ${city})`;
 }
 
+export interface ShiftInfo {
+  icon: string;
+  name: string;
+  shiftName: string;
+}
+
 /**
- * Returns the personified shift title with 3D celestial icon and globe
+ * Returns the personified shift title with single 3D globe and localized name
  */
-export function getShiftPersonification(blockId: string, lang: SupportedLanguage): string {
+export function getShiftPersonification(blockId: string, lang: SupportedLanguage): ShiftInfo {
   const b = (blockId || "").toLowerCase();
   if (b.includes("asia") || b.includes("азія") || b.includes("азия")) {
-    const label = lang === "uk" ? "Нічна зміна" : lang === "ru" ? "Ночная смена" : "Night Shift";
-    return `${icon("shift_night")} ${icon("region_asia")} <b>${label} (Азія)</b>`;
+    const shiftName = lang === "uk" ? "Нічна зміна" : lang === "ru" ? "Ночная смена" : "Night Shift";
+    const name = lang === "uk" ? "Азія" : lang === "ru" ? "Азия" : "Asia";
+    return { icon: icon("region_asia"), name, shiftName };
   }
   if (b.includes("europe") || b.includes("європа") || b.includes("европа")) {
-    const label = lang === "uk" ? "Денна зміна" : lang === "ru" ? "Дневная смена" : "Day Shift";
-    return `${icon("shift_day")} ${icon("region_europe")} <b>${label} (Європа)</b>`;
+    const shiftName = lang === "uk" ? "Денна зміна" : lang === "ru" ? "Дневная смена" : "Day Shift";
+    const name = lang === "uk" ? "Європа" : lang === "ru" ? "Европа" : "Europe";
+    return { icon: icon("region_europe"), name, shiftName };
   }
   if (b.includes("america") || b.includes("америка")) {
-    const label = lang === "uk" ? "Вечірня зміна" : lang === "ru" ? "Вечерняя смена" : "Evening Shift";
-    return `${icon("shift_evening")} ${icon("region_americas")} <b>${label} (Америка)</b>`;
+    const shiftName = lang === "uk" ? "Вечірня зміна" : lang === "ru" ? "Вечерняя смена" : "Evening Shift";
+    const name = lang === "uk" ? "Америка" : lang === "ru" ? "Америка" : "Americas";
+    return { icon: icon("region_americas"), name, shiftName };
   }
-  return `${icon("region_all")} <b>24/7 Global</b>`;
+  return { icon: icon("region_all"), name: "Global", shiftName: "24/7" };
 }

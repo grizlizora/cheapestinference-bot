@@ -164,7 +164,7 @@ export function formatAlertMessage(
       : "Slots sell out fast! Claim using the button below:";
 
     const hoursLocal = event.hoursUtc ? formatBlockHoursWithLocal(event.block, event.hoursUtc, lang) : "";
-    const hoursText = hoursLocal ? ` <code>(${escapeHtml(hoursLocal)})</code>` : "";
+    const hoursText = hoursLocal ? ` • <code>${escapeHtml(hoursLocal)}</code>` : "";
     const modelsList = (event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ");
 
     const body = `${getRegionIcon(event.block)} <b>${regionLabel}:</b> ${escapeHtml(blockName)}${hoursText}\n` +

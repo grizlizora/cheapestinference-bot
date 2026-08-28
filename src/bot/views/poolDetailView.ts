@@ -104,8 +104,9 @@ export function renderPoolDetailText(
 
   const blocksList = blocks
     .map((b) => {
-      const shiftHeader = getShiftPersonification(b.block_id, ctx.lang);
+      const shift = getShiftPersonification(b.block_id, ctx.lang);
       const hoursLocal = formatBlockHoursWithLocal(b.block_id, b.hours_utc, ctx.lang);
+      const cleanPrice = String(b.price_month).replace(/(\.00|\.0)$/, "");
       const smart = intelligenceEngine
         ? intelligenceEngine.getSmartStatus(slug, b.block_id, b.status, ctx.lang)
         : null;
@@ -117,24 +118,15 @@ export function renderPoolDetailText(
       const rawStatusText = (directText && directText !== textKey)
         ? directText
         : stripLeadingEmoji(isAvailable ? ctx.t("common.status_available") : ctx.t("common.status_sold_out"));
-      const statusBadge = `${statusIcon} ${rawStatusText}`;
 
-      const timeWord = ctx.lang === "uk" ? "Час" : ctx.lang === "ru" ? "Время" : "Hours";
-      const statusWord = ctx.lang === "uk" ? "Статус" : ctx.lang === "ru" ? "Статус" : "Status";
-      const priceWord = ctx.lang === "uk" ? "Ціна" : ctx.lang === "ru" ? "Цена" : "Price";
-
-      let row = `• ${shiftHeader}\n` +
-        `   <b>${timeWord}:</b> <code>${hoursLocal}</code>\n` +
-        `   <b>${statusWord}:</b> ${statusBadge} | <b>${priceWord}:</b> <code>$${b.price_month}/міс</code>`;
+      let row = `${shift.icon} <b>${shift.name}</b> <i>(${shift.shiftName})</i>\n` +
+        `• <code>${hoursLocal}</code>\n` +
+        `• ${statusIcon} <b>${rawStatusText}</b> — <b>$${cleanPrice}/міс</b>`;
 
       if (isAvailable && smart?.predictionTip) {
-        row += `\n   ${smart.predictionTip}`;
-      } else if (!isAvailable) {
-        if (smart?.etaTip) {
-          row += `\n   ${smart.etaTip}`;
-        } else if (smart?.collectingStatsTip) {
-          row += `\n   ${smart.collectingStatsTip}`;
-        }
+        row += `\n  ${smart.predictionTip}`;
+      } else if (!isAvailable && smart?.etaTip) {
+        row += `\n  ${smart.etaTip}`;
       }
 
       return row;
