@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS users (
   notify_prices_global INTEGER NOT NULL DEFAULT 1,
   notify_admin_new_users INTEGER NOT NULL DEFAULT 1,
   is_admin INTEGER NOT NULL DEFAULT 0,
+  total_donated_stars INTEGER NOT NULL DEFAULT 0,
   last_active_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -20,6 +21,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE INDEX IF NOT EXISTS idx_users_active ON users(is_active);
 CREATE INDEX IF NOT EXISTS idx_users_admins ON users(telegram_id) WHERE is_admin = 1 AND is_active = 1;
+CREATE INDEX IF NOT EXISTS idx_users_donors ON users(total_donated_stars DESC) WHERE total_donated_stars > 0;
 
 -- 2. Subscriptions Table
 CREATE TABLE IF NOT EXISTS subscriptions (
@@ -150,3 +152,19 @@ CREATE TABLE IF NOT EXISTS active_dashboards (
 
 CREATE INDEX IF NOT EXISTS idx_active_dashboards_user ON active_dashboards(user_id);
 CREATE INDEX IF NOT EXISTS idx_active_dashboards_interaction ON active_dashboards(last_interaction_at);
+
+-- 10. Donations Table (Telegram Stars XTR)
+CREATE TABLE IF NOT EXISTS donations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  telegram_id INTEGER NOT NULL,
+  amount_stars INTEGER NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'XTR',
+  telegram_payment_charge_id TEXT NOT NULL UNIQUE,
+  provider_payment_charge_id TEXT,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_donations_user ON donations(user_id);
+CREATE INDEX IF NOT EXISTS idx_donations_amount ON donations(amount_stars DESC);

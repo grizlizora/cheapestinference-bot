@@ -7,6 +7,8 @@ export interface PackedUserProfile {
   language: SupportedLanguage;
   isMuted: boolean;
   isActive: boolean;
+  isAdmin?: boolean;
+  totalDonatedStars?: number;
   notifyAvailableGlobal: boolean;
   notifySoldOutGlobal: boolean;
   notifyModelsGlobal: boolean;
@@ -40,10 +42,17 @@ export class SubscriberInvertedIndex {
     this.profiles.clear();
     this.tgIdToUserId.clear();
 
-    // 1. Stream Users
+    // 1. Stream Users (with dynamic schema backward compatibility)
+    const tableInfo = this.db.prepare(`PRAGMA table_info(users)`).all() as Array<{ name: string }>;
+    const cols = new Set(tableInfo.map((c) => c.name));
+    const hasAdmin = cols.has("is_admin") ? "COALESCE(is_admin, 0) as is_admin" : "0 as is_admin";
+    const hasStars = cols.has("total_donated_stars") ? "COALESCE(total_donated_stars, 0) as total_donated_stars" : "0 as total_donated_stars";
+
     const userStmt = this.db.prepare(`
       SELECT 
         id, telegram_id, language, is_muted, is_active,
+        ${hasAdmin},
+        ${hasStars},
         COALESCE(notify_available_global, 1) as notify_available_global,
         COALESCE(notify_sold_out_global, 0) as notify_sold_out_global,
         COALESCE(notify_models_global, 1) as notify_models_global,
@@ -58,6 +67,8 @@ export class SubscriberInvertedIndex {
       language: string;
       is_muted: number;
       is_active: number;
+      is_admin: number;
+      total_donated_stars: number;
       notify_available_global: number;
       notify_sold_out_global: number;
       notify_models_global: number;
@@ -70,6 +81,8 @@ export class SubscriberInvertedIndex {
         language: (row.language as SupportedLanguage) || "en",
         isMuted: row.is_muted === 1,
         isActive: row.is_active === 1,
+        isAdmin: row.is_admin === 1,
+        totalDonatedStars: row.total_donated_stars || 0,
         notifyAvailableGlobal: row.notify_available_global === 1,
         notifySoldOutGlobal: row.notify_sold_out_global === 1,
         notifyModelsGlobal: row.notify_models_global === 1,
@@ -122,6 +135,9 @@ export class SubscriberInvertedIndex {
     );
   }
 
+  /**
+   * Add a composite index mapping in O(1)
+   */
   private addIndexEntry(key: string, userId: number): void {
     let set = this.index.get(key);
     if (!set) {
@@ -142,7 +158,10 @@ export class SubscriberInvertedIndex {
   }
 
   /**
-   * O(1) Hierarchical Subscriber Resolution with Engagement-Based Active-First Sorting
+   * O(1) Hierarchical Subscriber Resolution with 3-Tier Priority Queue Sorting:
+   * 1. Admins first (instant delivery)
+   * 2. Top Donors (totalDonatedStars DESC — higher Stars = earlier alert delivery)
+   * 3. Engagement-based active users (lastActiveAt DESC)
    */
   public resolveSubscribers(
     poolSlug: string,
@@ -181,8 +200,19 @@ export class SubscriberInvertedIndex {
       results.push(profile);
     }
 
-    // Engagement-Based Sorting: Most recently active users are placed at the front of the queue
-    results.sort((a, b) => (b.lastActiveAt || 0) - (a.lastActiveAt || 0));
+    // 3-Tier Priority Queue Sorting:
+    // 1. Admins first
+    // 2. Top Donors (totalDonatedStars DESC)
+    // 3. Most recently active users
+    results.sort((a, b) => {
+      const adminDiff = (b.isAdmin ? 1 : 0) - (a.isAdmin ? 1 : 0);
+      if (adminDiff !== 0) return adminDiff;
+
+      const starsDiff = (b.totalDonatedStars || 0) - (a.totalDonatedStars || 0);
+      if (starsDiff !== 0) return starsDiff;
+
+      return (b.lastActiveAt || 0) - (a.lastActiveAt || 0);
+    });
 
     return results;
   }
@@ -273,6 +303,16 @@ export class SubscriberInvertedIndex {
       }
       for (const set of this.index.values()) {
         set.delete(userId);
+      }
+    }
+  }
+
+  public addDonationStars(telegramId: number, stars: number): void {
+    const userId = this.tgIdToUserId.get(telegramId);
+    if (userId) {
+      const profile = this.profiles.get(userId);
+      if (profile) {
+        profile.totalDonatedStars = (profile.totalDonatedStars || 0) + stars;
       }
     }
   }

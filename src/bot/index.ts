@@ -29,8 +29,10 @@ import {
 } from "../i18n/index.js";
 
 import { ActiveDashboardDAO } from "../db/dao/activeDashboards.js";
+import { DonationDAO } from "../db/dao/donations.js";
 import { LiveDashboardManager } from "./liveSync/liveDashboardManager.js";
 import { ActiveDashboardRegistry } from "./liveSync/dashboardRegistry.js";
+import { icon } from "./views/iconTheme.js";
 
 export function createTelegramBot(
   token: string,
@@ -41,8 +43,9 @@ export function createTelegramBot(
   scraper: ScraperOrchestrator,
   proxyPool: ProxyPool,
   historyDao?: SlotHistoryDAO,
-  activeDashboardDao?: ActiveDashboardDAO
-): { bot: Bot<BotContext>; dispatcher: NotificationDispatcher; liveDashboardManager: LiveDashboardManager } {
+  activeDashboardDao?: ActiveDashboardDAO,
+  donationDao?: DonationDAO
+): { bot: Bot<BotContext>; dispatcher: NotificationDispatcher; liveDashboardManager: LiveDashboardManager; donationDao: DonationDAO } {
   const bot = new Bot<BotContext>(token, {
     client: config.TELEGRAM_API_ROOT
       ? {
@@ -51,6 +54,7 @@ export function createTelegramBot(
       : undefined,
   });
   const resolvedHistoryDao = historyDao;
+  const resolvedDonationDao = donationDao || new DonationDAO(userDao.db);
 
   // 1. Global Error Boundary
   bot.catch((err) => {
@@ -447,6 +451,80 @@ export function createTelegramBot(
     ])
     .catch(() => {});
 
+  // 12. Telegram Stars (XTR) Payment Handlers
+  bot.on("pre_checkout_query", async (ctx) => {
+    try {
+      await ctx.answerPreCheckoutQuery(true);
+    } catch (err) {
+      console.error("❌ [Telegram Stars Pre-Checkout Error]:", err);
+      await ctx.answerPreCheckoutQuery(false, {
+        error_message:
+          ctx.lang === "uk"
+            ? "Помилка обробки платежу. Спробуйте знову."
+            : ctx.lang === "ru"
+            ? "Ошибка обработки платежа. Попробуйте снова."
+            : "Payment processing error. Please retry.",
+      }).catch(() => {});
+    }
+  });
+
+  bot.on("message:successful_payment", async (ctx) => {
+    const payment = ctx.message?.successful_payment;
+    if (!payment || !ctx.from) return;
+
+    const stars = payment.total_amount;
+    const chargeId = payment.telegram_payment_charge_id;
+    const providerChargeId = payment.provider_payment_charge_id;
+
+    console.log(
+      `⭐ [Telegram Stars Payment Received] User @${ctx.from.username || ctx.from.id} (${ctx.from.id}) paid ${stars} Stars! Charge ID: ${chargeId}`
+    );
+
+    // 1. Persist to SQLite & Turso cloud sync atomically
+    resolvedDonationDao.recordDonation(
+      ctx.user.id,
+      ctx.from.id,
+      stars,
+      chargeId,
+      providerChargeId
+    );
+
+    // 2. Synchronize Inverted Index RAM priority immediately
+    dispatcher.getInvertedIndex().addDonationStars(ctx.from.id, stars);
+
+    const userTotalStars = resolvedDonationDao.getUserTotalDonated(ctx.user.id);
+
+    // 3. Send personal gratitude message
+    const thanksTitle = ctx.t("donate.thanks_title");
+    const thanksBody = ctx.t("donate.thanks_body", {
+      stars: String(stars),
+      total_stars: String(userTotalStars),
+    });
+    const thanksText = `${icon("coffee")} ${thanksTitle}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${thanksBody}`;
+
+    await ctx.reply(thanksText, { parse_mode: "HTML" }).catch(() => {});
+
+    // 4. Notify admins about received donation
+    const allAdmins = userDao.getAllAdminTelegramIds(config.ADMIN_USER_IDS);
+    const userName = ctx.from.username
+      ? `@${ctx.from.username}`
+      : `${escapeHtml(ctx.from.first_name || "")}`;
+
+    for (const adminTgId of allAdmins) {
+      const adminRecord = userDao.getByTelegramId(adminTgId);
+      if (adminRecord && adminRecord.notify_admin_new_users === 1) {
+        const adminText = translate(adminRecord.language, "donate.admin_alert", {
+          user_name: userName,
+          telegram_id: String(ctx.from.id),
+          stars: String(stars),
+          total_stars: String(userTotalStars),
+          charge_id: chargeId,
+        });
+        await bot.api.sendMessage(adminTgId, adminText, { parse_mode: "HTML" }).catch(() => {});
+      }
+    }
+  });
+
   // Wire Scraper diff_events to dispatcher
   scraper.on("diff_events", async (events) => {
     try {
@@ -456,5 +534,5 @@ export function createTelegramBot(
     }
   });
 
-  return { bot, dispatcher, liveDashboardManager };
+  return { bot, dispatcher, liveDashboardManager, donationDao: resolvedDonationDao };
 }

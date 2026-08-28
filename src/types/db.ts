@@ -14,9 +14,21 @@ export interface UserRecord {
   notify_prices_global: number; // 1 = Enabled, 0 = Disabled
   notify_admin_new_users: number; // 1 = Admin wants new user alerts, 0 = Disabled
   is_admin?: number; // 1 = Admin, 0 = Regular User
+  total_donated_stars?: number; // Cumulative stars donated
   last_active_at: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface DonationRecord {
+  id: number;
+  user_id: number;
+  telegram_id: number;
+  amount_stars: number;
+  currency: string;
+  telegram_payment_charge_id: string;
+  provider_payment_charge_id?: string;
+  created_at: string;
 }
 
 export interface SubscriptionRecord {

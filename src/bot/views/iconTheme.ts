@@ -77,7 +77,10 @@ export type IconKey =
   | "shift_day"
   | "shift_evening"
   | "rank_diamond"
-  | "rank_shield";
+  | "rank_shield"
+  // Donations & Stars
+  | "coffee"
+  | "star";
 
 export interface IconDefinition {
   customEmojiId: string;
@@ -400,6 +403,16 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     customEmojiId: "5237799019329105246",
     unicodeFallback: "🛡️",
     name: "3D Security Shield",
+  },
+  coffee: {
+    customEmojiId: "5368324170671202293",
+    unicodeFallback: "☕",
+    name: "3D Hot Coffee Cup",
+  },
+  star: {
+    customEmojiId: "5445284980970201254",
+    unicodeFallback: "⭐",
+    name: "3D Animated Telegram Star",
   },
 };
 

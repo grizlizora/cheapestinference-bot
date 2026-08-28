@@ -22,6 +22,7 @@ describe("SubscriberInvertedIndex", () => {
         notify_prices_global INTEGER NOT NULL DEFAULT 1,
         notify_admin_new_users INTEGER NOT NULL DEFAULT 1,
         is_admin INTEGER NOT NULL DEFAULT 0,
+        total_donated_stars INTEGER NOT NULL DEFAULT 0,
         last_active_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -133,5 +134,53 @@ describe("SubscriberInvertedIndex", () => {
     // ActiveUser must be first!
     expect(resolved[0].telegramId).toBe(1002);
     expect(resolved[1].telegramId).toBe(1001);
+  });
+
+  it("should enforce strict 3-tier priority queue: Admins -> Top Donors (500 > 100 > 15) -> Free Active Users", () => {
+    // 1. Regular free user (active 1 min ago)
+    db.exec("INSERT INTO users (id, telegram_id, first_name, language, is_admin, total_donated_stars, last_active_at) VALUES (1, 1001, 'FreeUser', 'en', 0, 0, datetime('now', '-1 minute'))");
+    db.exec("INSERT INTO subscriptions (user_id, pool_slug, block_id) VALUES (1, 'flagship', 'europe')");
+
+    // 2. Small donor: 15 Stars
+    db.exec("INSERT INTO users (id, telegram_id, first_name, language, is_admin, total_donated_stars, last_active_at) VALUES (2, 1002, 'BronzeDonor', 'en', 0, 15, datetime('now', '-10 minutes'))");
+    db.exec("INSERT INTO subscriptions (user_id, pool_slug, block_id) VALUES (2, 'flagship', 'europe')");
+
+    // 3. Medium donor: 100 Stars
+    db.exec("INSERT INTO users (id, telegram_id, first_name, language, is_admin, total_donated_stars, last_active_at) VALUES (3, 1003, 'SilverDonor', 'en', 0, 100, datetime('now', '-20 minutes'))");
+    db.exec("INSERT INTO subscriptions (user_id, pool_slug, block_id) VALUES (3, 'flagship', 'europe')");
+
+    // 4. Whale donor: 500 Stars
+    db.exec("INSERT INTO users (id, telegram_id, first_name, language, is_admin, total_donated_stars, last_active_at) VALUES (4, 1004, 'GoldDonor', 'en', 0, 500, datetime('now', '-30 minutes'))");
+    db.exec("INSERT INTO subscriptions (user_id, pool_slug, block_id) VALUES (4, 'flagship', 'europe')");
+
+    // 5. Admin (active 1 hour ago)
+    db.exec("INSERT INTO users (id, telegram_id, first_name, language, is_admin, total_donated_stars, last_active_at) VALUES (5, 1005, 'AdminUser', 'en', 1, 0, datetime('now', '-1 hour'))");
+    db.exec("INSERT INTO subscriptions (user_id, pool_slug, block_id) VALUES (5, 'flagship', 'europe')");
+
+    const index = new SubscriberInvertedIndex(db);
+    const resolved = index.resolveSubscribers("flagship", "europe", "available");
+
+    expect(resolved).toHaveLength(5);
+
+    // Assert exact priority delivery sequence:
+    // 1st: Admin
+    expect(resolved[0].telegramId).toBe(1005);
+    // 2nd: 500 Stars Donor
+    expect(resolved[1].telegramId).toBe(1004);
+    // 3rd: 100 Stars Donor
+    expect(resolved[2].telegramId).toBe(1003);
+    // 4th: 15 Stars Donor
+    expect(resolved[3].telegramId).toBe(1002);
+    // 5th: Free User
+    expect(resolved[4].telegramId).toBe(1001);
+
+    // Live RAM update: Free user donates 1000 Stars
+    index.addDonationStars(1001, 1000);
+    const resolvedAfterDonation = index.resolveSubscribers("flagship", "europe", "available");
+
+    // Now: Admin is 1st, User 1001 is 2nd (ahead of 500 Stars GoldDonor)!
+    expect(resolvedAfterDonation[0].telegramId).toBe(1005);
+    expect(resolvedAfterDonation[1].telegramId).toBe(1001);
+    expect(resolvedAfterDonation[2].telegramId).toBe(1004);
   });
 });

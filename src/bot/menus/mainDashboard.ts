@@ -20,6 +20,7 @@ import { ActiveDashboardRegistry } from "../liveSync/dashboardRegistry.js";
 export { renderDashboardText, renderSettingsText, renderChangeLanguageText, renderHelpText, computePoolBadgeInfo } from "../views/dashboardView.js";
 export { safeEditMessageText } from "../views/common.js";
 import { renderDashboardText, renderSettingsText, renderChangeLanguageText, renderHelpText, computePoolBadgeInfo } from "../views/dashboardView.js";
+import { renderDonateText } from "../views/donateView.js";
 import { renderPoolDetailText } from "../views/poolDetailView.js";
 import { safeEditMessageText } from "../views/common.js";
 import { POOL_RANKS } from "../views/poolRanks.js";
@@ -180,6 +181,20 @@ export function createMainMenuHierarchy(
     )
     .row()
     .text(
+      (ctx) => ctx.t("settings.btn_donate"),
+      async (ctx) => {
+        await ctx.answerCallbackQuery().catch(() => {});
+        if (ctx.chat) {
+          dashboardRegistry?.updateView(ctx.chat.id, "other");
+        }
+        const profile = invertedIndex.getProfileByTgId(ctx.from?.id || 0);
+        const totalStars = profile?.totalDonatedStars || 0;
+        await safeEditMessageText(ctx, renderDonateText(ctx, totalStars));
+        return ctx.menu.nav("donate-menu");
+      }
+    )
+    .row()
+    .text(
       (ctx) => ctx.t("settings.btn_language"),
       async (ctx) => {
         await ctx.answerCallbackQuery().catch(() => {});
@@ -220,6 +235,57 @@ export function createMainMenuHierarchy(
         return ctx.menu.nav("main-dashboard-menu");
       }
     );
+
+  const donateTiers = [
+    { stars: 15, key: "donate.btn_tier_15" },
+    { stars: 50, key: "donate.btn_tier_50" },
+    { stars: 100, key: "donate.btn_tier_100" },
+    { stars: 250, key: "donate.btn_tier_250" },
+    { stars: 500, key: "donate.btn_tier_500" },
+  ];
+
+  const donateMenu = new Menu<BotContext>("donate-menu");
+  for (const tier of donateTiers) {
+    donateMenu
+      .text(
+        (ctx) => ctx.t(tier.key),
+        async (ctx) => {
+          await ctx.answerCallbackQuery().catch(() => {});
+          try {
+            const title = ctx.t("donate.invoice_title", { stars: String(tier.stars) });
+            const desc = ctx.t("donate.invoice_desc", { stars: String(tier.stars) });
+            const payload = JSON.stringify({
+              userId: ctx.user.id,
+              telegramId: ctx.from?.id,
+              stars: tier.stars,
+              ts: Date.now(),
+            });
+            await ctx.replyWithInvoice(
+              title,
+              desc,
+              payload,
+              "XTR",
+              [{ label: ctx.t("donate.invoice_label", { stars: String(tier.stars) }), amount: tier.stars }]
+            );
+          } catch (err) {
+            console.error("❌ [Telegram Stars Invoice Error]:", err);
+          }
+        }
+      )
+      .row();
+  }
+
+  donateMenu.text(
+    (ctx) => ctx.t("common.back"),
+    async (ctx) => {
+      await ctx.answerCallbackQuery().catch(() => {});
+      if (ctx.chat) {
+        dashboardRegistry?.updateView(ctx.chat.id, "settings");
+      }
+      await safeEditMessageText(ctx, renderSettingsText(ctx));
+      return ctx.menu.nav("settings-menu");
+    }
+  );
 
   const helpMenu = new Menu<BotContext>("help-menu")
     .text(
@@ -303,6 +369,7 @@ export function createMainMenuHierarchy(
     );
 
   // Register submenus into hierarchy
+  settingsMenu.register(donateMenu);
   settingsMenu.register(helpMenu);
   settingsMenu.register(languageMenu);
   settingsMenu.register(adminMenu);
@@ -310,5 +377,5 @@ export function createMainMenuHierarchy(
   mainDashboardMenu.register(subscriptionsMenu);
   mainDashboardMenu.register(settingsMenu);
 
-  return { mainDashboardMenu, languageMenu, poolDetailMenu, poolSettingsMenu, subscriptionsMenu, helpMenu, settingsMenu, adminMenu };
+  return { mainDashboardMenu, languageMenu, poolDetailMenu, poolSettingsMenu, subscriptionsMenu, helpMenu, settingsMenu, adminMenu, donateMenu };
 }
