@@ -108,15 +108,29 @@ export function renderDashboardText(
 }
 
 export function renderSettingsText(ctx: BotContext): string {
+  const flagUk = `<tg-emoji emoji-id="5447309366568953338">🇺🇦</tg-emoji>`;
+  const flagEn = `<tg-emoji emoji-id="5202196682497859879">🇬🇧</tg-emoji>`;
+  const flagRu = `<tg-emoji emoji-id="5449408995691341691">🇷🇺</tg-emoji>`;
+
   const langNames: Record<string, string> = {
-    uk: "Українська 🇺🇦",
-    en: "English 🇬🇧",
-    ru: "Русский 🇷🇺",
+    uk: `Українська ${flagUk}`,
+    en: `English ${flagEn}`,
+    ru: `Русский ${flagRu}`,
   };
   const currentLang = langNames[ctx.lang] || ctx.lang;
 
-  return ctx.t("settings.title", {
-    current_lang: currentLang,
-    telegram_id: String(ctx.from?.id || "N/A"),
-  });
+  const headerTitle = ctx.lang === "uk"
+    ? "<b>Налаштування бота</b>\n\nКеруйте мовою інтерфейсу, переглядайте довідку та контакти."
+    : ctx.lang === "ru"
+    ? "<b>Настройки бота</b>\n\nУправляйте языком интерфейса, просматривайте справку и контакты."
+    : "<b>Bot Settings</b>\n\nManage interface language, view help guides, and contacts.";
+
+  const langLabel = ctx.lang === "uk" ? "Поточна мова" : ctx.lang === "ru" ? "Текущий язык" : "Current language";
+  const idLabel = ctx.lang === "uk" ? "Ваш Telegram ID" : ctx.lang === "ru" ? "Ваш Telegram ID" : "Your Telegram ID";
+
+  const rendered = `${icon("nav_settings")} ${headerTitle}\n\n` +
+    `${icon("nav_language")} ${langLabel}: <b>${currentLang}</b>\n` +
+    `🆔 ${idLabel}: <code>${ctx.from?.id || "N/A"}</code>`;
+
+  return clampMessageText(rendered);
 }
