@@ -194,6 +194,15 @@ export function createTelegramBot(
           userDao.reactivateUser(ctx.from.id);
           user.is_active = 1;
           dispatcher.getInvertedIndex().updateUserPreferences(ctx.from.id, { isActive: true });
+          const userSubs = subDao.getSubscriptionsForUser(user.id);
+          for (const s of userSubs) {
+            dispatcher.getInvertedIndex().updateSubscription(user.id, s.pool_slug, s.block_id, {
+              available: s.notify_on_available === 1,
+              soldOut: s.notify_on_sold_out === 1,
+              models: s.notify_on_models === 1,
+              prices: s.notify_on_prices === 1,
+            });
+          }
         }
       }
 

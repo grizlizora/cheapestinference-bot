@@ -172,6 +172,7 @@ CREATE TABLE IF NOT EXISTS donations (
 CREATE INDEX IF NOT EXISTS idx_donations_user ON donations(user_id);
 CREATE INDEX IF NOT EXISTS idx_donations_amount ON donations(amount_stars DESC);
 CREATE INDEX IF NOT EXISTS idx_donations_created_at ON donations(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_donations_user_created ON donations(user_id, created_at DESC);
 
 -- 11. Notification Outbox (Zero-Loss Queue across Container Reboots)
 CREATE TABLE IF NOT EXISTS notification_outbox (

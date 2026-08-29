@@ -8,6 +8,7 @@ import { icon, getRawUnicode, IconKey } from "./iconTheme.js";
 
 import { renderCapacityBar } from "./capacityBar.js";
 import { POOL_RANKS } from "./poolRanks.js";
+import { renderUserProfileCard } from "./userRankHelper.js";
 
 export interface PoolBadgeInfo {
   icon: string;
@@ -146,7 +147,18 @@ export function renderSettingsText(ctx: BotContext): string {
 
   const idIcon = `<tg-emoji emoji-id="5422683699130933153">🪪</tg-emoji>`;
 
+  const profileCard = renderUserProfileCard(
+    {
+      isAdmin: ctx.user?.is_admin === 1,
+      totalDonatedStars: (ctx.user as any)?.total_donated_stars || 0,
+      lastActiveAt: ctx.user ? Date.parse(ctx.user.last_active_at) || Date.now() : Date.now(),
+      telegramId: ctx.from?.id,
+    },
+    ctx.lang
+  );
+
   const rendered = `${icon("nav_settings")} ${headerTitle}\n\n` +
+    `${profileCard}\n\n` +
     `${icon("nav_language")} ${langLabel}: <b>${currentLang}</b>\n` +
     `${icon(isMuted ? "notify_mute" : "notify_loud")} ${soundLabel}: <b>${soundStatus}</b>\n` +
     `${idIcon} ${idLabel}: <code>${ctx.from?.id || "N/A"}</code>`;
@@ -170,6 +182,7 @@ export function renderHelpText(ctx: BotContext): string {
   const starIcon = icon("star");
   const bulbIcon = icon("tip_lightbulb");
   const octoIcon = icon("git_octopus");
+  const zapIcon = icon("status_available");
 
   if (ctx.lang === "uk") {
     return `${guideIcon} <b>CheapestInference — Довідка та інструкція</b>\n\n` +
@@ -179,8 +192,10 @@ export function renderHelpText(ctx: BotContext): string {
       `• <b>Живий дашборд:</b> актуальна наявність слотів та інтерактивна шкала заповненості оновлюються наживо.\n` +
       `• <b>Персональні сповіщення:</b> можливість підписатися на весь тариф або окремі географічні слоти, а також фільтрувати типи подій (вільні слоти, sold out, нові моделі, ціни).\n` +
       `• <b>Швидке бронювання:</b> сповіщення містять прямі посилання для моментального оформлення замовлення на сайті.\n\n` +
-      `${starIcon} <b>Пріоритетна черга (Telegram Stars):</b>\n` +
-      `Користувачі, які підтримали проект зірочками, отримують сповіщення про гарячі слоти <b>найпершими</b>!\n\n` +
+      `${zapIcon} <b>Правила активності та черги (Zero-Loss):</b>\n` +
+      `• <b>14 днів активності:</b> якщо акаунт не взаємодіє з ботом >14 днів, сповіщення призупиняються для економії лімітів Telegram.\n` +
+      `• <b>Миттєве відновлення:</b> будь-яке натискання кнопки чи повідомлення боту миттєво повертає вас у чергу з повним збереженням усіх підписок!\n` +
+      `• <b>Пріоритет (Telegram Stars):</b> донатери отримують сповіщення в першій хвилі та мають розширене утримання до 450+ днів.\n\n` +
       `${bulbIcon} <b>Open-Source & Безпека:</b>\n` +
       `Проект є повністю відкритим, надійним та прозорим під ліцензією MIT.\n` +
       `${octoIcon} <a href="https://github.com/grizlizora/cheapestinference-bot">Відкритий вихідний код на GitHub</a>`;
@@ -192,8 +207,10 @@ export function renderHelpText(ctx: BotContext): string {
       `• <b>Живой дашборд:</b> актуальное наличие слотов и интерактивная шкала заполненности обновляются на лету.\n` +
       `• <b>Персональные уведомления:</b> подписка на весь тариф или отдельные слоты с фильтрацией событий (свободные слоты, sold out, модели, цены).\n` +
       `• <b>Быстрое бронирование:</b> уведомления содержат прямые кнопки для моментального заказа слота на сайте.\n\n` +
-      `${starIcon} <b>Приоритетная очередь (Telegram Stars):</b>\n` +
-      `Пользователи, поддержавшие проект звёздочками, получают уведомления о редких слотах <b>первыми</b>!\n\n` +
+      `${zapIcon} <b>Правила активности и очереди (Zero-Loss):</b>\n` +
+      `• <b>14 дней активности:</b> при отсутствии действий >14 дней доставка ставится на паузу для защиты лимитов Telegram.\n` +
+      `• <b>Мгновенное возобновление:</b> любое нажатие кнопки или сообщение боту мгновенно возвращает вас в очередь с полным сохранением подписок!\n` +
+      `• <b>Приоритет (Telegram Stars):</b> донатеры получают оповещения в первой волне и продлевают удержание до 450+ дней.\n\n` +
       `${bulbIcon} <b>Open-Source & Безопасность:</b>\n` +
       `Проект имеет полностью открытый, надежный и прозрачный исходный код под лицензией MIT.\n` +
       `${octoIcon} <a href="https://github.com/grizlizora/cheapestinference-bot">Исходный код на GitHub</a>`;
@@ -205,8 +222,10 @@ export function renderHelpText(ctx: BotContext): string {
       `• <b>Real-Time Dashboard:</b> live availability and capacity progress bars update dynamically.\n` +
       `• <b>Granular Alert Filters:</b> subscribe to entire tiers or specific regional slots, with customizable event triggers (slot drops, sold out, model upgrades, price updates).\n` +
       `• <b>Instant Checkout:</b> notifications include direct checkout buttons to secure capacity in seconds.\n\n` +
-      `${starIcon} <b>Priority Notification Queue:</b>\n` +
-      `Supporters who tip Telegram Stars receive slot availability notifications <b>first</b>!\n\n` +
+      `${zapIcon} <b>Activity Policy & Priority (Zero-Loss):</b>\n` +
+      `• <b>14-Day Rolling Window:</b> accounts inactive for >14 days are paused to eliminate Telegram API rate limits.\n` +
+      `• <b>Instant Revival:</b> pressing any button or sending a message instantly restores delivery with 100% of your preferences intact!\n` +
+      `• <b>Supporter Perks (Telegram Stars):</b> donors receive drop alerts in the first wave and extend retention up to 450+ days.\n\n` +
       `${bulbIcon} <b>Open-Source & Transparent:</b>\n` +
       `This project is 100% open-source, robust, and transparent under the MIT license.\n` +
       `${octoIcon} <a href="https://github.com/grizlizora/cheapestinference-bot">Source code on GitHub</a>`;

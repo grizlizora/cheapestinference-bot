@@ -215,6 +215,7 @@ export function initSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_donations_user ON donations(user_id);
     CREATE INDEX IF NOT EXISTS idx_donations_amount ON donations(amount_stars DESC);
     CREATE INDEX IF NOT EXISTS idx_donations_created_at ON donations(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_donations_user_created ON donations(user_id, created_at DESC);
 
     -- 11. Notification Outbox Table (Zero-Loss Queue)
     CREATE TABLE IF NOT EXISTS notification_outbox (

@@ -24,6 +24,7 @@ export class NotificationOutboxDAO {
   private stmtGetPending: Database.Statement;
   private stmtMarkDispatched: Database.Statement;
   private stmtMarkFailed: Database.Statement;
+  private stmtMarkTerminalFailed: Database.Statement;
   private stmtPruneOld: Database.Statement;
   private txEnqueueBatch: (items: OutboxItem[]) => void;
 
@@ -56,6 +57,12 @@ export class NotificationOutboxDAO {
     this.stmtMarkFailed = db.prepare(`
       UPDATE notification_outbox 
       SET attempts = attempts + 1, last_error = ?, status = CASE WHEN attempts + 1 >= 3 THEN 'failed' ELSE 'pending' END
+      WHERE id = ?
+    `);
+
+    this.stmtMarkTerminalFailed = db.prepare(`
+      UPDATE notification_outbox 
+      SET attempts = attempts + 1, last_error = ?, status = 'failed'
       WHERE id = ?
     `);
 
@@ -118,6 +125,10 @@ export class NotificationOutboxDAO {
 
   public markFailed(id: string, errorMsg: string): void {
     this.stmtMarkFailed.run(errorMsg, id);
+  }
+
+  public markTerminalFailed(id: string, errorMsg: string): void {
+    this.stmtMarkTerminalFailed.run(errorMsg, id);
   }
 
   public pruneOld(): number {

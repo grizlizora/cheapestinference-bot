@@ -90,7 +90,7 @@ export class NotificationDispatcher {
           : now;
 
         if (now - itemCreatedMs > this.MAX_MESSAGE_AGE_MS) {
-          this.outboxDao.markFailed(item.id, "Expired TTL on startup hydration");
+          this.outboxDao.markTerminalFailed(item.id, "Expired TTL on startup hydration");
           continue;
         }
 
@@ -477,14 +477,14 @@ export class NotificationDispatcher {
 
       // 1. Drop stale alerts (> 10 min old)
       if (now - candidate.enqueuedAt > this.MAX_MESSAGE_AGE_MS) {
-        this.outboxDao?.markFailed(candidate.id, "TTL expired in queue");
+        this.outboxDao?.markTerminalFailed(candidate.id, "TTL expired in queue");
         continue;
       }
 
       // 2. Drop alerts for deactivated/blocked users
       const profile = this.index.getProfileByTgId(candidate.telegramId);
       if (profile && !profile.isActive) {
-        this.outboxDao?.markFailed(candidate.id, "User deactivated");
+        this.outboxDao?.markTerminalFailed(candidate.id, "User deactivated");
         continue;
       }
 
@@ -610,7 +610,7 @@ export class NotificationDispatcher {
     if (errorCode === 403 || (errorCode === 400 && description.includes("chat not found"))) {
       this.index.markUserDeactivated(msg.telegramId);
       this.blockedUsersBatch.push(msg.telegramId);
-      this.outboxDao?.markFailed(msg.id, "User deactivated or blocked");
+      this.outboxDao?.markTerminalFailed(msg.id, "User deactivated or blocked");
       return;
     }
 

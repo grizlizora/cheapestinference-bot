@@ -69,12 +69,15 @@ export function computeAdaptiveInactivityLimitMs(
   lastDonatedAt?: number,
   now = Date.now()
 ): number {
-  if (stars <= 0) {
+  if (!Number.isFinite(stars) || stars <= 0) {
     return FREE_USER_INACTIVITY_LIMIT_MS;
   }
 
   const rawBonusDays = calculateStarBonusDays(stars);
-  const donationAgeMs = lastDonatedAt ? Math.max(0, now - lastDonatedAt) : 0;
+  const donationAgeMs =
+    Number.isFinite(lastDonatedAt) && (lastDonatedAt as number) > 0
+      ? Math.max(0, now - (lastDonatedAt as number))
+      : 0;
   const donationAgeDays = donationAgeMs / ONE_DAY_MS;
   const freshnessFactor = calculateRecencyDecayFactor(donationAgeDays);
 
@@ -511,7 +514,7 @@ export class SubscriberInvertedIndex {
   }
 
   /**
-   * Instant user block / deactivation (removes from RAM immediately)
+   * Instant user block / deactivation (marks inactive in RAM immediately)
    */
   public markUserDeactivated(telegramId: number): void {
     const userId = this.tgIdToUserId.get(telegramId);
@@ -519,9 +522,6 @@ export class SubscriberInvertedIndex {
       const profile = this.profiles.get(userId);
       if (profile) {
         profile.isActive = false;
-      }
-      for (const set of this.index.values()) {
-        set.delete(userId);
       }
     }
   }
