@@ -321,7 +321,7 @@ export function createSubscriptionsMenu(
         await ctx.answerCallbackQuery().catch(() => {});
         if (ctx.chat) {
           const msgId = ctx.callbackQuery?.message?.message_id;
-          dashboardRegistry?.updateView(ctx.chat.id, "dashboard", undefined, ctx.lang, msgId);
+          dashboardRegistry?.updateView(ctx.chat.id, "dashboard", undefined, ctx.lang, msgId, ctx.user?.id);
         }
         await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao, scraper));
         return ctx.menu.nav("main-dashboard-menu");

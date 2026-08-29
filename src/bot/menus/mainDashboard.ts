@@ -348,7 +348,7 @@ export function createMainMenuHierarchy(
             c.session.tempPoolSlug = pool.slug;
             if (c.chat) {
               const msgId = c.callbackQuery?.message?.message_id;
-              dashboardRegistry?.updateView(c.chat.id, "pool_detail", pool.slug, c.lang, msgId);
+              dashboardRegistry?.updateView(c.chat.id, "pool_detail", pool.slug, c.lang, msgId, c.user?.id);
             }
             await safeEditMessageText(
               c,
@@ -365,7 +365,7 @@ export function createMainMenuHierarchy(
         await ctx.answerCallbackQuery().catch(() => {});
         if (ctx.chat) {
           const msgId = ctx.callbackQuery?.message?.message_id;
-          dashboardRegistry?.updateView(ctx.chat.id, "subscriptions", undefined, ctx.lang, msgId);
+          dashboardRegistry?.updateView(ctx.chat.id, "subscriptions", undefined, ctx.lang, msgId, ctx.user?.id);
         }
         await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
         return ctx.menu.nav("subscriptions-menu");
@@ -410,7 +410,7 @@ export function createMainMenuHierarchy(
         await ctx.answerCallbackQuery().catch(() => {});
         if (ctx.chat) {
           const msgId = ctx.callbackQuery?.message?.message_id;
-          dashboardRegistry?.updateView(ctx.chat.id, "settings", undefined, ctx.lang, msgId);
+          dashboardRegistry?.updateView(ctx.chat.id, "settings", undefined, ctx.lang, msgId, ctx.user?.id);
         }
         await safeEditMessageText(ctx, renderSettingsText(ctx));
         return ctx.menu.nav("settings-menu");
