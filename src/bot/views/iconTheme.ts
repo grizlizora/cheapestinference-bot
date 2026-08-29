@@ -84,6 +84,10 @@ export type IconKey =
   | "shift_evening"
   | "rank_diamond"
   | "rank_shield"
+  | "rank_infinity"
+  | "infinity"
+  | "zap"
+  | "rocket"
   // Donations & Stars
   | "coffee"
   | "star"
@@ -432,6 +436,26 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     customEmojiId: "5237799019329105246",
     unicodeFallback: "🛡️",
     name: "3D Security Shield",
+  },
+  rank_infinity: {
+    customEmojiId: "6298717844804733009",
+    unicodeFallback: "♾️",
+    name: "3D Animated Infinity Loop",
+  },
+  infinity: {
+    customEmojiId: "6298717844804733009",
+    unicodeFallback: "♾️",
+    name: "3D Animated Infinity Loop",
+  },
+  zap: {
+    customEmojiId: "5456140674028019486",
+    unicodeFallback: "⚡",
+    name: "3D Electric Cyan Bolt",
+  },
+  rocket: {
+    customEmojiId: "5445284980978621387",
+    unicodeFallback: "🚀",
+    name: "3D Hyperdrive Rocket",
   },
   coffee: {
     customEmojiId: "5307845791283425776",

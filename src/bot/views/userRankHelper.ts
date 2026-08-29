@@ -54,6 +54,8 @@ export function getUserRankMeta(
   // 1. Admin (P0 Priority & Permanent Lifetime Immunity)
   if (isAdmin) {
     const iconHtml = icon("nav_admin");
+    const infinityHtml = icon("infinity");
+    const zapHtml = icon("zap");
     const rankTitle =
       lang === "uk"
         ? `${iconHtml} <b>Адміністратор / Автор</b>`
@@ -62,16 +64,16 @@ export function getUserRankMeta(
         : `${iconHtml} <b>Admin / Creator</b>`;
     const priorityTitle =
       lang === "uk"
-        ? "⚡ <b>P0 • Миттєва доставка</b> (Абсолютний пріоритет)"
+        ? `${zapHtml} <b>P0 • Миттєва доставка</b> (Абсолютний пріоритет)`
         : lang === "ru"
-        ? "⚡ <b>P0 • Мгновенная доставка</b> (Абсолютный приоритет)"
-        : "⚡ <b>P0 • Instant Dispatch</b> (Absolute Priority)";
+        ? `${zapHtml} <b>P0 • Мгновенная доставка</b> (Абсолютный приоритет)`
+        : `${zapHtml} <b>P0 • Instant Dispatch</b> (Absolute Priority)`;
     const retentionText =
       lang === "uk"
-        ? "♾️ <b>Безстроковий імунітет</b> (Завжди активний)"
+        ? `${infinityHtml} <b>Безстроковий імунітет</b> (Завжди активний)`
         : lang === "ru"
-        ? "♾️ <b>Бессрочный иммунитет</b> (Всегда активен)"
-        : "♾️ <b>Lifetime Immunity</b> (Always active)";
+        ? `${infinityHtml} <b>Бессрочный иммунитет</b> (Всегда активен)`
+        : `${infinityHtml} <b>Lifetime Immunity</b> (Always active)`;
 
     return {
       tier: "admin",
@@ -104,6 +106,13 @@ export function getUserRankMeta(
   let rankTitle = "";
   let priorityTitle = "";
 
+  const zapHtml = icon("zap");
+  const rocketHtml = icon("rocket");
+  const shieldHtml = icon("rank_shield");
+  const coffeeHtml = icon("coffee");
+  const bellHtml = icon("notify_bell_on");
+  const standbyHtml = icon("status_standby");
+
   if (totalDonatedStars >= 250) {
     tier = "diamond";
     iconHtml = icon("rank_diamond");
@@ -115,13 +124,13 @@ export function getUserRankMeta(
         : `${iconHtml} <b>Diamond Patron</b>`;
     priorityTitle =
       lang === "uk"
-        ? "🚀 <b>P1 • Топ Черга</b> (1-ша хвиля сповіщень)"
+        ? `${rocketHtml} <b>P1 • Топ Черга</b> (1-ша хвиля сповіщень)`
         : lang === "ru"
-        ? "🚀 <b>P1 • Топ Очередь</b> (1-я волна уведомлений)"
-        : "🚀 <b>P1 • Top Queue</b> (1st wave of alerts)";
+        ? `${rocketHtml} <b>P1 • Топ Очередь</b> (1-я волна уведомлений)`
+        : `${rocketHtml} <b>P1 • Top Queue</b> (1st wave of alerts)`;
   } else if (totalDonatedStars >= 100) {
     tier = "speed";
-    iconHtml = icon("event_slot_drop");
+    iconHtml = zapHtml;
     rankTitle =
       lang === "uk"
         ? `${iconHtml} <b>Speed Patron</b>`
@@ -130,13 +139,13 @@ export function getUserRankMeta(
         : `${iconHtml} <b>Speed Patron</b>`;
     priorityTitle =
       lang === "uk"
-        ? "⚡ <b>P1 • Високий пріоритет</b> (Черга донатерів)"
+        ? `${zapHtml} <b>P1 • Високий пріоритет</b> (Черга донатерів)`
         : lang === "ru"
-        ? "⚡ <b>P1 • Высокий приоритет</b> (Очередь донатеров)"
-        : "⚡ <b>P1 • High Priority</b> (Supporter queue)";
+        ? `${zapHtml} <b>P1 • Высокий приоритет</b> (Очередь донатеров)`
+        : `${zapHtml} <b>P1 • High Priority</b> (Supporter queue)`;
   } else if (totalDonatedStars >= 50) {
     tier = "contributor";
-    iconHtml = icon("rank_shield");
+    iconHtml = shieldHtml;
     rankTitle =
       lang === "uk"
         ? `${iconHtml} <b>Contributor</b>`
@@ -145,13 +154,13 @@ export function getUserRankMeta(
         : `${iconHtml} <b>Contributor</b>`;
     priorityTitle =
       lang === "uk"
-        ? "🌟 <b>P1 • Підвищений пріоритет</b>"
+        ? `${shieldHtml} <b>P1 • Підвищений пріоритет</b>`
         : lang === "ru"
-        ? "🌟 <b>P1 • Повышенный приоритет</b>"
-        : "🌟 <b>P1 • Elevated Priority</b>";
+        ? `${shieldHtml} <b>P1 • Повышенный приоритет</b>`
+        : `${shieldHtml} <b>P1 • Elevated Priority</b>`;
   } else if (totalDonatedStars >= 1) {
     tier = "supporter";
-    iconHtml = icon("coffee");
+    iconHtml = coffeeHtml;
     rankTitle =
       lang === "uk"
         ? `${iconHtml} <b>Supporter</b>`
@@ -160,13 +169,13 @@ export function getUserRankMeta(
         : `${iconHtml} <b>Supporter</b>`;
     priorityTitle =
       lang === "uk"
-        ? "☕ <b>P1 • Пріоритетна черга</b>"
+        ? `${coffeeHtml} <b>P1 • Пріоритетна черга</b>`
         : lang === "ru"
-        ? "☕ <b>P1 • Приоритетная очередь</b>"
-        : "☕ <b>P1 • Priority Queue</b>";
+        ? `${coffeeHtml} <b>P1 • Приоритетная очередь</b>`
+        : `${coffeeHtml} <b>P1 • Priority Queue</b>`;
   } else if (isDormant) {
     tier = "dormant";
-    iconHtml = icon("status_standby");
+    iconHtml = standbyHtml;
     rankTitle =
       lang === "uk"
         ? `${iconHtml} <b>Режим очікування</b>`
@@ -175,10 +184,10 @@ export function getUserRankMeta(
         : `${iconHtml} <b>Standby Observer</b>`;
     priorityTitle =
       lang === "uk"
-        ? "💤 <b>Призупинено</b> (>14 днів неактивності)"
+        ? `${standbyHtml} <b>Призупинено</b> (>14 днів неактивності)`
         : lang === "ru"
-        ? "💤 <b>Приостановлено</b> (>14 дней неактивности)"
-        : "💤 <b>Paused</b> (>14 days inactive)";
+        ? `${standbyHtml} <b>Приостановлено</b> (>14 дней неактивности)`
+        : `${standbyHtml} <b>Paused</b> (>14 days inactive)`;
   } else {
     tier = "active";
     iconHtml = icon("status_available");
@@ -190,10 +199,10 @@ export function getUserRankMeta(
         : `${iconHtml} <b>Active Observer</b>`;
     priorityTitle =
       lang === "uk"
-        ? "🔔 <b>P2 • Стандартна черга</b>"
+        ? `${bellHtml} <b>P2 • Стандартна черга</b>`
         : lang === "ru"
-        ? "🔔 <b>P2 • Стандартная очередь</b>"
-        : "🔔 <b>P2 • Standard Queue</b>";
+        ? `${bellHtml} <b>P2 • Стандартная очередь</b>`
+        : `${bellHtml} <b>P2 • Standard Queue</b>`;
   }
 
   // 4. Localized Retention Description
