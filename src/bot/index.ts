@@ -403,10 +403,9 @@ export function createTelegramBot(
 
   bot.command("help", async (ctx) => {
     const keyboard = new InlineKeyboard()
-      .url("🐙 GitHub", "https://github.com/grizlizora/cheapestinference-bot")
-      .url("🌐 CheapestInference", "https://cheapestinference.com/pools")
+      .url(ctx.t("help.btn_open_site"), "https://cheapestinference.com/pools")
       .row()
-      .url("👨‍💻 @grizlizora", "https://t.me/grizlizora");
+      .url(ctx.t("help.btn_github"), "https://github.com/grizlizora/cheapestinference-bot");
     await ctx.reply(
       renderHelpText(ctx),
       {
@@ -633,7 +632,7 @@ export function createTelegramBot(
 
     const profile = dispatcher.getInvertedIndex().getProfileByTgId(ctx.from.id);
     const totalStars = profile?.totalDonatedStars || 0;
-    await safeEditMessageText(ctx, renderDonateText(ctx, totalStars), donateMenu);
+    await safeEditMessageText(ctx, renderDonateText(ctx, totalStars), { reply_markup: donateMenu });
   });
 
   // Wire Scraper diff_events to dispatcher

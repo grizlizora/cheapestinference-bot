@@ -1,6 +1,9 @@
 import Database from "better-sqlite3";
 import { SupportedLanguage } from "../../types/db.js";
 
+export const FREE_USER_INACTIVITY_LIMIT_MS = 14 * 24 * 60 * 60 * 1000; // 14 days = 1,209,600,000 ms
+export const DONOR_INACTIVITY_LIMIT_MS = 90 * 24 * 60 * 60 * 1000;     // 90 days = 7,776,000,000 ms
+
 export interface PackedUserProfile {
   userId: number;
   telegramId: number;
@@ -78,23 +81,27 @@ export class SubscriberInvertedIndex {
       notify_prices_global: number;
       last_active_at?: string;
     }>) {
-      this.profiles.set(row.id, {
-        userId: row.id,
-        telegramId: row.telegram_id,
-        language: (row.language as SupportedLanguage) || "en",
-        isMuted: row.is_muted === 1,
-        isActive: row.is_active === 1,
-        isAdmin: row.is_admin === 1,
-        totalDonatedStars: row.total_donated_stars || 0,
-        notifyAvailableGlobal: row.notify_available_global === 1,
-        notifySoldOutGlobal: row.notify_sold_out_global === 1,
-        notifyModelsGlobal: row.notify_models_global === 1,
-        notifyPricesGlobal: row.notify_prices_global === 1,
-        lastActiveAt: row.last_active_at ? (Date.parse(row.last_active_at.replace(" ", "T") + "Z") || Date.parse(row.last_active_at) || 0) : 0,
-        lastDbTouchAt: row.last_active_at ? (Date.parse(row.last_active_at.replace(" ", "T") + "Z") || Date.parse(row.last_active_at) || 0) : 0,
-      });
-      this.tgIdToUserId.set(row.telegram_id, row.id);
-    }
+        const parsedLastActive = row.last_active_at
+          ? (Date.parse(row.last_active_at.replace(" ", "T") + "Z") || Date.parse(row.last_active_at) || Date.now())
+          : Date.now();
+
+        this.profiles.set(row.id, {
+          userId: row.id,
+          telegramId: row.telegram_id,
+          language: (row.language as SupportedLanguage) || "en",
+          isMuted: row.is_muted === 1,
+          isActive: row.is_active === 1,
+          isAdmin: row.is_admin === 1,
+          totalDonatedStars: row.total_donated_stars || 0,
+          notifyAvailableGlobal: row.notify_available_global === 1,
+          notifySoldOutGlobal: row.notify_sold_out_global === 1,
+          notifyModelsGlobal: row.notify_models_global === 1,
+          notifyPricesGlobal: row.notify_prices_global === 1,
+          lastActiveAt: parsedLastActive,
+          lastDbTouchAt: parsedLastActive,
+        });
+        this.tgIdToUserId.set(row.telegram_id, row.id);
+      }
 
     // 2. Stream Subscriptions
     const subStmt = this.db.prepare(`
@@ -239,21 +246,31 @@ export class SubscriberInvertedIndex {
       for (const id of globalExclusions) matchedUserIds.delete(id);
     }
 
-    // 3-Bucket Linear Partition (Dial's Scheme): O(k) linear separation
+    // 3-Bucket Linear Partition (Dial's Scheme): O(k) linear separation with Inactivity Engine
     const admins: PackedUserProfile[] = [];
     const donors: PackedUserProfile[] = [];
     const freeUsers: PackedUserProfile[] = [];
+    const now = Date.now();
 
     for (const userId of matchedUserIds) {
       const profile = this.profiles.get(userId);
       if (!profile || !profile.isActive) continue;
 
+      const timeSinceActive = now - (profile.lastActiveAt || 0);
+
+      // Invariant 2: Admins always exempt (Priority P0)
       if (profile.isAdmin) {
         admins.push(profile);
       } else if ((profile.totalDonatedStars || 0) > 0) {
-        donors.push(profile);
+        // Invariant 2: Star Donors (Priority P1) - Extended Grace Window (90 Days)
+        if (timeSinceActive <= DONOR_INACTIVITY_LIMIT_MS) {
+          donors.push(profile);
+        }
       } else {
-        freeUsers.push(profile);
+        // Invariant 1: Free Users (Priority P2) - 14-Day Exact Rolling Window
+        if (timeSinceActive <= FREE_USER_INACTIVITY_LIMIT_MS) {
+          freeUsers.push(profile);
+        }
       }
     }
 
@@ -362,6 +379,9 @@ export class SubscriberInvertedIndex {
    * Upsert or register user in memory
    */
   public upsertUserProfile(profile: PackedUserProfile): void {
+    if (!profile.lastActiveAt) {
+      profile.lastActiveAt = Date.now();
+    }
     this.profiles.set(profile.userId, profile);
     this.tgIdToUserId.set(profile.telegramId, profile.userId);
   }

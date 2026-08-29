@@ -220,5 +220,9 @@
     "export_history_in_progress": "⏳ <i>Generating full change history Excel/CSV report...</i>",
     "new_user_alert": "👤 <b>New user in bot!</b>\n\n• <b>Name:</b> <code>{first_name}</code>\n• <b>Username:</b> {username}\n• <b>Telegram ID:</b> <code>{telegram_id}</code>\n• <b>Language:</b> {language}\n• <b>Total users:</b> <code>{total_users}</code>"
   },
+  "help": {
+    "btn_open_site": "🌐 CheapestInference (Official Site)",
+    "btn_github": "🐙 GitHub Repository (Open-Source)"
+  },
   "help_text": "ℹ️ <b>How does this bot work?</b>\n\n1. The bot monitors the <a href=\"https://cheapestinference.com/pools\">official CheapestInference website</a> 24/7 via resilient high-speed proxy channels.\n2. Each compute pool is partitioned into three daily 8-hour regional blocks (Asia, Europe, Americas).\n3. Live slot availability updates in real time on the dashboard.\n4. In each pool card, you can configure granular alerts for specific slots or regions.\n5. The moment a slot opens — you receive instant notifications with direct checkout buttons!\n\n💡 <b>Open-Source Project:</b>\nThis project is 100% open-source, robust, and transparent under the MIT license.\n🐙 <a href=\"https://github.com/grizlizora/cheapestinference-bot\">Source code on GitHub</a>"
 }

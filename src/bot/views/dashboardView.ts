@@ -166,37 +166,48 @@ export function renderChangeLanguageText(ctx: BotContext): string {
 
 export function renderHelpText(ctx: BotContext): string {
   const guideIcon = icon("nav_guide");
+  const slotIcon = icon("event_slot_drop");
+  const starIcon = icon("star");
   const bulbIcon = icon("tip_lightbulb");
   const octoIcon = icon("git_octopus");
 
   if (ctx.lang === "uk") {
-    return `${guideIcon} <b>Як працює цей бот?</b>\n\n` +
-      `1. Бот цілодобово перевіряє <a href="https://cheapestinference.com/pools">офіційний сайт CheapestInference</a> через захищений високошвидкісний канал.\n` +
-      `2. Кожен тариф ділиться на три щоденні 8-годинні часові блоки (Азія, Європа, Америка).\n` +
-      `3. Ви можете переглядати актуальну наявність слотів у реальному часі наживо.\n` +
-      `4. У картці кожного тарифу (пулу) ви можете налаштувати персональні сповіщення на потрібні вам слоти або окремі регіони.\n` +
-      `5. Щойно слот з'являється — ви миттєво отримуєте повідомлення з кнопкою швидкого бронювання!\n\n` +
-      `${bulbIcon} <b>Open-Source проект:</b>\n` +
+    return `${guideIcon} <b>CheapestInference — Довідка та інструкція</b>\n\n` +
+      `${slotIcon} <b>Як працює цей бот?</b>\n` +
+      `• <b>Цілодобовий моніторинг:</b> бот безперервно перевіряє офіційний сайт <a href="https://cheapestinference.com/pools">cheapestinference.com</a> через високошвидкісні проксі-канали без затримок.\n` +
+      `• <b>Регіональні 8-годинні блоки:</b> кожен тариф ділиться на три щоденні зміни (Азія: 00:00–08:00, Європа: 08:00–16:00, Америка: 16:00–24:00 UTC).\n` +
+      `• <b>Живий дашборд:</b> актуальна наявність слотів та інтерактивна шкала заповненості оновлюються наживо.\n` +
+      `• <b>Персональні сповіщення:</b> можливість підписатися на весь тариф або окремі географічні слоти, а також фільтрувати типи подій (вільні слоти, sold out, нові моделі, ціни).\n` +
+      `• <b>Швидке бронювання:</b> сповіщення містять прямі посилання для моментального оформлення замовлення на сайті.\n\n` +
+      `${starIcon} <b>Пріоритетна черга (Telegram Stars):</b>\n` +
+      `Користувачі, які підтримали проект зірочками, отримують сповіщення про гарячі слоти <b>найпершими</b>!\n\n` +
+      `${bulbIcon} <b>Open-Source & Безпека:</b>\n` +
       `Проект є повністю відкритим, надійним та прозорим під ліцензією MIT.\n` +
       `${octoIcon} <a href="https://github.com/grizlizora/cheapestinference-bot">Відкритий вихідний код на GitHub</a>`;
   } else if (ctx.lang === "ru") {
-    return `${guideIcon} <b>Как работает этот бот?</b>\n\n` +
-      `1. Бот круглосуточно проверяет <a href="https://cheapestinference.com/pools">официальный сайт CheapestInference</a> через защищенный высокоскоростной канал.\n` +
-      `2. Каждый тариф делится на три ежедневных 8-часовых временных блока (Азия, Европа, Америка).\n` +
-      `3. Вы можете просматривать актуальное наличие слотов в реальном времени с помощью кнопок меню.\n` +
-      `4. В карточке каждого тарифа (пула) вы можете настроить персональные уведомления на нужные вам слоты или отдельные регионы.\n` +
-      `5. Как только слот появляется — вы моментально получаете сообщение с кнопкой бронирования!\n\n` +
-      `${bulbIcon} <b>Open-Source проект:</b>\n` +
+    return `${guideIcon} <b>CheapestInference — Справка и инструкция</b>\n\n` +
+      `${slotIcon} <b>Как работает этот бот?</b>\n` +
+      `• <b>Круглосуточный мониторинг:</b> бот непрерывно проверяет официальный сайт <a href="https://cheapestinference.com/pools">cheapestinference.com</a> через защищенные скоростные каналы.\n` +
+      `• <b>Региональные 8-часовые блоки:</b> каждый тариф делится на три смены (Азия: 00:00–08:00, Европа: 08:00–16:00, Америка: 16:00–24:00 UTC).\n` +
+      `• <b>Живой дашборд:</b> актуальное наличие слотов и интерактивная шкала заполненности обновляются на лету.\n` +
+      `• <b>Персональные уведомления:</b> подписка на весь тариф или отдельные слоты с фильтрацией событий (свободные слоты, sold out, модели, цены).\n` +
+      `• <b>Быстрое бронирование:</b> уведомления содержат прямые кнопки для моментального заказа слота на сайте.\n\n` +
+      `${starIcon} <b>Приоритетная очередь (Telegram Stars):</b>\n` +
+      `Пользователи, поддержавшие проект звёздочками, получают уведомления о редких слотах <b>первыми</b>!\n\n` +
+      `${bulbIcon} <b>Open-Source & Безопасность:</b>\n` +
       `Проект имеет полностью открытый, надежный и прозрачный исходный код под лицензией MIT.\n` +
       `${octoIcon} <a href="https://github.com/grizlizora/cheapestinference-bot">Исходный код на GitHub</a>`;
   } else {
-    return `${guideIcon} <b>How this bot works</b>\n\n` +
-      `1. The bot monitors the <a href="https://cheapestinference.com/pools">official CheapestInference website</a> 24/7 via resilient high-speed proxy channels.\n` +
-      `2. Each compute pool is partitioned into three daily 8-hour regional blocks (Asia, Europe, Americas).\n` +
-      `3. You can inspect live slot availability in real time via the menu buttons.\n` +
-      `4. In each pool card, you can configure granular alerts for specific slots or regions.\n` +
-      `5. The moment a slot opens — you receive instant notifications with direct checkout buttons!\n\n` +
-      `${bulbIcon} <b>Open-Source Project:</b>\n` +
+    return `${guideIcon} <b>CheapestInference — User Guide & Help</b>\n\n` +
+      `${slotIcon} <b>How this bot works</b>\n` +
+      `• <b>24/7 Live Monitoring:</b> bot continuously tracks the official <a href="https://cheapestinference.com/pools">cheapestinference.com</a> website via resilient high-speed proxy channels.\n` +
+      `• <b>Regional 8-Hour Blocks:</b> each compute tier is partitioned into three daily shifts (Asia: 00:00–08:00, Europe: 08:00–16:00, Americas: 16:00–24:00 UTC).\n` +
+      `• <b>Real-Time Dashboard:</b> live availability and capacity progress bars update dynamically.\n` +
+      `• <b>Granular Alert Filters:</b> subscribe to entire tiers or specific regional slots, with customizable event triggers (slot drops, sold out, model upgrades, price updates).\n` +
+      `• <b>Instant Checkout:</b> notifications include direct checkout buttons to secure capacity in seconds.\n\n` +
+      `${starIcon} <b>Priority Notification Queue:</b>\n` +
+      `Supporters who tip Telegram Stars receive slot availability notifications <b>first</b>!\n\n` +
+      `${bulbIcon} <b>Open-Source & Transparent:</b>\n` +
       `This project is 100% open-source, robust, and transparent under the MIT license.\n` +
       `${octoIcon} <a href="https://github.com/grizlizora/cheapestinference-bot">Source code on GitHub</a>`;
   }
