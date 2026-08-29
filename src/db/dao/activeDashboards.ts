@@ -5,6 +5,7 @@
 
 import Database from "better-sqlite3";
 import { ActiveDashboardRecord, SupportedLanguage } from "../../types/db.js";
+import { tursoCloudSync } from "../tursoSync.js";
 
 export class ActiveDashboardDAO {
   private stmtUpsert: Database.Statement;
@@ -118,6 +119,34 @@ export class ActiveDashboardDAO {
       last_rendered_text_hash: record.last_rendered_text_hash ?? 0,
       last_rendered_keyboard_hash: record.last_rendered_keyboard_hash ?? 0,
     });
+
+    tursoCloudSync.pushMutation(
+      `INSERT INTO active_dashboards (
+        chat_id, message_id, user_id, view_type, pool_slug, language,
+        last_rendered_text_hash, last_rendered_keyboard_hash,
+        last_telegram_edit_at, last_interaction_at, consecutive_errors, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, CURRENT_TIMESTAMP)
+      ON CONFLICT(chat_id) DO UPDATE SET
+        message_id = excluded.message_id,
+        user_id = excluded.user_id,
+        view_type = excluded.view_type,
+        pool_slug = excluded.pool_slug,
+        language = excluded.language,
+        last_interaction_at = CURRENT_TIMESTAMP,
+        consecutive_errors = 0,
+        updated_at = CURRENT_TIMESTAMP`,
+      [
+        record.chat_id,
+        record.message_id,
+        record.user_id,
+        record.view_type,
+        record.pool_slug ?? null,
+        record.language,
+        record.last_rendered_text_hash ?? 0,
+        record.last_rendered_keyboard_hash ?? 0,
+      ],
+      true
+    );
   }
 
   public updateView(chatId: number, viewType: string, poolSlug?: string, lang?: SupportedLanguage, messageId?: number): void {
@@ -130,14 +159,51 @@ export class ActiveDashboardDAO {
       language: lang || existing.language,
       message_id: messageId || 0,
     });
+
+    tursoCloudSync.pushMutation(
+      `UPDATE active_dashboards SET
+        view_type = ?,
+        pool_slug = ?,
+        language = ?,
+        message_id = CASE WHEN ? > 0 THEN ? ELSE message_id END,
+        last_interaction_at = CURRENT_TIMESTAMP,
+        consecutive_errors = 0,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE chat_id = ?`,
+      [
+        viewType,
+        poolSlug !== undefined ? poolSlug : existing.pool_slug,
+        lang || existing.language,
+        messageId || 0,
+        messageId || 0,
+        chatId,
+      ]
+    );
   }
 
   public touchInteraction(chatId: number): void {
     this.stmtTouchInteraction.run(chatId);
+    tursoCloudSync.pushMutation(
+      `UPDATE active_dashboards SET
+        last_interaction_at = CURRENT_TIMESTAMP,
+        consecutive_errors = 0,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE chat_id = ?`,
+      [chatId]
+    );
   }
 
   public markEditSuccess(chatId: number, textHash: number): void {
     this.stmtUpdateEditSuccess.run({ chat_id: chatId, last_rendered_text_hash: textHash });
+    tursoCloudSync.pushMutation(
+      `UPDATE active_dashboards SET
+        last_rendered_text_hash = ?,
+        last_telegram_edit_at = CURRENT_TIMESTAMP,
+        consecutive_errors = 0,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE chat_id = ?`,
+      [textHash, chatId]
+    );
   }
 
   public incrementError(chatId: number): void {
@@ -146,6 +212,11 @@ export class ActiveDashboardDAO {
 
   public delete(chatId: number): void {
     this.stmtDelete.run(chatId);
+    tursoCloudSync.pushMutation(
+      `DELETE FROM active_dashboards WHERE chat_id = ?`,
+      [chatId],
+      true
+    );
   }
 
   public getHydrationCandidates(): ActiveDashboardRecord[] {
@@ -154,6 +225,11 @@ export class ActiveDashboardDAO {
 
   public pruneStale(): number {
     const res = this.stmtPruneOld.run();
+    tursoCloudSync.pushMutation(
+      `DELETE FROM active_dashboards
+      WHERE last_interaction_at < datetime('now', '-48 hours')
+         OR consecutive_errors >= 3`
+    );
     return res.changes;
   }
 }

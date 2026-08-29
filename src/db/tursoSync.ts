@@ -281,14 +281,16 @@ export class TursoCloudSync {
         { type: "execute", stmt: { sql: "SELECT * FROM subscriptions" } },
         { type: "execute", stmt: { sql: "SELECT * FROM donations" } },
         { type: "execute", stmt: { sql: "SELECT * FROM pool_state" } },
+        { type: "execute", stmt: { sql: "SELECT * FROM active_dashboards WHERE last_interaction_at >= datetime('now', '-48 hours') AND consecutive_errors < 3" } },
       ]);
 
       const usersResult = results[0]?.response?.result;
       const subsResult = results[1]?.response?.result;
       const donationsResult = results[2]?.response?.result;
       const poolStateResult = results[3]?.response?.result;
+      const dashboardsResult = results[4]?.response?.result;
 
-      if (!usersResult && !subsResult && !poolStateResult && !donationsResult) {
+      if (!usersResult && !subsResult && !poolStateResult && !donationsResult && !dashboardsResult) {
         console.log("☁️ [TursoSync] No remote state found in Turso.");
         return;
       }
@@ -366,10 +368,32 @@ export class TursoCloudSync {
           updated_at = excluded.updated_at
       `);
 
+      const upsertDashboardStmt = db.prepare(`
+        INSERT INTO active_dashboards (
+          chat_id, message_id, user_id, view_type, pool_slug, language,
+          last_rendered_text_hash, last_rendered_keyboard_hash,
+          last_telegram_edit_at, last_interaction_at, consecutive_errors, created_at, updated_at
+        ) VALUES (
+          @chat_id, @message_id, @user_id, @view_type, @pool_slug, @language,
+          @last_rendered_text_hash, @last_rendered_keyboard_hash,
+          @last_telegram_edit_at, @last_interaction_at, @consecutive_errors, @created_at, @updated_at
+        )
+        ON CONFLICT(chat_id) DO UPDATE SET
+          message_id = excluded.message_id,
+          user_id = excluded.user_id,
+          view_type = excluded.view_type,
+          pool_slug = excluded.pool_slug,
+          language = excluded.language,
+          last_interaction_at = excluded.last_interaction_at,
+          consecutive_errors = 0,
+          updated_at = excluded.updated_at
+      `);
+
       let loadedUsers = 0;
       let loadedSubs = 0;
       let loadedDonations = 0;
       let loadedPools = 0;
+      let loadedDashboards = 0;
 
       const hydrateTx = db.transaction(() => {
         if (usersResult?.rows) {
@@ -485,11 +509,41 @@ export class TursoCloudSync {
             }
           }
         }
+
+        if (dashboardsResult?.rows) {
+          const cols: string[] = dashboardsResult.cols.map((c: any) => c.name);
+          for (const row of dashboardsResult.rows) {
+            const dashObj: any = {};
+            cols.forEach((colName, idx) => {
+              dashObj[colName] = row[idx]?.value !== undefined ? row[idx].value : null;
+            });
+            try {
+              upsertDashboardStmt.run({
+                chat_id: Number(dashObj.chat_id),
+                message_id: Number(dashObj.message_id),
+                user_id: Number(dashObj.user_id),
+                view_type: String(dashObj.view_type || "dashboard"),
+                pool_slug: dashObj.pool_slug ? String(dashObj.pool_slug) : null,
+                language: String(dashObj.language || "en"),
+                last_rendered_text_hash: 0,
+                last_rendered_keyboard_hash: 0,
+                last_telegram_edit_at: String(dashObj.last_telegram_edit_at || new Date().toISOString()),
+                last_interaction_at: String(dashObj.last_interaction_at || new Date().toISOString()),
+                consecutive_errors: Number(dashObj.consecutive_errors || 0),
+                created_at: String(dashObj.created_at || new Date().toISOString()),
+                updated_at: String(dashObj.updated_at || new Date().toISOString()),
+              });
+              loadedDashboards++;
+            } catch (err: any) {
+              console.warn("⚠️ [TursoSync] Dashboard row hydration error:", err?.message || err);
+            }
+          }
+        }
       });
 
       hydrateTx();
       const elapsed = (performance.now() - startTime).toFixed(2);
-      console.log(`✅ [TursoSync] Hydrated ${loadedUsers} users, ${loadedSubs} subscriptions, ${loadedDonations} donations, ${loadedPools} pool states from Turso in ${elapsed}ms`);
+      console.log(`✅ [TursoSync] Hydrated ${loadedUsers} users, ${loadedSubs} subscriptions, ${loadedDonations} donations, ${loadedPools} pool states, ${loadedDashboards} active dashboards from Turso in ${elapsed}ms`);
     } catch (err: any) {
       console.error("❌ [TursoSync] Failed to pull state from Turso:", err?.message || err);
     }
