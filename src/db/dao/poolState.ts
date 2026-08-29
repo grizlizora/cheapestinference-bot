@@ -158,8 +158,9 @@ export class PoolStateDAO {
     }
   }
 
-  saveSnapshot(snapshot: PoolsSnapshot, source = "api", latencyMs = 0): void {
-    this.txSaveSnapshot(snapshot.data);
+  saveSnapshot(snapshot: PoolsSnapshot | PoolData[], source = "api", latencyMs = 0): void {
+    const pools = Array.isArray(snapshot) ? snapshot : (snapshot?.data ?? []);
+    this.txSaveSnapshot(pools);
     this.touchVerified(source, latencyMs);
   }
 

@@ -182,7 +182,7 @@ export function renderPoolDetailText(
   const rankTitle = rank.tierName[ctx.lang] || first.pool_name;
 
   const totalBlocks = blocks.length || 3;
-  const availableCount = blocks.filter((b) => b.status === "available" || b.status === "limited").length;
+  const availableCount = blocks.filter((b) => isSlotAvailable(b.status)).length;
   const capacityBar = renderCapacityBar(availableCount, totalBlocks, "html");
 
   const capacityLabel = ctx.lang === "uk" ? "Місткість кластера" : ctx.lang === "ru" ? "Вместимость кластера" : "Cluster Capacity";

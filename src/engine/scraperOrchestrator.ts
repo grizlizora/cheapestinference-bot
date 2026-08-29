@@ -191,8 +191,19 @@ export class ScraperOrchestrator extends EventEmitter {
       this.lastSource = result.source;
       this.lastUsedProxy = result.usedProxy;
 
-      // 1. FAST PATH: Compute diffs and dispatch alerts IMMEDIATELY at T+0ms (Zero DB Delay)
+      // 1. Compute diffs
       const events = this.diffEngine.processSnapshot(result.snapshot);
+
+      // 2. Persist authoritative snapshot to SQLite DB FIRST (0.15ms execution time)
+      // Guarantees LiveDashboard and handlers read fresh state upon diff_events
+      try {
+        const authoritativeSnapshot = this.diffEngine.getSnapshot() || result.snapshot;
+        if (authoritativeSnapshot) {
+          this.poolStateDao.saveSnapshot(authoritativeSnapshot, result.source, result.latencyMs);
+        }
+      } catch (e: any) {
+        this.emit("warn", `Failed to save snapshot to SQLite: ${e.message}`);
+      }
 
       this.emit("heartbeat", {
         source: result.source,
@@ -202,19 +213,10 @@ export class ScraperOrchestrator extends EventEmitter {
         eventsCount: events.length,
       });
 
+      // 3. Dispatch diff_events to subscribers and live dashboard
       if (events.length > 0) {
         this.lastSlotEventTimestamp = Date.now();
         this.emit("diff_events", events);
-      }
-
-      // 2. Synchronously persist authoritative snapshot to SQLite DB (0.15ms execution time)
-      try {
-        const authoritativeSnapshot = this.diffEngine.getSnapshot() || result.snapshot;
-        if (authoritativeSnapshot) {
-          this.poolStateDao.saveSnapshot(authoritativeSnapshot, result.source, result.latencyMs);
-        }
-      } catch (e: any) {
-        this.emit("warn", `Failed to save snapshot to SQLite: ${e.message}`);
       }
 
       return events;
@@ -255,6 +257,10 @@ export class ScraperOrchestrator extends EventEmitter {
         this.apiConsecutiveErrors++;
         if (this.apiConsecutiveErrors >= 3) {
           this.apiCircuitOpenUntil = Date.now() + 60_000; // Open circuit for 60s
+          this.apiEtag = undefined;
+          this.apiLastModified = undefined;
+          this.htmlEtag = undefined;
+          this.htmlLastModified = undefined;
           this.emit("warn", `JSON API Engine failed 3 times. Opening circuit breaker for 60s.`);
         } else {
           this.emit("warn", `JSON API Engine fetch error (${apiErr?.message || apiErr}). Falling back to HTML.`);

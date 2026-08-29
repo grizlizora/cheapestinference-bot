@@ -244,6 +244,13 @@ export function formatAlertMessage(
       }
     }
 
+    const poolBtnLabel = lang === "uk"
+      ? `🌐 Відкрити ${escapeHtml(event.poolName)} на сайті`
+      : lang === "ru"
+      ? `🌐 Открыть ${escapeHtml(event.poolName)} на сайте`
+      : `🌐 Open ${escapeHtml(event.poolName)} on Site`;
+
+    keyboard = new InlineKeyboard().url(poolBtnLabel, poolUrl);
     text = `${header}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${body}`;
   } else if (event.type === "MODEL_UPGRADE_EVENT") {
     const rawHeader = translate(lang, "alerts.model_upgrade_header", {
@@ -544,10 +551,10 @@ export function formatBundledAlertMessage(
   if (allSoldOut && allSamePool) {
     const pName = escapeHtml(matchedEvents[0].event.poolName);
     title = lang === "uk"
-      ? `${icon("event_slot_sold")} <b>СЛОТИ РОЗПРОДАНО • ${pName}</b>`
+      ? `${icon("event_slot_sold")} <b>СЛОТИ РОЗПРОДАНО • ${pName} (${count})</b>`
       : lang === "ru"
-      ? `${icon("event_slot_sold")} <b>СЛОТЫ РАСПРОДАНЫ • ${pName}</b>`
-      : `${icon("event_slot_sold")} <b>SLOTS SOLD OUT • ${pName}</b>`;
+      ? `${icon("event_slot_sold")} <b>СЛОТЫ РАСПРОДАНЫ • ${pName} (${count})</b>`
+      : `${icon("event_slot_sold")} <b>SLOTS SOLD OUT • ${pName} (${count})</b>`;
   } else if (allSoldOut) {
     title = lang === "uk"
       ? `${icon("event_slot_sold")} <b>СЛОТИ РОЗПРОДАНО (${count})</b>`
@@ -593,9 +600,15 @@ export function formatBundledAlertMessage(
           `  • ${getRegionIcon(event.block)} <b>${escapeHtml(blockName)}:</b> ${icon("status_sold_out")} <i>${statusSoldOut}</i>`
         );
       }
+      const poolBtnLabel = lang === "uk"
+        ? `🌐 Відкрити ${event.poolSlug.toUpperCase()} на сайті`
+        : lang === "ru"
+        ? `🌐 Открыть ${event.poolSlug.toUpperCase()} на сайте`
+        : `🌐 Open ${event.poolSlug.toUpperCase()} on Site`;
+
       candidates.push({
         priority: 4,
-        label: `🔍 ${event.poolSlug.toUpperCase()}`,
+        label: poolBtnLabel,
         url: poolUrl,
         poolSlug: event.poolSlug,
         isSpecificAction: false,

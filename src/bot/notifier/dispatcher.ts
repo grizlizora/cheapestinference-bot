@@ -154,26 +154,34 @@ export class NotificationDispatcher {
   public async handleDiffEvents(events: DiffEvent[]): Promise<void> {
     if (!events || events.length === 0) return;
 
-    // Cross-Tick Idempotency Latch: prevent duplicate alerts for the same pool/block within 5m unless state inverted
+    // Cross-Tick Idempotency Latch & Anti-Flap Guard (prevents rapid engine flapping within 60s)
     const now = Date.now();
+    const MIN_REVERSAL_INTERVAL_MS = 60 * 1000;
     const validEvents: DiffEvent[] = [];
+
     for (const event of events) {
       const latchKey = `${event.poolSlug}:${event.block || "ALL"}:${event.type}`;
       const lastSent = this.lastDispatchedEventLatch.get(latchKey);
 
+      // Suppress duplicate identical event within 5 minutes
       if (lastSent && (now - lastSent) < 5 * 60 * 1000) {
         console.warn(`🛡️ [Dispatcher Latch] Suppressed duplicate ${event.type} for ${event.poolSlug}:${event.block}`);
         continue;
       }
 
-      this.lastDispatchedEventLatch.set(latchKey, now);
-
-      if (event.type === "SLOT_APPEARED") {
-        this.lastDispatchedEventLatch.delete(`${event.poolSlug}:${event.block || "ALL"}:SLOT_DISAPPEARED`);
-      } else if (event.type === "SLOT_DISAPPEARED") {
-        this.lastDispatchedEventLatch.delete(`${event.poolSlug}:${event.block || "ALL"}:SLOT_APPEARED`);
+      // Check opposite latch: if opposite state was dispatched within 60s, suppress rapid flapping
+      const oppositeType = event.type === "SLOT_APPEARED" ? "SLOT_DISAPPEARED" : event.type === "SLOT_DISAPPEARED" ? "SLOT_APPEARED" : undefined;
+      if (oppositeType) {
+        const oppositeKey = `${event.poolSlug}:${event.block || "ALL"}:${oppositeType}`;
+        const lastOpposite = this.lastDispatchedEventLatch.get(oppositeKey);
+        if (lastOpposite && (now - lastOpposite) < MIN_REVERSAL_INTERVAL_MS) {
+          console.warn(`🛡️ [Anti-Flap Guard] Suppressed ${event.type} for ${event.poolSlug}:${event.block} (within 60s of ${oppositeType})`);
+          continue;
+        }
+        this.lastDispatchedEventLatch.delete(oppositeKey);
       }
 
+      this.lastDispatchedEventLatch.set(latchKey, now);
       validEvents.push(event);
     }
 

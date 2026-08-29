@@ -321,7 +321,7 @@ describe("NotificationDispatcher Modern Alert & Bundling Test Suite", () => {
 
     // There should be exactly 1 button for FLAGSHIP, not 2 duplicate buttons!
     expect(inlineButtons).toHaveLength(1);
-    expect(inlineButtons[0].text).toBe("🔍 FLAGSHIP");
+    expect(inlineButtons[0].text).toContain("FLAGSHIP");
     expect(inlineButtons[0].url).toBe("https://cheapestinference.com/pools/flagship");
   });
 
