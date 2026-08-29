@@ -19,14 +19,24 @@ data/
 .DS_Store
 Thumbs.db
 
-# Custom Emoji Assets & Generation Tools (Local Only)
+# Custom Emoji Assets & Generation Tools (Local Only - Never Push to Git)
 assets/
+assets/**
 docs/custom_emoji_prompts.md
 docs/video_motion_prompts.md
-scripts/generate_vector_emojis.ts
-scripts/generate_sprite_sheets.ts
-scripts/slice_emoji_videos.ts
-scripts/render_animated_stickers.ts
-
-
-
+scripts/convert_*.ts
+scripts/slice_*.ts
+scripts/validate_*.ts
+scripts/refine_*.ts
+scripts/build_*.ts
+scripts/format_*.ts
+scripts/process_*.ts
+scripts/debug_*.ts
+scripts/fix_*.ts
+scripts/clean_*.ts
+scripts/restore_*.ts
+scripts/upgrade_*.ts
+scripts/update_*.ts
+scripts/test_vibrant_*.ts
+scripts/append_tech_spec.ts
+scripts/fetch_fluent_3d_emojis.ts

@@ -67,7 +67,7 @@
     "invoice_label": "Спасибо {stars} Stars",
     "thanks_title": "🎉 <b>Огромное спасибо за вашу поддержку!</b>",
     "thanks_body": "Вы задонатили <b>{stars} ⭐ Telegram Stars</b>!\n\n⭐️ Ваша общая поддержка: <b>{total_stars} ⭐</b>\n🚀 <b>Приоритет в очереди уведомлений активирован!</b>\nТеперь вы будете получать уведомления о свободных слотах в числе самых первых!",
-    "admin_alert": "🌟 <b>Получен новый донат Telegram Stars!</b>\n━━━━━━━━━━━━━━━━━━━━━━━━\n• <b>Пользователь:</b> {user_name} (<code>{telegram_id}</code>)\n• <b>Сумма:</b> <b>{stars} ⭐ Stars</b>\n• <b>Всего от пользователя:</b> <b>{total_stars} ⭐</b>\n• <b>ID транзакции:</b> <code>{charge_id}</code>"
+    "admin_alert": "🌟 <b>Получен новый донат Telegram Stars!</b>\n\n• <b>Пользователь:</b> {user_name} (<code>{telegram_id}</code>)\n• <b>Сумма:</b> <b>{stars} ⭐ Stars</b>\n• <b>Всего от пользователя:</b> <b>{total_stars} ⭐</b>\n• <b>ID транзакции:</b> <code>{charge_id}</code>"
   },
   "pool_detail": {
     "title": "🏷 <b>{pool_name}</b>\n\n📝 <b>Описание:</b>\n<i>{description}</i>\n\n🤖 <b>Включенные нейросети:</b>\n{models_list}\n\n💰 <b>Стоимость:</b>\n• Базовый тариф: от <b>${min_price}/мес</b> (~${min_price_day}/день)\n• Скидка за год: <b>{annual_discount}%</b>\n\n🕒 <b>Региональные слоты (по 8 часов каждый):</b>\n{blocks_list}\n\n🔗 <b>Официальная страница:</b> <a href=\"{url}\">{url}</a>",
@@ -218,7 +218,7 @@
     "backup_in_progress": "⏳ <i>Создание онлайн-снапшота базы данных SQLite (`VACUUM INTO`)...</i>",
     "export_users_in_progress": "⏳ <i>Формирование Excel/CSV отчета о пользователях и подписках...</i>",
     "export_history_in_progress": "⏳ <i>Формирование Excel/CSV отчета обо всей истории изменений...</i>",
-    "new_user_alert": "👤 <b>Новый пользователь в боте!</b>\n━━━━━━━━━━━━━━━━━━━━━━━━\n• <b>Имя:</b> <code>{first_name}</code>\n• <b>Username:</b> {username}\n• <b>Telegram ID:</b> <code>{telegram_id}</code>\n• <b>Язык интерфейса:</b> {language}\n• <b>Всего пользователей:</b> <code>{total_users}</code>"
+    "new_user_alert": "👤 <b>Новый пользователь в боте!</b>\n\n• <b>Имя:</b> <code>{first_name}</code>\n• <b>Username:</b> {username}\n• <b>Telegram ID:</b> <code>{telegram_id}</code>\n• <b>Язык интерфейса:</b> {language}\n• <b>Всего пользователей:</b> <code>{total_users}</code>"
   },
   "help_text": "ℹ️ <b>Как работает этот бот?</b>\n\n1. Бот круглосуточно проверяет <a href=\"https://cheapestinference.com/pools\">официальный сайт CheapestInference</a> через защищенный высокоскоростной канал.\n2. Каждый тариф делится на три ежедневных 8-часовых временных блока (Азия, Европа, Америка).\n3. Вы можете просматривать актуальное наличие слотов в реальном времени с помощью кнопок меню.\n4. В карточке каждого тарифа (пула) вы можете настроить персональные уведомления на нужные вам слоты или отдельные регионы.\n5. Как только слот появляется — вы моментально получаете сообщение с кнопкой бронирования!\n\n💡 <b>Open-Source проект:</b>\nПроект имеет полностью открытый, надежный и прозрачный исходный код под лицензией MIT.\n🐙 <a href=\"https://github.com/grizlizora/cheapestinference-bot\">Исходный код на GitHub</a>"
 }

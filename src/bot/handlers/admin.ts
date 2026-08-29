@@ -115,7 +115,7 @@ export function renderAdminText(
   const msUnit = ctx.lang === "en" ? "ms" : "мс";
   const title = adminHeader.replace(/<\/?b>/g, "");
 
-  return `${icon("nav_admin")} <b>${title}</b>\n━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+  return `${icon("nav_admin")} <b>${title}</b>\n\n` +
     `${statusOrb} <b>${statusTitle}:</b> ${statusLabel} ${statusOrb}\n` +
     `${icon("nav_clock")} <b>${uptimeTitle}:</b> ${uptimeStr}\n\n` +
     `${usersIcon} <b>${usersTitle}:</b>\n` +

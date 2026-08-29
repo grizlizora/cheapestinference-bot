@@ -44,6 +44,7 @@ async function bootstrap() {
     console.log(`ℹ️ [TursoSync] Turso Cloud Sync is inactive (TURSO_AUTH_TOKEN is not configured). Operating on local SQLite SSD.`);
   }
   const userDao = new UserDAO(db);
+  userDao.syncAdminsFromConfig(config.ADMIN_USER_IDS, config.ADMIN_USERNAMES);
   const subDao = new SubscriptionDAO(db);
   const poolStateDao = new PoolStateDAO(db);
   const notificationLogDao = new NotificationLogDAO(db);

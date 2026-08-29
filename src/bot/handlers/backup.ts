@@ -136,7 +136,7 @@ export function createUsersExportHandler(
 
       const caption = [
         title,
-        `━━━━━━━━━━━━━━━━━━━━━━━━`,
+        "",
         `${icon("nav_clock")} <b>${dateLabel}</b> <code>${new Date().toISOString()}</code>`,
         `<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> <b>${totalUsersLabel}</b> <code>${stats.total}</code> (${activeLabel}: ${stats.active}, ${blockedLabel}: ${stats.blocked})`,
         `${icon("notify_bell_on")} <b>${rulesLabel}</b> <code>${activeSubsCount}</code>`,

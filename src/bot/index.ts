@@ -225,8 +225,7 @@ export function createTelegramBot(
             };
             const langStr = flagMap[ctx.lang] || ctx.lang;
 
-            const adminMsg = `${userIcon} <b>Новий користувач у боті!</b>\n` +
-              `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+            const adminMsg = `${userIcon} <b>Новий користувач у боті!</b>\n\n` +
               `• <b>Ім'я:</b> <code>${escapeHtml(ctx.from.first_name)}</code>\n` +
               `• <b>Username:</b> ${usernameStr}\n` +
               `• ${idIcon} <b>Telegram ID:</b> <code>${ctx.from.id}</code>\n` +

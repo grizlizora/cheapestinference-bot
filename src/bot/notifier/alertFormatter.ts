@@ -174,7 +174,7 @@ export function formatAlertMessage(
       `${icon("nav_clock")} <b>${timeLabel}:</b> <code>${timeFormatted} UTC</code>\n\n` +
       `${icon("event_slot_drop")} <i>${calloutText}</i>`;
 
-    text = `${header}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${body}`;
+    text = `${header}\n\n${body}`;
 
     if (event.analytics?.isBatchDrop) {
       const rawBatch =
@@ -251,7 +251,7 @@ export function formatAlertMessage(
       : `🌐 Open ${escapeHtml(event.poolName)} on Site`;
 
     keyboard = new InlineKeyboard().url(poolBtnLabel, poolUrl);
-    text = `${header}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${body}`;
+    text = `${header}\n\n${body}`;
   } else if (event.type === "MODEL_UPGRADE_EVENT") {
     const rawHeader = translate(lang, "alerts.model_upgrade_header", {
       pool_name: escapeHtml(event.poolName),
@@ -307,7 +307,7 @@ export function formatAlertMessage(
       `${allModelsList}\n\n` +
       `${icon("event_slot_drop")} <i>${upgradeFreeText}</i>`;
 
-    text = `${header}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${body}`;
+    text = `${header}\n\n${body}`;
     keyboard = new InlineKeyboard().url(
       translate(lang, "common.open_site"),
       poolUrl
@@ -346,7 +346,7 @@ export function formatAlertMessage(
       `${deltaBadge}${ratingBadge ? `\n${ratingBadge}` : ""}\n\n` +
       `${icon("nav_link")} <i>${lockPriceText}</i>`;
 
-    text = `${header}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${body}`;
+    text = `${header}\n\n${body}`;
 
     const btnLabel = translate(lang, "alerts.btn_claim_slot_block", {
       block_name: blockName,
@@ -388,7 +388,7 @@ export function formatAlertMessage(
       `${icon("ai_robot")} <b>${modelsLabel}:</b> ${modelsList}\n\n` +
       `${icon("event_slot_drop")} <i>${allSubsText}</i>`;
 
-    text = `${header}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${body}`;
+    text = `${header}\n\n${body}`;
     keyboard = new InlineKeyboard().url(
       translate(lang, "common.open_site"),
       poolUrl
@@ -444,7 +444,7 @@ export function formatAlertMessage(
     const body = `${diffLines.join("\n")}\n\n` +
       `${icon("nav_clock")} <b>${timeLabel}:</b> <code>${timeFormatted} UTC</code>`;
 
-    text = `${header}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${body}`;
+    text = `${header}\n\n${body}`;
     keyboard = new InlineKeyboard().url(
       translate(lang, "common.open_site"),
       poolUrl
@@ -477,7 +477,7 @@ export function formatAlertMessage(
       `${icon("event_tier_update")} <b>${descLabel}:</b> <i>${escapeHtml((event.metadata?.description as string) || "High-performance compute pool")}</i>\n\n` +
       `${icon("event_slot_drop")} <i>${autoSubText}</i>`;
 
-    text = `${header}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${body}`;
+    text = `${header}\n\n${body}`;
     keyboard = new InlineKeyboard().url(
       translate(lang, "common.open_site"),
       poolUrl
@@ -765,10 +765,10 @@ export function formatBundledAlertMessage(
       : `${icon("nav_clock")} <i>Updated at: ${timeFormatted} UTC</i>`;
 
   const bodyContent = allSoldOut
-    ? `${sectionLines.join(allSamePool ? "\n" : "\n───\n")}\n\n${icon("notify_bell_on")} <i>${botNotifyText}</i>`
-    : sectionLines.join("\n───\n");
+    ? `${sectionLines.join("\n\n")}\n\n${icon("notify_bell_on")} <i>${botNotifyText}</i>`
+    : sectionLines.join("\n\n");
 
-  const text = `${title}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${bodyContent}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${footer}`;
+  const text = `${title}\n\n${bodyContent}\n\n${footer}`;
   const firstEvent = matchedEvents[0].event;
 
   return {

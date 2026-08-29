@@ -115,6 +115,11 @@ export function isUserAdmin(
 ): boolean {
   if (!userId) return false;
   if (adminIdsSet.has(userId)) {
+    if (userDao && typeof userDao.setAdmin === "function" && !userDao.isAdmin(userId)) {
+      try {
+        userDao.setAdmin(userId, true);
+      } catch {}
+    }
     return true;
   }
   if (userDao && userDao.isAdmin(userId)) {
@@ -123,7 +128,7 @@ export function isUserAdmin(
   if (username) {
     const clean = username.replace(/^@/, "").toLowerCase();
     if (adminUsernamesSet.has(clean)) {
-      if (userDao && typeof userDao.setAdmin === "function") {
+      if (userDao && typeof userDao.setAdmin === "function" && !userDao.isAdmin(userId)) {
         try {
           userDao.setAdmin(userId, true);
         } catch {}

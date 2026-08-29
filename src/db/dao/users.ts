@@ -124,15 +124,39 @@ export class UserDAO {
     }) as UserRecord;
 
     tursoCloudSync.pushMutation(
-      `INSERT INTO users (id, telegram_id, username, first_name, language) 
-       VALUES (?, ?, ?, ?, ?) 
+      `INSERT INTO users (id, telegram_id, username, first_name, language, is_admin) 
+       VALUES (?, ?, ?, ?, ?, ?) 
        ON CONFLICT(telegram_id) DO UPDATE SET 
-         id=excluded.id, username=excluded.username, first_name=excluded.first_name, updated_at=CURRENT_TIMESTAMP`,
-      [user.id, params.telegram_id, params.username, params.first_name, params.language || "en"],
+         id=excluded.id, username=excluded.username, first_name=excluded.first_name, is_admin=excluded.is_admin, updated_at=CURRENT_TIMESTAMP`,
+      [user.id, params.telegram_id, params.username, params.first_name, params.language || "en", user.is_admin ?? 0],
       true
     );
 
     return user;
+  }
+
+  syncAdminsFromConfig(adminIds: number[], adminUsernames: string[]): void {
+    if (adminIds.length > 0) {
+      for (const id of adminIds) {
+        this.stmtSetAdmin.run(1, id);
+        tursoCloudSync.pushMutation(
+          `UPDATE users SET is_admin = 1, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?`,
+          [id],
+          true
+        );
+      }
+    }
+    if (adminUsernames.length > 0) {
+      const cleanUsernames = adminUsernames.map(u => u.replace(/^@/, "").toLowerCase());
+      for (const u of cleanUsernames) {
+        this.db.prepare(`UPDATE users SET is_admin = 1, updated_at = CURRENT_TIMESTAMP WHERE LOWER(username) = ?`).run(u);
+        tursoCloudSync.pushMutation(
+          `UPDATE users SET is_admin = 1, updated_at = CURRENT_TIMESTAMP WHERE LOWER(username) = ?`,
+          [u],
+          true
+        );
+      }
+    }
   }
 
   setLanguage(tgId: number, lang: SupportedLanguage): void {
