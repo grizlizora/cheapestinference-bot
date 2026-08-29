@@ -278,6 +278,31 @@ export function createTelegramBot(
       dispatcher
     );
 
+  // 8b. Auto-capture & Touch Active Dashboard on any callback query interaction
+  bot.use(async (ctx, next) => {
+    if (ctx.callbackQuery && ctx.chat && ctx.from) {
+      const msgId = ctx.callbackQuery.message?.message_id;
+      if (msgId) {
+        const session = activeDashboardRegistry.get(ctx.chat.id);
+        if (!session) {
+          activeDashboardRegistry.register(
+            ctx.chat.id,
+            msgId,
+            ctx.user?.id || ctx.from.id,
+            ctx.lang,
+            "dashboard"
+          );
+        } else {
+          if (session.messageId !== msgId) {
+            session.messageId = msgId;
+          }
+          activeDashboardRegistry.touchInteraction(ctx.chat.id);
+        }
+      }
+    }
+    await next();
+  });
+
   bot.use(mainDashboardMenu);
 
   // 9. Live Auto-Updating Dashboard Manager
