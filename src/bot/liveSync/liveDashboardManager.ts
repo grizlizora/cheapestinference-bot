@@ -185,11 +185,22 @@ export class LiveDashboardManager {
 
       const payload: Record<string, any> = {
         parse_mode: "HTML",
-        reply_markup: targetMenu,
         link_preview_options: { is_disabled: true },
       };
 
-      if (typeof (targetMenu as any).prepare === "function") {
+      if (typeof (targetMenu as any).render === "function") {
+        try {
+          const renderedKeyboard = await (targetMenu as any).render(syntheticCtx);
+          if (Array.isArray(renderedKeyboard)) {
+            payload.reply_markup = { inline_keyboard: renderedKeyboard };
+          }
+        } catch (e: any) {
+          console.warn(`⚠️ [LiveSync] targetMenu.render fallback: ${e.message}`);
+        }
+      }
+
+      if (!payload.reply_markup && typeof (targetMenu as any).prepare === "function") {
+        payload.reply_markup = targetMenu;
         await (targetMenu as any).prepare(payload, syntheticCtx);
       }
 

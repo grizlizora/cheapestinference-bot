@@ -54,8 +54,12 @@ export class ActiveDashboardRegistry {
       const records = this.dao.getHydrationCandidates();
       let count = 0;
       for (const r of records) {
-        const lastEditTs = new Date(r.last_telegram_edit_at).getTime() || 0;
-        const lastInteractionTs = new Date(r.last_interaction_at).getTime() || Date.now();
+        const lastEditTs = r.last_telegram_edit_at
+          ? (Date.parse(r.last_telegram_edit_at.replace(" ", "T") + "Z") || Date.parse(r.last_telegram_edit_at) || 0)
+          : 0;
+        const lastInteractionTs = r.last_interaction_at
+          ? (Date.parse(r.last_interaction_at.replace(" ", "T") + "Z") || Date.parse(r.last_interaction_at) || Date.now())
+          : Date.now();
 
         this.activeSessions.set(r.chat_id, {
           chatId: r.chat_id,
@@ -64,12 +68,12 @@ export class ActiveDashboardRegistry {
           lang: r.language,
           viewType: r.view_type as LiveViewType,
           poolSlug: r.pool_slug || undefined,
-          lastRenderedTextHash: r.last_rendered_text_hash || 0,
-          lastRenderedKeyboardHash: r.last_rendered_keyboard_hash || 0,
+          lastRenderedTextHash: 0, // Reset to 0 so startup scrape immediately pushes live update
+          lastRenderedKeyboardHash: 0,
           lastScrapeTimestamp: 0,
-          lastTelegramEditAt: lastEditTs,
+          lastTelegramEditAt: 0,   // Reset to 0 to bypass throttle on boot
           lastUserInteractionAt: lastInteractionTs,
-          consecutiveErrors: r.consecutive_errors || 0,
+          consecutiveErrors: 0,
         });
         count++;
       }

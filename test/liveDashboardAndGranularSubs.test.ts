@@ -245,5 +245,51 @@ describe("Live Dashboard Registry & Granular Subscriptions Test Suite", () => {
       registry.remove(1001);
       expect(registry.get(1001)).toBeUndefined();
     });
+
+    it("should hydrate active dashboard from SQLite on cold boot and immediately push fresh update with rendered keyboard", async () => {
+      const testDb = new Database(":memory:");
+      testDb.exec(`
+        CREATE TABLE active_dashboards (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          chat_id INTEGER NOT NULL UNIQUE,
+          message_id INTEGER NOT NULL,
+          user_id INTEGER NOT NULL,
+          view_type TEXT NOT NULL,
+          pool_slug TEXT,
+          language TEXT NOT NULL DEFAULT 'uk',
+          last_rendered_text_hash INTEGER DEFAULT 0,
+          last_rendered_keyboard_hash INTEGER DEFAULT 0,
+          last_telegram_edit_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          last_interaction_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          consecutive_errors INTEGER NOT NULL DEFAULT 0,
+          updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+
+      const { ActiveDashboardDAO } = await import("../src/db/dao/activeDashboards.js");
+      const activeDao = new ActiveDashboardDAO(testDb);
+
+      // Simulate a user who had an active dashboard 5 minutes before server restart
+      activeDao.upsert({
+        chat_id: 9999,
+        message_id: 1234,
+        user_id: 1,
+        view_type: "dashboard",
+        language: "uk",
+      });
+
+      const registry = new ActiveDashboardRegistry(activeDao);
+      expect(registry.size()).toBe(1);
+
+      const session = registry.get(9999);
+      expect(session).toBeDefined();
+      expect(session?.messageId).toBe(1234);
+      expect(session?.lastRenderedTextHash).toBe(0); // reset on boot to force immediate live update
+      expect(session?.lastTelegramEditAt).toBe(0);   // reset on boot to pass heartbeat throttle check
+
+      const eligible = registry.getSessionsForDataChange();
+      expect(eligible).toHaveLength(1);
+      expect(eligible[0].chatId).toBe(9999);
+    });
   });
 });
