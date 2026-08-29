@@ -7,17 +7,18 @@
 [![grammY](https://img.shields.io/badge/grammY-Telegram%20Framework-2481CC?style=for-the-badge&logo=telegram&logoColor=white)](https://grammy.dev/)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL%20Mode-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
 [![Turso](https://img.shields.io/badge/Turso-Cloud%20Sync-00D2BA?style=for-the-badge&logo=sqlite&logoColor=white)](https://turso.tech/)
-[![Vitest](https://img.shields.io/badge/Vitest-155%20Tests%20Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)](https://vitest.dev/)
+[![Vitest](https://img.shields.io/badge/Vitest-183%20Tests%20Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)](https://vitest.dev/)
 [![Latency](https://img.shields.io/badge/Live%20Origin%20API-240ms--280ms-success?style=for-the-badge&logo=lightning&logoColor=white)]()
 [![LiveSync](https://img.shields.io/badge/Telegram%20LiveSync-51ms--65ms-blue?style=for-the-badge&logo=telegram&logoColor=white)]()
 [![Tor](https://img.shields.io/badge/Tor%20Network-SOCKS5h-7D4698?style=for-the-badge&logo=torproject&logoColor=white)](https://www.torproject.org/)
-[![Stars](https://img.shields.io/badge/Telegram%20Stars-XTR%20Integrated-gold?style=for-the-badge&logo=telegram&logoColor=white)]()
+[![Stars](https://img.shields.io/badge/Telegram%20Stars-5--Tier%20Patron%20Engine-gold?style=for-the-badge&logo=telegram&logoColor=white)]()
+[![Inactivity](https://img.shields.io/badge/Inactivity%20Engine-Zero--Loss%20Revival-cyan?style=for-the-badge&logo=shield&logoColor=white)]()
 [![Docker](https://img.shields.io/badge/Docker-Alpine%20Multi--Stage-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
 <br />
 
-**⚡ Real-time 24/7 drop monitor & Telegram alert bot for [CheapestInference.com](https://cheapestinference.com/pools). Direct live REST API backend integration with zero edge-cache lag, slot oscillation immunity ($K=2$ noise gate), instant slot availability alerts with 1-click claim buttons, 3D animated Telegram Premium custom emoji system, 3-tier priority queue (Admins P0 ➔ Stars VIP Donors P1 ➔ Free Active P2), real-time price drop tracking, predictive availability ETA with Tukey IQR filtering, Turso Cloud Sync dual-mode persistence, and zero-lock SQLite.**
+**⚡ Real-time 24/7 drop monitor & Telegram alert bot for [CheapestInference.com](https://cheapestinference.com/pools) (unmetered dedicated GPU inference pools by [Featherless.ai](https://featherless.ai)). Direct live REST API backend integration with zero edge-cache lag, slot oscillation immunity ($K=2$ noise gate), instant slot availability alerts with 1-click claim buttons, 3D animated Telegram Premium custom emoji system, 14-day inactivity suspension with Zero-Loss Instant Revival, 5-tier dynamic patron ranking (👑 Admin ➔ 💎 Diamond ➔ 🚀 Speed ➔ ❤️ Contributor ➔ ☕ Supporter), DWRR priority queue draining, predictive availability ETA with Tukey IQR filtering, Turso Cloud Sync dual-mode persistence, and zero-lock SQLite.**
 
 [🤖 Live Telegram Bot (@cheapestinference_bot)](https://t.me/cheapestinference_bot) • [🏛 Architecture Overview](#-system-architecture) • [📦 Supported Pools & Regional Blocks](#-supported-pools-tiers--regional-blocks) • [👨‍💻 Author & Contact](#-author--collaboration)
 
@@ -33,12 +34,13 @@
 - [Engineering Highlights](#-engineering-highlights)
   - [1. Extreme Low-Latency Network Pipeline (48–65ms)](#1-extreme-low-latency-network-pipeline-4865ms)
   - [2. In-Memory Inverted Index & 3-Tier Priority Queue](#2-in-memory-inverted-index--3-tier-priority-queue)
-  - [3. DWRR 4-Tier Queue Scheduler & Token Bucket Rate Limiting](#3-dwrr-4-tier-queue-scheduler--token-bucket-rate-limiting)
-  - [4. Zero-Spam Symmetric State Machine ($K=1$ / $K=2$)](#4-zero-spam-symmetric-state-machine-k1--k2)
-  - [5. Turso Cloud Sync Dual-Mode & Compact SQLite WAL](#5-turso-cloud-sync-dual-mode--compact-sqlite-wal)
-  - [6. Predictive Analytics, Drop Classifier & Fair-Value Price Engine](#6-predictive-analytics-drop-classifier--fair-value-price-engine)
+  - [3. 14-Day Inactivity Engine, Star Donor Calculus & Zero-Loss Revival](#3-14-day-inactivity-engine-star-donor-calculus--zero-loss-revival)
+  - [4. DWRR 4-Tier Queue Scheduler & Token Bucket Rate Limiting (27 msg/s)](#4-dwrr-4-tier-queue-scheduler--token-bucket-rate-limiting-27-msgs)
+  - [5. Zero-Spam Symmetric State Machine ($K=1$ / $K=2$)](#5-zero-spam-symmetric-state-machine-k1--k2)
+  - [6. Turso Cloud Sync Dual-Mode & Compact SQLite WAL](#6-turso-cloud-sync-dual-mode--compact-sqlite-wal)
+  - [7. Predictive Analytics, Drop Classifier & Fair-Value Price Engine](#7-predictive-analytics-drop-classifier--fair-value-price-engine)
 - [3D Telegram Premium Custom Emojis & LiveSync UI](#-3d-telegram-premium-custom-emojis--livesync-ui)
-- [Telegram Stars (XTR) VIP Tier System](#-telegram-stars-xtr-vip-tier-system)
+- [Telegram Stars (XTR) 5-Tier Patron & Priority System](#-telegram-stars-xtr-5-tier-patron--priority-system)
 - [Full-Stack Features Matrix](#-full-stack-features-matrix)
 - [Local Development & Quick Start](#-local-development--quick-start)
 - [24/7 Free Cloud Deployment Guides](#-247-free-cloud-deployment-guides)
@@ -150,12 +152,26 @@ flowchart TD
 * **RAM Footprint**: Each user profile occupies only **~64 bytes** in memory; 50,000 active users consume less than **4MB RAM**.
 * **Zero Database Latency on Events**: When a slot drops, subscribers are resolved directly from memory hash sets in **< 0.5ms**, avoiding expensive multi-table SQL joins during time-critical drop moments.
 * **3-Tier Linear Partition Priority Queue (Dial's Scheme)**:
-  * **P0 (Admins)**: Received with **0ms instant delivery** ahead of all queues.
-  * **P1 (Telegram Stars VIP Donors)**: Sorted strictly by `ORDER BY total_donated_stars DESC` (a user with 500 ⭐ receives alerts earlier than one with 50 ⭐).
+  * **P0 (Admins)**: Received with **0ms instant delivery** and permanent lifetime immunity ahead of all queues.
+  * **P1 (Telegram Stars VIP Donors)**: Sorted strictly by `ORDER BY total_donated_stars DESC` (e.g. 500 ⭐ Diamond Patron receives alerts earlier than 50 ⭐ Contributor).
   * **P2 (Free Active Users)**: Sorted by engagement recency `ORDER BY last_active_at DESC`.
 * **Granular Multi-Tariff Isolation**: Supports independent composite filtering across 4 event flags (`available`, `sold_out`, `models`, `prices`) and 3 regional blocks (`#asia`, `#europe`, `#americas`).
 
-### 3. DWRR 4-Tier Queue Scheduler & Token Bucket Rate Limiting
+### 3. 14-Day Inactivity Engine, Star Donor Calculus & Zero-Loss Revival
+* **14-Day Rolling Window**: Free users inactive for $>14\text{ days}$ ($1,209,600,000\text{ ms}$) are automatically paused from slot dispatch queues in $O(1)$ RAM time, saving **100% of Telegram API rate limits** for active users.
+* **Progressive Star Donor Retention Calculus**: Star donations dynamically extend active monitoring retention far beyond the 14-day baseline without requiring daily app interactions:
+  $$\text{CutoffMs} = 14\text{d} + \text{BonusDays}(\text{Stars}) \times \text{DecayFactor}(\text{AgeDays}) \times 86,400,000\text{ ms}$$
+  * **Tier 1 (1–15 ⭐)**: $+2.0\text{ d/star}$ (up to $+30\text{ days}$)
+  * **Tier 2 (16–50 ⭐)**: $+1.5\text{ d/star}$ (up to $+82\text{ days}$)
+  * **Tier 3 (51–100 ⭐)**: $+1.0\text{ d/star}$ (up to $+132\text{ days}$)
+  * **Tier 4 (101–500 ⭐)**: $+0.8\text{ d/star}$ (up to $+452\text{ days}$)
+  * **Tier 5 (>500 ⭐)**: $+0.5\text{ d/star}$
+* **Temporal Recency Decay**: Recent donations maintain $100\%$ bonus value, gracefully decaying over time ($\le 30\text{d}: 1.0 \to 31\text{-}90\text{d}: 0.85 \to 91\text{-}180\text{d}: 0.70 \to 181\text{-}360\text{d}: 0.50 \to >730\text{d}: 0.20$). Any new micro-donation refreshes the recency factor.
+* **Zero-Loss Instant Revival**: The exact millisecond an inactive user touches the bot (`/start`, button press, or text message), `last_active_at` is updated in SQLite and RAM, instantly restoring all subscription dispatch queues with zero loss of preferences.
+* **Telegram 403 Block Safety**: When a user blocks the bot, Telegram 403 sets `profile.isActive = false` in RAM without destructively wiping `this.index` subscriptions, guaranteeing immediate auto-revival upon unblocking.
+* **Covering DB Indexing & Outbox Pruning**: `idx_donations_user_created ON donations(user_id, created_at DESC)` ensures $O(K)$ cold-boot hydration, while `markTerminalFailed()` eliminates retries on permanently blocked recipients.
+
+### 4. DWRR 4-Tier Queue Scheduler & Token Bucket Rate Limiting (27 msg/s)
 * **Deficit Weighted Round Robin (DWRR)** ensures zero starvation across 4 distinct priority queues:
   * **P0**: Interactive user commands, admin actions, and test alerts (`Quantum: 10`).
   * **P1**: Slot availability drops (`SLOT_APPEARED`, `Quantum: 5`).
@@ -164,20 +180,20 @@ flowchart TD
 * **Leaky Token Bucket**: Strictly enforces **27 msg/s** broadcast rate (under Telegram’s 30 msg/s ceiling) with a 1.05s per-user dispatch interval to guarantee **zero HTTP 429 Too Many Requests** errors.
 * **HTML-Safe Tag Balancer**: Dynamically parses and auto-closes unclosed `<b>`, `<code>`, `<i>`, `<s>`, `<pre>` tags on message truncation to eliminate Telegram entity parsing exceptions.
 
-### 4. Zero-Spam Symmetric State Machine ($K=1$ / $K=2$)
+### 5. Zero-Spam Symmetric State Machine ($K=1$ / $K=2$)
 * **Fast-Lane $K=1$ Confirmation**: Newly available slots (`available` or `limited`) trigger alerts on the very first detection cycle to maximize user claim probability.
 * **Noise-Filter $K=2$ Confirmation**: Disappearances, sold-out states, and pool removals require 2 consecutive confirmation cycles before dispatch, preventing false alarms caused by intermittent network glitches.
 * **Bipartite Model Diffing**: Accurately classifies version upgrades (`GLM 5.2` $\to$ `GLM 5.3`), added models, and decommissioned models.
 * **Dynamic Catalog Pruning**: Synchronously purges deprecated pools from SQLite when upstream removes them.
 
-### 5. Turso Cloud Sync Dual-Mode & Compact SQLite WAL
+### 6. Turso Cloud Sync Dual-Mode & Compact SQLite WAL
 * **Dual-Mode Persistence**: Hybrid architecture pairing ultra-fast local SQLite (WAL mode, `< 0.2ms` query latency) with **Turso Cloud (libSQL over HTTPS)** for zero-data-loss container restarts.
 * **Immediate Mutation Push**: Critical user interactions (`setLanguage`, subscription toggles, Stars donations, price alerts) are pushed immediately (`immediate: true`) to Turso Cloud.
 * **Cold-Start Hydration**: On container boot, the bot restores users, granular subscriptions, donations, and cluster pool states from Turso in **~600ms**.
 * **64MB WAL Journal Limit**: `PRAGMA journal_size_limit = 67108864;` prevents unbounded WAL file expansion on disk.
 * **Zero-Lock Live Backup**: `/backup` command executes `VACUUM INTO` streaming with SHA-256 integrity verification, sending the database directly to the admin on Telegram without locking user operations.
 
-### 6. Predictive Analytics, Drop Classifier & Fair-Value Price Engine
+### 7. Predictive Analytics, Drop Classifier & Fair-Value Price Engine
 * **Tukey IQR Outlier Defense & Recency-Weighted EWMA**: Automatically filters out abnormal platform maintenance spikes ($[Q_1 - 1.5 \cdot IQR, Q_3 + 1.5 \cdot IQR]$) and weights recent drops ($w_i = \frac{1}{1 + 0.1 \cdot i}$) to compute true demand categories (`flash` $<5$m, `hot` $5-30$m, `moderate` $30$m$-2$h, `stable` $>2$h).
 * **Time-to-Availability ETA & 24h Harmonic Cadence**: Automatically detects periodic daily resets (e.g. 08:00 UTC unrenewed lease expiries) and computes expected return windows with Median Absolute Deviation (MAD) confidence scoring (`🟢 High confidence (85%)` / `🟡 Medium (65%)` / `⚪ Low (35%)`).
 * **Strict Sample Gating ($N \ge 3$)**: Suppresses speculative ETA and price rating claims until at least 3 verified historical records exist (`📊 Collecting stats (2/3)`).
@@ -196,12 +212,21 @@ flowchart TD
 
 ---
 
-## ⭐ Telegram Stars (XTR) VIP Tier System
+## ⭐ Telegram Stars (XTR) 5-Tier Patron & Priority System
+
+| Tier / Rank | 3D Custom Badge | Stars Range | Active Retention Bonus | Queue Priority | Delivery Wave |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **👑 Admin / Creator** | 👑 `<tg-emoji>` | `Admin` | ♾️ **Permanent Lifetime Immunity** | **P0 • Instant** | **0.03 – 0.05s** (Absolute VIP) |
+| **💎 Diamond Patron** | 💎 `<tg-emoji>` | `250+ ⭐` | **+300 to +500+ Days** | **P1 • Top Queue** | **0.05 – 0.20s** (1st Wave) |
+| **🚀 Speed Patron** | ⚡ `<tg-emoji>` | `100–249 ⭐` | **+146 to +265 Days** | **P1 • High Priority** | **0.20 – 0.50s** (Supporters) |
+| **❤️ Contributor** | ❤️ `<tg-emoji>` | `50–99 ⭐` | **+96 to +145 Days** | **P1 • Elevated Priority** | **0.50 – 1.00s** (Supporters) |
+| **☕ Supporter** | ☕ `<tg-emoji>` | `1–49 ⭐` | **+44 to +95 Days** | **P1 • Priority Queue** | **1.00 – 1.50s** (Supporters) |
+| **⚡ Active Observer** | 🟢 `<tg-emoji>` | `0 ⭐` | **14 Days Rolling Window** | **P2 • Standard Queue** | **1.50 – 3.50s** (General Queue) |
+| **💤 Standby Observer** | 💤 `<tg-emoji>` | `0 ⭐` ($>14\text{d}$) | **Paused (Zero-Loss Instant Revival)** | *Standby (Revives on touch)* | *Auto-Resumes on action* |
 
 * **Official Telegram Stars API**: Built-in support for digital goods and stars payments (`createInvoiceLink`, `pre_checkout_query`, `successful_payment`).
-* **Fixed Support Packages**: 15 ⭐ (Supporter), 50 ⭐ (Pro), 100 ⭐ (VIP), 250 ⭐ (Elite), 500 ⭐ (Whale).
-* **Custom Amount Flow**: Interactive text input supporting any custom star donation from **1 to 10,000 ⭐** with live invoice confirmation.
-* **VIP Priority Queue Boost**: Cumulative star accumulation directly escalates the user's priority position in notification broadcasts.
+* **Interactive Custom Amount Flow**: Text input supporting any custom star donation from **1 to 10,000 ⭐** with live invoice generation.
+* **Real-Time Status Transparency**: Bot Settings and Support menus render dynamic user profile cards with real-time countdown of remaining active days and queue tier.
 
 ---
 
@@ -323,12 +348,12 @@ npm test
 ```
 
 ```
- Test Files  30 passed (30)
-      Tests  155 passed (155)
-   Duration  2.18s
+ Test Files  36 passed (36)
+      Tests  183 passed (183)
+   Duration  2.38s
 ```
 
-* **30 Test Suites**: Complete End-to-End Simulation (7 Stages), Strict 3-Tier Priority Ordering (P0 Admin ➔ P1 VIP Donors DESC ➔ P2 Free Active), Granular Multi-Tariff Event Isolation, Slot Availability Oscillation Immunity ($K=2$ Noise Gate), Slot Diffing ($K=1$/$K=2$), Predictive Analytics & Outlier-Free IQR, Price Rating (ATL / Fair Value), Bipartite Model Matching, Tor Stream Isolation, In-Memory Inverted Index, Singleflight Polling, DWRR Scheduler, Live Dashboard Sync, Rate Limiting, Multi-Language i18n, Turso Cloud Sync Hydration, Telegram Stars (XTR) Custom Flow, and SQLite Migrations.
+* **36 Test Suites**: Complete End-to-End Simulation (7 Stages), Strict 3-Tier Priority Ordering (P0 Admin ➔ P1 VIP Donors DESC ➔ P2 Free Active), 14-Day Inactivity Engine & Dormant Filtering, Progressive Star Retention Calculus & Decay Invariants, Zero-Loss Instant Revival on User Touch, Telegram 403 Block Safety & Subscriber Index Preservation, Granular Multi-Tariff Event Isolation, Slot Availability Oscillation Immunity ($K=2$ Noise Gate), Slot Diffing ($K=1$/$K=2$), Predictive Analytics & Outlier-Free IQR, Price Rating (ATL / Fair Value), Bipartite Model Matching, Tor Stream Isolation, In-Memory Inverted Index, Singleflight Polling, DWRR Scheduler, Live Dashboard Sync, Rate Limiting, Multi-Language i18n, Turso Cloud Sync Hydration, Telegram Stars (XTR) Custom Flow, and SQLite Migrations.
 
 ---
 
