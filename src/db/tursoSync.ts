@@ -263,18 +263,22 @@ export class TursoCloudSync {
       // Safe non-fatal schema column migrations on remote Turso instance
       const migrations = [
         "ALTER TABLE users ADD COLUMN total_donated_stars INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1",
+        "ALTER TABLE users ADD COLUMN last_active_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
         "ALTER TABLE pool_state ADD COLUMN infra_spec TEXT",
         "ALTER TABLE pool_state ADD COLUMN manual_provisioning INTEGER DEFAULT 0",
-        "ALTER TABLE active_dashboards ADD COLUMN last_telegram_edit_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
-        "ALTER TABLE active_dashboards ADD COLUMN last_interaction_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
+        "ALTER TABLE active_dashboards ADD COLUMN message_id INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE active_dashboards ADD COLUMN user_id INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE active_dashboards ADD COLUMN view_type TEXT NOT NULL DEFAULT 'dashboard'",
+        "ALTER TABLE active_dashboards ADD COLUMN pool_slug TEXT",
+        "ALTER TABLE active_dashboards ADD COLUMN language TEXT NOT NULL DEFAULT 'en'",
         "ALTER TABLE active_dashboards ADD COLUMN last_rendered_text_hash INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE active_dashboards ADD COLUMN last_rendered_keyboard_hash INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE active_dashboards ADD COLUMN last_telegram_edit_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
+        "ALTER TABLE active_dashboards ADD COLUMN last_interaction_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
         "ALTER TABLE active_dashboards ADD COLUMN consecutive_errors INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE active_dashboards ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
         "ALTER TABLE active_dashboards ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
-        "ALTER TABLE active_dashboards ADD COLUMN pool_slug TEXT",
-        "ALTER TABLE active_dashboards ADD COLUMN language TEXT NOT NULL DEFAULT 'en'",
-        "ALTER TABLE active_dashboards ADD COLUMN view_type TEXT NOT NULL DEFAULT 'dashboard'",
       ];
       for (const sql of migrations) {
         await this.executePipeline([{ type: "execute", stmt: { sql } }]).catch(() => {});
