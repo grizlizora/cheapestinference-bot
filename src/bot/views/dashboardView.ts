@@ -145,7 +145,7 @@ export function renderSettingsText(ctx: BotContext): string {
     ? (ctx.lang === "uk" ? `Без звуку (тихий режим) ${icon("notify_mute")}` : ctx.lang === "ru" ? `Без звука (тихий режим) ${icon("notify_mute")}` : `Silent (muted) ${icon("notify_mute")}`)
     : (ctx.lang === "uk" ? `Звук увімкнено ${icon("notify_loud")}` : ctx.lang === "ru" ? `Звук включен ${icon("notify_loud")}` : `Audible ${icon("notify_loud")}`);
 
-  const idIcon = `<tg-emoji emoji-id="5422683699130933153">🪪</tg-emoji>`;
+  const idIcon = icon("id_badge");
 
   const profileCard = renderUserProfileCard(
     {

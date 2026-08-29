@@ -256,26 +256,28 @@ export function renderUserProfileCard(
   lang: SupportedLanguage = "en"
 ): string {
   const meta = getUserRankMeta(profile, lang);
+  const userIcon = icon("user");
+  const starIcon = icon("star");
   const starsBadge =
-    meta.totalDonatedStars > 0 ? ` (${meta.totalDonatedStars} ⭐)` : "";
+    meta.totalDonatedStars > 0 ? ` (${meta.totalDonatedStars} ${starIcon})` : "";
 
   if (lang === "uk") {
     return (
-      `👤 <b>Профіль та статус:</b>\n` +
+      `${userIcon} <b>Профіль та статус:</b>\n` +
       `• <b>Ранг:</b> ${meta.rankTitle}${starsBadge}\n` +
       `• <b>Пріоритет черги:</b> ${meta.priorityTitle}\n` +
       `• <b>Стан моніторингу:</b> ${meta.retentionText}`
     );
   } else if (lang === "ru") {
     return (
-      `👤 <b>Профиль и статус:</b>\n` +
+      `${userIcon} <b>Профиль и статус:</b>\n` +
       `• <b>Ранг:</b> ${meta.rankTitle}${starsBadge}\n` +
       `• <b>Приоритет очереди:</b> ${meta.priorityTitle}\n` +
       `• <b>Статус мониторинга:</b> ${meta.retentionText}`
     );
   } else {
     return (
-      `👤 <b>Profile & Status:</b>\n` +
+      `${userIcon} <b>Profile & Status:</b>\n` +
       `• <b>Rank:</b> ${meta.rankTitle}${starsBadge}\n` +
       `• <b>Queue Priority:</b> ${meta.priorityTitle}\n` +
       `• <b>Monitoring State:</b> ${meta.retentionText}`

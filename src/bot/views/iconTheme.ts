@@ -96,7 +96,12 @@ export type IconKey =
   | "star"
   | "tip_lightbulb"
   | "git_octopus"
-  | "writing_hand";
+  | "writing_hand"
+  // User Profile & Community
+  | "user"
+  | "user_profile"
+  | "users_group"
+  | "id_badge";
 
 export interface IconDefinition {
   customEmojiId: string;
@@ -499,6 +504,26 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     customEmojiId: "5470060791883374114",
     unicodeFallback: "✍️",
     name: "3D Writing Hand",
+  },
+  user: {
+    customEmojiId: "5373012449597335010",
+    unicodeFallback: "👤",
+    name: "3D Glowing User Avatar",
+  },
+  user_profile: {
+    customEmojiId: "5373012449597335010",
+    unicodeFallback: "👤",
+    name: "3D Glowing User Avatar",
+  },
+  users_group: {
+    customEmojiId: "5372926953978341366",
+    unicodeFallback: "👥",
+    name: "3D Users Group",
+  },
+  id_badge: {
+    customEmojiId: "5422683699130933153",
+    unicodeFallback: "🪪",
+    name: "3D ID Security Badge",
   },
 };
 
