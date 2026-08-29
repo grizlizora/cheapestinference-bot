@@ -487,6 +487,19 @@ export class SubscriberInvertedIndex {
   }
 
   /**
+   * Fast-path touch last active timestamp in RAM (O(1))
+   */
+  public touchLastActive(telegramId: number, now: number = Date.now()): void {
+    const userId = this.tgIdToUserId.get(telegramId);
+    if (userId) {
+      const profile = this.profiles.get(userId);
+      if (profile) {
+        profile.lastActiveAt = now;
+      }
+    }
+  }
+
+  /**
    * Upsert or register user in memory
    */
   public upsertUserProfile(profile: PackedUserProfile): void {
