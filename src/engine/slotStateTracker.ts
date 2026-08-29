@@ -370,20 +370,39 @@ export class SlotStateTracker {
     incomingSlotKeys: Set<string>,
     incomingPoolSlugs: Set<string>,
     historyDao: SlotHistoryDAO | undefined,
-    timestamp: number
+    timestamp: number,
+    predictiveEngine?: PredictiveAnalyticsEngine
   ): DiffEvent[] {
     const events: DiffEvent[] = [];
 
     // 1. Missing Slots
     for (const [key, slot] of this.inMemorySlots) {
       if (!incomingSlotKeys.has(key)) {
-        const wasAvailable = slot.status === "available" || slot.status === "limited";
+        const wasAvailable = isSlotAvailable(slot.status);
         if (wasAvailable) {
           const count = (this.pendingDisappearances.get(key) || 0) + 1;
           if (count >= 2) {
             this.pendingDisappearances.delete(key);
             historyDao?.recordSlotClosed(slot.poolSlug, slot.block);
             this.inMemorySlots.delete(key);
+
+            let eta = undefined;
+            if (predictiveEngine) {
+              eta = predictiveEngine.predictNextAvailability(slot.poolSlug, slot.block, "sold-out");
+            }
+
+            let avgLifespanFormatted = "";
+            let demandCategory: DemandCategory = "unknown";
+            let avgLifespanSeconds: number | null = null;
+            let totalOpenings = 0;
+
+            if (historyDao) {
+              const analytics = historyDao.getBlockPredictiveAnalytics(slot.poolSlug, slot.block);
+              avgLifespanFormatted = analytics.avgDurationFormatted;
+              demandCategory = analytics.demandCategory;
+              avgLifespanSeconds = analytics.avgDurationSeconds;
+              totalOpenings = analytics.totalOpenings;
+            }
 
             events.push({
               id: crypto.randomUUID(),
@@ -396,6 +415,15 @@ export class SlotStateTracker {
               newStatus: "sold-out",
               newPrice: slot.pricePerMonth,
               timestamp,
+              analytics: {
+                avgLifespanFormatted,
+                avgLifespanSeconds,
+                demandCategory,
+                isBatchDrop: false,
+                dropPattern: "UNKNOWN",
+                totalOpenings,
+                eta,
+              },
             });
           } else {
             this.pendingDisappearances.set(key, count);

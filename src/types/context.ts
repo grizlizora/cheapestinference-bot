@@ -7,6 +7,8 @@ export interface SessionData {
   lastActiveMenu?: string;
   waitingForCustomStars?: boolean;
   pendingCustomStars?: number;
+  pendingDeepLink?: string;
+  fromSettings?: boolean;
 }
 
 export type BotContext = Context &

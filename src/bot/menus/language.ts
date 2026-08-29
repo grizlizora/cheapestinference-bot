@@ -30,9 +30,9 @@ export function createLanguageMenu(
     ctx.answerCallbackQuery(toast).catch(() => {});
 
     const msgId = ctx.callbackQuery?.message?.message_id;
-    const pendingDeepLink = (ctx.session as any)?.pendingDeepLink;
+    const pendingDeepLink = ctx.session?.pendingDeepLink;
     if (pendingDeepLink && typeof pendingDeepLink === "string") {
-      delete (ctx.session as any).pendingDeepLink;
+      delete ctx.session.pendingDeepLink;
       if (pendingDeepLink.startsWith("pool_")) {
         const slug = pendingDeepLink.replace("pool_", "");
         ctx.session.tempPoolSlug = slug;
@@ -51,9 +51,9 @@ export function createLanguageMenu(
       }
     }
 
-    const fromSettings = (ctx.session as any)?.fromSettings;
+    const fromSettings = ctx.session?.fromSettings;
     if (fromSettings) {
-      delete (ctx.session as any).fromSettings;
+      delete ctx.session.fromSettings;
       if (ctx.chat && msgId && dashboardRegistry) {
         dashboardRegistry.register(ctx.chat.id, msgId, ctx.user.id, lang, "settings");
       }

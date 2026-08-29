@@ -40,7 +40,7 @@ export function createStartHandler(
     const match = (ctx as any).match;
     if (ctx.isNewUser) {
       if (match && typeof match === "string") {
-        (ctx.session as any).pendingDeepLink = match;
+        ctx.session.pendingDeepLink = match;
       }
       await safeReply(ctx, ctx.t("onboarding.welcome_title", { wave_icon: icon("onboarding_wave") }), {
         reply_markup: languageMenu,
@@ -52,14 +52,18 @@ export function createStartHandler(
     if (match && typeof match === "string") {
       if (match.startsWith("pool_") && poolDetailMenu) {
         const slug = match.replace("pool_", "");
-        ctx.session.tempPoolSlug = slug;
-        const msg = await safeReply(ctx, renderPoolDetailText(ctx, poolStateDao, historyDao, scraper), {
-          reply_markup: poolDetailMenu,
-          parse_mode: "HTML",
-          link_preview_options: { is_disabled: true },
-        });
-        liveDashboardManager?.getRegistry().register(ctx.chat.id, msg.message_id, ctx.user.id, ctx.lang, "pool_detail", slug);
-        return;
+        const knownPools = poolStateDao.getPoolSummaries();
+        const poolExists = knownPools.some((p) => p.slug === slug);
+        if (poolExists) {
+          ctx.session.tempPoolSlug = slug;
+          const msg = await safeReply(ctx, renderPoolDetailText(ctx, poolStateDao, historyDao, scraper), {
+            reply_markup: poolDetailMenu,
+            parse_mode: "HTML",
+            link_preview_options: { is_disabled: true },
+          });
+          liveDashboardManager?.getRegistry().register(ctx.chat.id, msg.message_id, ctx.user.id, ctx.lang, "pool_detail", slug);
+          return;
+        }
       }
       if ((match === "alerts" || match === "subscriptions") && subDao && subscriptionsMenu) {
         const msg = await safeReply(ctx, renderSubscriptionsText(ctx, subDao), {

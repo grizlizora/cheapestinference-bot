@@ -3,7 +3,8 @@ import { config } from "../config/env.js";
 
 interface MutationItem {
   sql: string;
-  args: any[];
+  args?: any[];
+  retryCount?: number;
 }
 
 export class TursoCloudSync {
@@ -258,6 +259,17 @@ export class TursoCloudSync {
           },
         },
       ]);
+
+      // Safe non-fatal schema column migrations on remote Turso instance
+      const migrations = [
+        "ALTER TABLE users ADD COLUMN total_donated_stars INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE pool_state ADD COLUMN infra_spec TEXT",
+        "ALTER TABLE pool_state ADD COLUMN manual_provisioning INTEGER DEFAULT 0",
+      ];
+      for (const sql of migrations) {
+        await this.executePipeline([{ type: "execute", stmt: { sql } }]).catch(() => {});
+      }
+
       this.isInitialized = true;
     } catch (err: any) {
       console.warn("⚠️ [TursoSync] Remote schema check warning:", err?.message || err);
@@ -561,7 +573,7 @@ export class TursoCloudSync {
       this.pendingMutations.shift(); // Drop oldest to guarantee flat RAM bound
     }
 
-    this.pendingMutations.push({ sql, args });
+    this.pendingMutations.push({ sql, args, retryCount: 0 });
 
     // High-watermark or immediate flush requested
     if (immediate || this.pendingMutations.length >= 50) {
@@ -606,7 +618,18 @@ export class TursoCloudSync {
       );
     } catch (err: any) {
       console.warn(`⚠️ [TursoSync] Background batch push warning (${batch.length} mutations):`, err?.message || err);
-      this.pendingMutations = [...batch, ...this.pendingMutations];
+      // Poison-pill protection: increment retry count and discard mutations failing > 5 times
+      const retryableBatch: Array<{ sql: string; args?: any[]; retryCount?: number }> = [];
+      for (const item of batch) {
+        const count = (item.retryCount || 0) + 1;
+        if (count <= 5) {
+          retryableBatch.push({ ...item, retryCount: count });
+        } else {
+          console.error("❌ [TursoSync] Discarding poison-pill mutation after 5 failed attempts:", item.sql);
+        }
+      }
+
+      this.pendingMutations = [...retryableBatch, ...this.pendingMutations];
       if (this.pendingMutations.length > TursoCloudSync.MAX_PENDING_MUTATIONS) {
         this.pendingMutations = this.pendingMutations.slice(0, TursoCloudSync.MAX_PENDING_MUTATIONS);
       }

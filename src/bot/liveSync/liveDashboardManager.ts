@@ -13,6 +13,7 @@ import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
 import { ActiveDashboardRegistry, ActiveDashboardEntry, fnv1a32 } from "./dashboardRegistry.js";
 import { renderDashboardText } from "../views/dashboardView.js";
 import { renderPoolDetailText } from "../views/poolDetailView.js";
+import { stripTgEmoji } from "../views/common.js";
 import { translate } from "../../i18n/index.js";
 
 export interface LiveDashboardManagerOptions {
@@ -57,6 +58,22 @@ export class LiveDashboardManager {
     // Attach hooks to ScraperOrchestrator
     this.scraper.on("diff_events", () => this.handleDataChanged());
     this.scraper.on("heartbeat", (hb: any) => this.handleScraperHeartbeat(Boolean(hb?.modified)));
+
+    // Unreferenced watchdog timer to self-heal any dropped event loops
+    this.watchdogTimer = setInterval(() => {
+      if (this.updateQueue.length > 0 && !this.isDispatching) {
+        this.startDispatchWorker();
+      }
+    }, 5000);
+    this.watchdogTimer.unref();
+  }
+
+  private watchdogTimer?: NodeJS.Timeout;
+
+  public close(): void {
+    if (this.watchdogTimer) {
+      clearInterval(this.watchdogTimer);
+    }
   }
 
   public getRegistry(): ActiveDashboardRegistry {
@@ -76,7 +93,7 @@ export class LiveDashboardManager {
 
   /**
    * Invoked on routine heartbeat polls and scrape cycles.
-   * Heartbeat routing: Tier 1 (Active <30m) every 15s; Tier 2 (Eco 30m-24h) every 60s.
+   * Heartbeat routing: Tier 1 (Active <30m) every 10s; Tier 2 (Eco 30m-24h) every 60s.
    */
   public handleScraperHeartbeat(isModified: boolean): void {
     if (isModified) {
@@ -103,50 +120,60 @@ export class LiveDashboardManager {
 
     const processTick = async () => {
       if (!this.isDispatching) return;
-      const now = performance.now();
+      try {
+        const now = performance.now();
 
-      // Check HTTP 429 backoff
-      if (this.isPaused) {
-        if (now < this.pauseUntil) {
-          const waitMs = Math.max(10, Math.ceil(this.pauseUntil - now));
-          setTimeout(processTick, waitMs);
+        // Check HTTP 429 backoff
+        if (this.isPaused) {
+          if (now < this.pauseUntil) {
+            const waitMs = Math.max(10, Math.ceil(this.pauseUntil - now));
+            setTimeout(processTick, waitMs);
+            return;
+          }
+          this.isPaused = false;
+        }
+
+        // Refill tokens
+        const elapsed = now - this.lastTokenRefill;
+        if (elapsed >= this.tokenIntervalMs) {
+          const newTokens = Math.floor(elapsed / this.tokenIntervalMs);
+          this.tokens = Math.min(this.maxTokens, this.tokens + newTokens);
+          this.lastTokenRefill += newTokens * this.tokenIntervalMs;
+        }
+
+        if (this.updateQueue.length === 0) {
+          this.isDispatching = false;
           return;
         }
-        this.isPaused = false;
-      }
 
-      // Refill tokens
-      const elapsed = now - this.lastTokenRefill;
-      if (elapsed >= this.tokenIntervalMs) {
-        const newTokens = Math.floor(elapsed / this.tokenIntervalMs);
-        this.tokens = Math.min(this.maxTokens, this.tokens + newTokens);
-        this.lastTokenRefill += newTokens * this.tokenIntervalMs;
-      }
-
-      if (this.updateQueue.length === 0) {
-        this.isDispatching = false;
-        return;
-      }
-
-      if (this.tokens >= 1) {
-        const session = this.updateQueue.shift();
-        if (session) {
-          this.queuedChatIds.delete(session.chatId);
-          const chatLastSent = this.lastChatEditTime.get(session.chatId) || 0;
-          if (Date.now() - chatLastSent < this.USER_EDIT_GAP_MS) {
-            // Requeue at tail if chat rate limit hasn't passed
-            if (!this.queuedChatIds.has(session.chatId)) {
-              this.queuedChatIds.add(session.chatId);
-              this.updateQueue.push(session);
+        if (this.tokens >= 1) {
+          const session = this.updateQueue.shift();
+          if (session) {
+            this.queuedChatIds.delete(session.chatId);
+            const chatLastSent = this.lastChatEditTime.get(session.chatId) || 0;
+            if (Date.now() - chatLastSent < this.USER_EDIT_GAP_MS) {
+              // Requeue at tail if chat rate limit hasn't passed
+              if (!this.queuedChatIds.has(session.chatId)) {
+                this.queuedChatIds.add(session.chatId);
+                this.updateQueue.push(session);
+              }
+            } else {
+              this.tokens -= 1;
+              await this.executeEdit(session).catch((err) => {
+                this.handleEditError(err, session);
+              });
             }
-          } else {
-            this.tokens -= 1;
-            this.executeEdit(session).catch(() => {});
           }
         }
+      } catch (tickErr: any) {
+        console.error("⚠️ [LiveDashboardManager] Unexpected tick error:", tickErr?.message || tickErr);
+      } finally {
+        if (this.isDispatching && this.updateQueue.length > 0) {
+          setTimeout(processTick, Math.max(15, this.tokenIntervalMs));
+        } else {
+          this.isDispatching = false;
+        }
       }
-
-      setTimeout(processTick, Math.max(10, this.tokenIntervalMs));
     };
 
     setImmediate(processTick);
@@ -205,9 +232,24 @@ export class LiveDashboardManager {
       }
 
       const editStartTime = Date.now();
-      await this.bot.api.editMessageText(session.chatId, session.messageId, text, payload as any);
-      const tgEditLatency = Date.now() - editStartTime;
+      try {
+        await this.bot.api.editMessageText(session.chatId, session.messageId, text, payload as any);
+      } catch (tgErr: any) {
+        const desc = tgErr?.description || tgErr?.message || "";
+        // 1. Emoji fallback if custom emoji tag was rejected
+        if (desc.includes("DOCUMENT_INVALID") || desc.includes("CUSTOM_EMOJI_INVALID")) {
+          const stripped = stripTgEmoji(text);
+          await this.bot.api.editMessageText(session.chatId, session.messageId, stripped, payload as any);
+        } else if (desc.includes("message is not modified")) {
+          // 2. Normal response when message is already identical: record success & hash
+          this.registry.recordEditSuccess(session.chatId, textHash);
+          return;
+        } else {
+          throw tgErr;
+        }
+      }
 
+      const tgEditLatency = Date.now() - editStartTime;
       this.registry.recordEditSuccess(session.chatId, textHash);
       console.log(`📡 [LiveSync] In-place updated view '${session.viewType}' for chat ${session.chatId} in ${tgEditLatency}ms (TG API)`);
     } catch (err: any) {

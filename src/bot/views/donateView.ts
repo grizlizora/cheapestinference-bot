@@ -13,7 +13,7 @@ export function renderDonateText(ctx: BotContext, userTotalStars = 0): string {
       ctx.lang === "uk"
         ? `\n\n${diamondIcon} <b>Ваш статус:</b> <b>${userTotalStars} Stars задоначено</b> (Пріоритет активовано!)`
         : ctx.lang === "ru"
-        ? `\n\n${diamondIcon} <b>Ваш статус:</b> <b>${userTotalStars} Stars задоначено</b> (Приоритет включен!)`
+        ? `\n\n${diamondIcon} <b>Ваш статус:</b> <b>${userTotalStars} Stars пожертвовано</b> (Приоритет включен!)`
         : `\n\n${diamondIcon} <b>Your Status:</b> <b>${userTotalStars} Stars donated</b> (Priority active!)`;
   }
 

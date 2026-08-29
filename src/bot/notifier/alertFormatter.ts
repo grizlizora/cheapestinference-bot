@@ -196,7 +196,7 @@ export function formatAlertMessage(
 
     const btnLabel = translate(lang, "alerts.btn_claim_slot_block", {
       block_name: blockName,
-      price: escapeHtml(cleanPriceString(event.newPrice)),
+      price: cleanPriceString(event.newPrice),
       currency_month: currencyMonth,
     });
 
@@ -245,10 +245,10 @@ export function formatAlertMessage(
     }
 
     const poolBtnLabel = lang === "uk"
-      ? `🌐 Відкрити ${escapeHtml(event.poolName)} на сайті`
+      ? `🌐 Відкрити ${event.poolName} на сайті`
       : lang === "ru"
-      ? `🌐 Открыть ${escapeHtml(event.poolName)} на сайте`
-      : `🌐 Open ${escapeHtml(event.poolName)} on Site`;
+      ? `🌐 Открыть ${event.poolName} на сайте`
+      : `🌐 Open ${event.poolName} on Site`;
 
     keyboard = new InlineKeyboard().url(poolBtnLabel, poolUrl);
     text = `${header}\n\n${body}`;
@@ -350,7 +350,7 @@ export function formatAlertMessage(
 
     const btnLabel = translate(lang, "alerts.btn_claim_slot_block", {
       block_name: blockName,
-      price: escapeHtml(cleanNewPrice),
+      price: cleanNewPrice,
       currency_month: currencyMonth,
     });
 

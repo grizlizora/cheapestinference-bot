@@ -175,7 +175,8 @@ export class SlotDiffEngine {
       syncResult.incomingSlotKeys,
       syncResult.incomingPoolSlugs,
       this.historyDao,
-      now
+      now,
+      this.predictiveEngine
     );
     events.push(...missingEvents);
 

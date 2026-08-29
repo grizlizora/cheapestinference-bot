@@ -66,9 +66,10 @@ export class PriceDiffEvaluator {
 
     const basePriceChanged = pool.minPricePerDay !== prevPool.minPricePerDay;
     const allBlocksHaveSamePrice =
-      stagedSlotPriceChanges.length === pool.blocks.length &&
-      pool.blocks.length > 1 &&
-      stagedSlotPriceChanges.every((c) => c.newPrice === stagedSlotPriceChanges[0].newPrice);
+      (stagedSlotPriceChanges.length === pool.blocks.length &&
+        pool.blocks.length > 1 &&
+        stagedSlotPriceChanges.every((c) => c.newPrice === stagedSlotPriceChanges[0].newPrice)) ||
+      (pool.blocks.length === 1 && basePriceChanged && stagedSlotPriceChanges.length === 1);
 
     if (allBlocksHaveSamePrice) {
       // Case A: Uniform pool base tariff update

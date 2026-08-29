@@ -99,6 +99,10 @@ export class ActiveDashboardDAO {
     `);
   }
 
+  public getByChatId(chatId: number): ActiveDashboardRecord | undefined {
+    return this.stmtGetByChatId.get(chatId) as ActiveDashboardRecord | undefined;
+  }
+
   public upsert(record: {
     chat_id: number;
     message_id: number;
@@ -149,9 +153,21 @@ export class ActiveDashboardDAO {
     );
   }
 
-  public updateView(chatId: number, viewType: string, poolSlug?: string, lang?: SupportedLanguage, messageId?: number): void {
+  public updateView(chatId: number, viewType: string, poolSlug?: string, lang?: SupportedLanguage, messageId?: number, userId?: number): void {
     const existing = this.stmtGetByChatId.get(chatId) as ActiveDashboardRecord | undefined;
-    if (!existing) return;
+    if (!existing) {
+      if (messageId && messageId > 0) {
+        this.upsert({
+          chat_id: chatId,
+          message_id: messageId,
+          user_id: userId || chatId,
+          view_type: viewType,
+          pool_slug: poolSlug,
+          language: lang || "en",
+        });
+      }
+      return;
+    }
     this.stmtUpdateView.run({
       chat_id: chatId,
       view_type: viewType,

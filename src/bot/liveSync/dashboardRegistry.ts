@@ -126,19 +126,26 @@ export class ActiveDashboardRegistry {
     });
   }
 
-  public updateView(chatId: number, viewType: LiveViewType, poolSlug?: string, lang?: SupportedLanguage, messageId?: number): void {
-    const session = this.activeSessions.get(chatId);
-    if (session) {
-      session.viewType = viewType;
-      if (poolSlug !== undefined) session.poolSlug = poolSlug;
-      if (lang !== undefined) session.lang = lang;
-      if (messageId !== undefined && messageId > 0) session.messageId = messageId;
-      session.lastUserInteractionAt = Date.now();
-      // Re-insert at Map tail to ensure true LRU ordering
-      this.activeSessions.delete(chatId);
-      this.activeSessions.set(chatId, session);
+  public updateView(chatId: number, viewType: LiveViewType, poolSlug?: string, lang?: SupportedLanguage, messageId?: number, userId?: number): void {
+    let session = this.activeSessions.get(chatId);
+    if (!session) {
+      if (messageId && messageId > 0) {
+        this.register(chatId, messageId, userId || chatId, lang || "en", viewType, poolSlug);
+        return;
+      }
+      return;
     }
-    this.dao?.updateView(chatId, viewType, poolSlug, lang, messageId);
+    session.viewType = viewType;
+    if (poolSlug !== undefined) session.poolSlug = poolSlug;
+    if (lang !== undefined) session.lang = lang;
+    if (messageId !== undefined && messageId > 0) session.messageId = messageId;
+    session.lastUserInteractionAt = Date.now();
+    session.lastRenderedTextHash = 0; // Reset text hash so new view renders immediately!
+    session.consecutiveErrors = 0;
+    // Re-insert at Map tail to ensure true LRU ordering
+    this.activeSessions.delete(chatId);
+    this.activeSessions.set(chatId, session);
+    this.dao?.updateView(chatId, viewType, poolSlug, lang, messageId, userId);
   }
 
   public touchInteraction(chatId: number): void {
@@ -216,9 +223,9 @@ export class ActiveDashboardRegistry {
       // Beyond 24h: Standby tier, no routine heartbeat edit
       if (idleDuration > ActiveDashboardRegistry.ECO_TIER_MS) continue;
 
-      // Tier 1: Active user (<30m) -> throttle 15s
+      // Tier 1: Active user (<30m) -> throttle 10s
       if (idleDuration <= ActiveDashboardRegistry.ACTIVE_TIER_MS) {
-        if (now - session.lastTelegramEditAt >= 15_000) {
+        if (now - session.lastTelegramEditAt >= 10_000) {
           candidates.push(session);
         }
       }

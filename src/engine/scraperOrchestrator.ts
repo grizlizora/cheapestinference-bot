@@ -104,11 +104,11 @@ export class ScraperOrchestrator extends EventEmitter {
   private calculateNextIntervalMs(): number {
     if (this.consecutiveFailures === 0) {
       const now = Date.now();
-      const isVolatile = now - this.lastSlotEventTimestamp < 5 * 60 * 1000;
+      const timeSinceEvent = now - this.lastSlotEventTimestamp;
       
-      if (isVolatile) {
-        const timeSinceEvent = now - this.lastSlotEventTimestamp;
-        // Stepped volatility decay: 3.0s (0-1m) -> 3.6s (1-3m) -> 4.2s (3-5m) -> baseline (5s+)
+      // Tier 1: Volatile / Fast Active (0 - 5 min post-event)
+      if (timeSinceEvent < 5 * 60 * 1000) {
+        // Stepped volatility decay: 3.0s (0-1m) -> 3.6s (1-3m) -> 4.2s (3-5m)
         let fastMin = 3.0;
         let fastMax = 4.0;
         if (timeSinceEvent > 3 * 60 * 1000) {
@@ -121,6 +121,14 @@ export class ScraperOrchestrator extends EventEmitter {
         return Math.floor((fastMin + Math.random() * (fastMax - fastMin)) * 1000);
       }
 
+      // Tier 3: Deep Idle (> 30 min quiet period)
+      if (timeSinceEvent > 30 * 60 * 1000) {
+        const idleMin = 15;
+        const idleMax = 20;
+        return Math.floor((idleMin + Math.random() * (idleMax - idleMin)) * 1000);
+      }
+
+      // Tier 2: Standard Baseline (5 - 30 min)
       const range = this.config.maxIntervalSec - this.config.minIntervalSec;
       const randomSec = this.config.minIntervalSec + Math.random() * range;
       return Math.floor(randomSec * 1000);

@@ -18,6 +18,7 @@ export class UserDAO {
   private stmtReactivate: Database.Statement;
   private stmtGetStats: Database.Statement;
   private stmtSetAdmin: Database.Statement;
+  private stmtSetAdminByUsername: Database.Statement;
   private stmtIsAdmin: Database.Statement;
   private stmtGetAllAdmins: Database.Statement;
   private txDeactivateBatch: (ids: number[]) => void;
@@ -27,6 +28,9 @@ export class UserDAO {
     this.stmtGetById = db.prepare("SELECT * FROM users WHERE id = ?");
     this.stmtSetAdmin = db.prepare(`
       UPDATE users SET is_admin = ?, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?
+    `);
+    this.stmtSetAdminByUsername = db.prepare(`
+      UPDATE users SET is_admin = 1, updated_at = CURRENT_TIMESTAMP WHERE LOWER(username) = ?
     `);
     this.stmtIsAdmin = db.prepare(`
       SELECT is_admin FROM users WHERE telegram_id = ?
@@ -149,7 +153,7 @@ export class UserDAO {
     if (adminUsernames.length > 0) {
       const cleanUsernames = adminUsernames.map(u => u.replace(/^@/, "").toLowerCase());
       for (const u of cleanUsernames) {
-        this.db.prepare(`UPDATE users SET is_admin = 1, updated_at = CURRENT_TIMESTAMP WHERE LOWER(username) = ?`).run(u);
+        this.stmtSetAdminByUsername.run(u);
         tursoCloudSync.pushMutation(
           `UPDATE users SET is_admin = 1, updated_at = CURRENT_TIMESTAMP WHERE LOWER(username) = ?`,
           [u],
