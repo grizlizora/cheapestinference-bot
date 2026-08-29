@@ -2,7 +2,11 @@ import Database from "better-sqlite3";
 import { SupportedLanguage } from "../../types/db.js";
 
 export const FREE_USER_INACTIVITY_LIMIT_MS = 14 * 24 * 60 * 60 * 1000; // 14 days = 1,209,600,000 ms
-export const DONOR_INACTIVITY_LIMIT_MS = 90 * 24 * 60 * 60 * 1000;     // 90 days = 7,776,000,000 ms
+export const STAR_GRACE_EXTENSION_MS = 24 * 60 * 60 * 1000;            // +1 day per 1 Star = 86,400,000 ms
+
+export function computeUserInactivityLimitMs(stars: number = 0): number {
+  return FREE_USER_INACTIVITY_LIMIT_MS + Math.max(0, stars) * STAR_GRACE_EXTENSION_MS;
+}
 
 export interface PackedUserProfile {
   userId: number;
@@ -258,17 +262,21 @@ export class SubscriberInvertedIndex {
 
       const timeSinceActive = now - (profile.lastActiveAt || 0);
 
-      // Invariant 2: Admins always exempt (Priority P0)
+      // Invariant 1: Admins always exempt with infinite lifetime immunity (Priority P0)
       if (profile.isAdmin) {
         admins.push(profile);
-      } else if ((profile.totalDonatedStars || 0) > 0) {
-        // Invariant 2: Star Donors (Priority P1) - Extended Grace Window (90 Days)
-        if (timeSinceActive <= DONOR_INACTIVITY_LIMIT_MS) {
+        continue;
+      }
+
+      // Invariant 2: Smart Proportional Star Retention Window
+      // Base: 14 days. Each donated Star dynamically adds +1 day of active notification retention!
+      const userStars = profile.totalDonatedStars || 0;
+      const userCutoffLimitMs = computeUserInactivityLimitMs(userStars);
+
+      if (timeSinceActive <= userCutoffLimitMs) {
+        if (userStars > 0) {
           donors.push(profile);
-        }
-      } else {
-        // Invariant 1: Free Users (Priority P2) - 14-Day Exact Rolling Window
-        if (timeSinceActive <= FREE_USER_INACTIVITY_LIMIT_MS) {
+        } else {
           freeUsers.push(profile);
         }
       }

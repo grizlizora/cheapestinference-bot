@@ -50,11 +50,10 @@ describe("14-Day Inactivity Engine & Dormant User Alert Filtering Invariants", (
     expect(resolved[0].telegramId).toBe(1001);
   });
 
-  it("2. Admin & Donor Immunity: Admins and VIP Donors are NOT filtered by the 14-day rule", () => {
+  it("2. Proportional Star Retention & Admin Immunity: Star donors get +1 day per Star, Admins get infinite immunity", () => {
     const now = Date.now();
-    const inactive40DaysAgo = new Date(now - 40 * 86400 * 1000).toISOString();
 
-    // Admin inactive for 40 days
+    // 1. Admin inactive for 100 days -> Always immune (P0)
     const adminUser = userDao.upsertUser({
       telegram_id: 2001,
       username: "admin_inactive",
@@ -62,41 +61,67 @@ describe("14-Day Inactivity Engine & Dormant User Alert Filtering Invariants", (
       language: "uk",
     });
     userDao.setAdmin(2001, true);
-    db.prepare(`UPDATE users SET last_active_at = ? WHERE id = ?`).run(inactive40DaysAgo, adminUser.id);
+    db.prepare(`UPDATE users SET last_active_at = ? WHERE id = ?`).run(new Date(now - 100 * 86400 * 1000).toISOString(), adminUser.id);
 
-    // Donor (50 Stars) inactive for 40 days
-    const donorUser = userDao.upsertUser({
+    // 2. Donor A: 1 Star (Cutoff: 14 + 1 = 15 days) -> Inactive 14.5 days -> INCLUDED
+    const donor1StarActive = userDao.upsertUser({
       telegram_id: 2002,
-      username: "donor_inactive",
-      first_name: "Donor",
+      username: "donor_1_star_active",
+      first_name: "Donor1",
       language: "en",
     });
-    donationDao.recordDonation(donorUser.id, 2002, 50, "ch_star_immunity_50");
-    db.prepare(`UPDATE users SET last_active_at = ? WHERE id = ?`).run(inactive40DaysAgo, donorUser.id);
+    donationDao.recordDonation(donor1StarActive.id, 2002, 1, "ch_star_1_ok");
+    db.prepare(`UPDATE users SET last_active_at = ? WHERE id = ?`).run(new Date(now - 14.5 * 86400 * 1000).toISOString(), donor1StarActive.id);
 
-    // Free user inactive for 40 days
-    const freeUser = userDao.upsertUser({
+    // 3. Donor B: 1 Star (Cutoff: 14 + 1 = 15 days) -> Inactive 16 days -> EXCLUDED
+    const donor1StarExpired = userDao.upsertUser({
       telegram_id: 2003,
+      username: "donor_1_star_expired",
+      first_name: "Donor1Exp",
+      language: "en",
+    });
+    donationDao.recordDonation(donor1StarExpired.id, 2003, 1, "ch_star_1_exp");
+    db.prepare(`UPDATE users SET last_active_at = ? WHERE id = ?`).run(new Date(now - 16 * 86400 * 1000).toISOString(), donor1StarExpired.id);
+
+    // 4. Donor C: 50 Stars (Cutoff: 14 + 50 = 64 days) -> Inactive 50 days -> INCLUDED
+    const donor50Stars = userDao.upsertUser({
+      telegram_id: 2004,
+      username: "donor_50_stars",
+      first_name: "Donor50",
+      language: "uk",
+    });
+    donationDao.recordDonation(donor50Stars.id, 2004, 50, "ch_star_50_ok");
+    db.prepare(`UPDATE users SET last_active_at = ? WHERE id = ?`).run(new Date(now - 50 * 86400 * 1000).toISOString(), donor50Stars.id);
+
+    // 5. Free user inactive for 15 days -> EXCLUDED
+    const freeUser = userDao.upsertUser({
+      telegram_id: 2005,
       username: "free_inactive",
       first_name: "Free",
       language: "uk",
     });
-    db.prepare(`UPDATE users SET last_active_at = ? WHERE id = ?`).run(inactive40DaysAgo, freeUser.id);
+    db.prepare(`UPDATE users SET last_active_at = ? WHERE id = ?`).run(new Date(now - 15 * 86400 * 1000).toISOString(), freeUser.id);
 
-    // All 3 subscribe to Frontier Americas
-    for (const u of [adminUser, donorUser, freeUser]) {
+    // All 5 subscribe to Frontier Americas
+    for (const u of [adminUser, donor1StarActive, donor1StarExpired, donor50Stars, freeUser]) {
       db.exec(`INSERT INTO subscriptions (user_id, pool_slug, block_id, notify_on_available) VALUES (${u.id}, 'frontier', 'americas', 1)`);
     }
 
     const index = new SubscriberInvertedIndex(db);
     const resolved = index.resolveSubscribers("frontier", "americas", "available");
 
-    // Invariant: Admin (P0) and Donor (P1) are present, Free user is filtered out
-    expect(resolved).toHaveLength(2);
-    expect(resolved[0].telegramId).toBe(2001); // Admin
+    // Invariant:
+    // [0] Admin (P0) -> tgId: 2001
+    // [1] Donor 50 Stars (P1) -> tgId: 2004
+    // [2] Donor 1 Star (P1) -> tgId: 2002
+    // Excluded: Donor 1 Star expired (2003) and Free user (2005)
+    expect(resolved).toHaveLength(3);
+    expect(resolved[0].telegramId).toBe(2001); // Admin (P0)
     expect(resolved[0].isAdmin).toBe(true);
-    expect(resolved[1].telegramId).toBe(2002); // Donor
+    expect(resolved[1].telegramId).toBe(2004); // 50 Stars (P1)
     expect(resolved[1].totalDonatedStars).toBe(50);
+    expect(resolved[2].telegramId).toBe(2002); // 1 Star (P1)
+    expect(resolved[2].totalDonatedStars).toBe(1);
   });
 
   it("3. Instant Zero-Loss Revival: Interacting with bot resets lastActiveAt and immediately restores dispatch", () => {
