@@ -108,10 +108,11 @@ export function getUserRankMeta(
 
   const zapHtml = icon("zap");
   const rocketHtml = icon("rocket");
-  const shieldHtml = icon("rank_shield");
+  const heartHtml = icon("heart");
   const coffeeHtml = icon("coffee");
   const bellHtml = icon("notify_bell_on");
   const standbyHtml = icon("status_standby");
+  const liveHtml = icon("status_available");
 
   if (totalDonatedStars >= 250) {
     tier = "diamond";
@@ -145,7 +146,7 @@ export function getUserRankMeta(
         : `${zapHtml} <b>P1 • High Priority</b> (Supporter queue)`;
   } else if (totalDonatedStars >= 50) {
     tier = "contributor";
-    iconHtml = shieldHtml;
+    iconHtml = heartHtml;
     rankTitle =
       lang === "uk"
         ? `${iconHtml} <b>Contributor</b>`
@@ -154,10 +155,10 @@ export function getUserRankMeta(
         : `${iconHtml} <b>Contributor</b>`;
     priorityTitle =
       lang === "uk"
-        ? `${shieldHtml} <b>P1 • Підвищений пріоритет</b>`
+        ? `${heartHtml} <b>P1 • Підвищений пріоритет</b>`
         : lang === "ru"
-        ? `${shieldHtml} <b>P1 • Повышенный приоритет</b>`
-        : `${shieldHtml} <b>P1 • Elevated Priority</b>`;
+        ? `${heartHtml} <b>P1 • Повышенный приоритет</b>`
+        : `${heartHtml} <b>P1 • Elevated Priority</b>`;
   } else if (totalDonatedStars >= 1) {
     tier = "supporter";
     iconHtml = coffeeHtml;
@@ -190,7 +191,7 @@ export function getUserRankMeta(
         : `${standbyHtml} <b>Paused</b> (>14 days inactive)`;
   } else {
     tier = "active";
-    iconHtml = icon("status_available");
+    iconHtml = liveHtml;
     rankTitle =
       lang === "uk"
         ? `${iconHtml} <b>Активний користувач</b>`
@@ -210,24 +211,24 @@ export function getUserRankMeta(
   if (isDormant) {
     retentionText =
       lang === "uk"
-        ? "💤 <b>Сповіщення на паузі</b> <i>(Натисніть будь-яку кнопку для миттєвого відновлення)</i>"
+        ? `${standbyHtml} <b>Сповіщення на паузі</b> <i>(Натисніть будь-яку кнопку для миттєвого відновлення)</i>`
         : lang === "ru"
-        ? "💤 <b>Уведомления на паузе</b> <i>(Нажмите любую кнопку для мгновенного возобновления)</i>"
-        : "💤 <b>Alerts on standby</b> <i>(Press any button to instantly resume)</i>";
+        ? `${standbyHtml} <b>Уведомления на паузе</b> <i>(Нажмите любую кнопку для мгновенного возобновления)</i>`
+        : `${standbyHtml} <b>Alerts on standby</b> <i>(Press any button to instantly resume)</i>`;
   } else if (totalDonatedStars > 0) {
     retentionText =
       lang === "uk"
-        ? `🟢 <b>Активно ще ${remainingDays} дн.</b> (+${effectiveBonusDays} дн. бонус Stars)`
+        ? `${liveHtml} <b>Активно ще ${remainingDays} дн.</b> (+${effectiveBonusDays} дн. бонус Stars)`
         : lang === "ru"
-        ? `🟢 <b>Активно ещё ${remainingDays} дн.</b> (+${effectiveBonusDays} дн. бонус Stars)`
-        : `🟢 <b>Active for ${remainingDays} days</b> (+${effectiveBonusDays}d Stars bonus)`;
+        ? `${liveHtml} <b>Активно ещё ${remainingDays} дн.</b> (+${effectiveBonusDays} дн. бонус Stars)`
+        : `${liveHtml} <b>Active for ${remainingDays} days</b> (+${effectiveBonusDays}d Stars bonus)`;
   } else {
     retentionText =
       lang === "uk"
-        ? `🟢 <b>Активно ще ${remainingDays} дн.</b> <i>(Поновлюється при взаємодії)</i>`
+        ? `${liveHtml} <b>Активно ще ${remainingDays} дн.</b> <i>(Поновлюється при взаємодії)</i>`
         : lang === "ru"
-        ? `🟢 <b>Активно ещё ${remainingDays} дн.</b> <i>(Продлевается при действии)</i>`
-        : `🟢 <b>Active for ${remainingDays} days</b> <i>(Auto-renews on interaction)</i>`;
+        ? `${liveHtml} <b>Активно ещё ${remainingDays} дн.</b> <i>(Продлевается при действии)</i>`
+        : `${liveHtml} <b>Active for ${remainingDays} days</b> <i>(Auto-renews on interaction)</i>`;
   }
 
   return {

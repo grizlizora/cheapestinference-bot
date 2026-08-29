@@ -83,7 +83,10 @@ export type IconKey =
   | "shift_day"
   | "shift_evening"
   | "rank_diamond"
+  | "diamond"
   | "rank_shield"
+  | "rank_heart"
+  | "heart"
   | "rank_infinity"
   | "infinity"
   | "zap"
@@ -428,14 +431,29 @@ export const ICON_REGISTRY: Record<IconKey, IconDefinition> = {
     name: "3D Evening Sunset",
   },
   rank_diamond: {
-    customEmojiId: "5375296873982604963",
+    customEmojiId: "5471952986970267163",
     unicodeFallback: "💎",
-    name: "3D Diamond Gem",
+    name: "3D Animated Sparkling Diamond",
+  },
+  diamond: {
+    customEmojiId: "5471952986970267163",
+    unicodeFallback: "💎",
+    name: "3D Animated Sparkling Diamond",
   },
   rank_shield: {
     customEmojiId: "5237799019329105246",
     unicodeFallback: "🛡️",
     name: "3D Security Shield",
+  },
+  rank_heart: {
+    customEmojiId: "5449505950283078474",
+    unicodeFallback: "❤️",
+    name: "3D Animated Pulsing Red Heart",
+  },
+  heart: {
+    customEmojiId: "5449505950283078474",
+    unicodeFallback: "❤️",
+    name: "3D Animated Pulsing Red Heart",
   },
   rank_infinity: {
     customEmojiId: "6298717844804733009",
