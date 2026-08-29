@@ -137,11 +137,18 @@ export function renderSettingsText(ctx: BotContext): string {
 
   const langLabel = ctx.lang === "uk" ? "Поточна мова" : ctx.lang === "ru" ? "Текущий язык" : "Current language";
   const idLabel = ctx.lang === "uk" ? "Ваш Telegram ID" : ctx.lang === "ru" ? "Ваш Telegram ID" : "Your Telegram ID";
+  const soundLabel = ctx.lang === "uk" ? "Режим звуку" : ctx.lang === "ru" ? "Режим звука" : "Sound Mode";
+
+  const isMuted = (ctx.user?.is_muted ?? 0) === 1;
+  const soundStatus = isMuted
+    ? (ctx.lang === "uk" ? `Без звуку (тихий режим) ${icon("notify_mute")}` : ctx.lang === "ru" ? `Без звука (тихий режим) ${icon("notify_mute")}` : `Silent (muted) ${icon("notify_mute")}`)
+    : (ctx.lang === "uk" ? `Звук увімкнено ${icon("notify_loud")}` : ctx.lang === "ru" ? `Звук включен ${icon("notify_loud")}` : `Audible ${icon("notify_loud")}`);
 
   const idIcon = `<tg-emoji emoji-id="5422683699130933153">🪪</tg-emoji>`;
 
   const rendered = `${icon("nav_settings")} ${headerTitle}\n\n` +
     `${icon("nav_language")} ${langLabel}: <b>${currentLang}</b>\n` +
+    `${icon(isMuted ? "notify_mute" : "notify_loud")} ${soundLabel}: <b>${soundStatus}</b>\n` +
     `${idIcon} ${idLabel}: <code>${ctx.from?.id || "N/A"}</code>`;
 
   return clampMessageText(rendered);

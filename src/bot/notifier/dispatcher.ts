@@ -55,6 +55,9 @@ export class NotificationDispatcher {
   private blockedUsersBatch: number[] = [];
   private batchFlushTimer?: NodeJS.Timeout;
 
+  // Cross-Tick Idempotency Latch: key -> timestamp
+  private lastDispatchedEventLatch = new Map<string, number>();
+
   constructor(
     private bot: Bot<BotContext>,
     private userDao: UserDAO,
@@ -151,13 +154,38 @@ export class NotificationDispatcher {
   public async handleDiffEvents(events: DiffEvent[]): Promise<void> {
     if (!events || events.length === 0) return;
 
+    // Cross-Tick Idempotency Latch: prevent duplicate alerts for the same pool/block within 5m unless state inverted
+    const now = Date.now();
+    const validEvents: DiffEvent[] = [];
+    for (const event of events) {
+      const latchKey = `${event.poolSlug}:${event.block || "ALL"}:${event.type}`;
+      const lastSent = this.lastDispatchedEventLatch.get(latchKey);
+
+      if (lastSent && (now - lastSent) < 5 * 60 * 1000) {
+        console.warn(`🛡️ [Dispatcher Latch] Suppressed duplicate ${event.type} for ${event.poolSlug}:${event.block}`);
+        continue;
+      }
+
+      this.lastDispatchedEventLatch.set(latchKey, now);
+
+      if (event.type === "SLOT_APPEARED") {
+        this.lastDispatchedEventLatch.delete(`${event.poolSlug}:${event.block || "ALL"}:SLOT_DISAPPEARED`);
+      } else if (event.type === "SLOT_DISAPPEARED") {
+        this.lastDispatchedEventLatch.delete(`${event.poolSlug}:${event.block || "ALL"}:SLOT_APPEARED`);
+      }
+
+      validEvents.push(event);
+    }
+
+    if (validEvents.length === 0) return;
+
     // 1. Group events per user across the scrape poll
     const userEventsMap = new Map<
       number,
       { user: PackedUserProfile; matchedEvents: Array<{ event: DiffEvent; priority: BroadcastPriority }> }
     >();
 
-    for (const event of events) {
+    for (const event of validEvents) {
       let resolvedType: "available" | "sold_out" | "models" | "prices" = "available";
       let priority: BroadcastPriority = "P1";
 

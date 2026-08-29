@@ -237,27 +237,40 @@ export class ScraperOrchestrator extends EventEmitter {
     const effectiveHtmlEtag = bypassEtag ? undefined : this.htmlEtag;
     const effectiveHtmlLastModified = bypassEtag ? undefined : this.htmlLastModified;
 
+    const isCircuitOpen = Date.now() < this.apiCircuitOpenUntil;
+
     // Primary: Live Backend REST API (api.cheapestinference.com/api/pools) with real-time stock
-    try {
-      const apiResult = await this.apiEngine.fetch(
-        effectiveApiEtag,
-        effectiveApiLastModified,
-        4_000
-      );
-      if (apiResult.etag) this.apiEtag = apiResult.etag;
-      if (apiResult.lastModified) this.apiLastModified = apiResult.lastModified;
-      return apiResult;
-    } catch (apiErr: any) {
-      this.emit("warn", `JSON API Engine fetch error (${apiErr?.message || apiErr}). Falling back to HTML.`);
-      const htmlResult = await this.htmlEngine.fetch(
-        effectiveHtmlEtag,
-        effectiveHtmlLastModified,
-        4_000
-      );
-      if (htmlResult.etag) this.htmlEtag = htmlResult.etag;
-      if (htmlResult.lastModified) this.htmlLastModified = htmlResult.lastModified;
-      return htmlResult;
+    if (!isCircuitOpen) {
+      try {
+        const apiResult = await this.apiEngine.fetch(
+          effectiveApiEtag,
+          effectiveApiLastModified,
+          4_000
+        );
+        this.apiConsecutiveErrors = 0;
+        if (apiResult.etag) this.apiEtag = apiResult.etag;
+        if (apiResult.lastModified) this.apiLastModified = apiResult.lastModified;
+        return apiResult;
+      } catch (apiErr: any) {
+        this.apiConsecutiveErrors++;
+        if (this.apiConsecutiveErrors >= 3) {
+          this.apiCircuitOpenUntil = Date.now() + 60_000; // Open circuit for 60s
+          this.emit("warn", `JSON API Engine failed 3 times. Opening circuit breaker for 60s.`);
+        } else {
+          this.emit("warn", `JSON API Engine fetch error (${apiErr?.message || apiErr}). Falling back to HTML.`);
+        }
+      }
     }
+
+    // Fallback: HTML Snapshot Engine
+    const htmlResult = await this.htmlEngine.fetch(
+      effectiveHtmlEtag,
+      effectiveHtmlLastModified,
+      4_000
+    );
+    if (htmlResult.etag) this.htmlEtag = htmlResult.etag;
+    if (htmlResult.lastModified) this.htmlLastModified = htmlResult.lastModified;
+    return htmlResult;
   }
 
   public getTelemetry() {

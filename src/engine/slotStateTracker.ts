@@ -210,10 +210,12 @@ export class SlotStateTracker {
         if (prevSlot) {
           const wasAvailable = isSlotAvailable(prevSlot.status);
           const isAvailable = isSlotAvailable(block.status);
+          let targetStatus = block.status;
 
           // Status Transition: Became Available (K=1 Fast-Track)
           if (!wasAvailable && isAvailable) {
             this.pendingDisappearances.delete(key);
+            targetStatus = block.status;
             historyDao?.recordSlotOpened(pool.slug, block.block, block.status, block.pricePerMonth);
 
             events.push({
@@ -234,6 +236,7 @@ export class SlotStateTracker {
             const count = (this.pendingDisappearances.get(key) || 0) + 1;
             if (count >= 2) {
               this.pendingDisappearances.delete(key);
+              targetStatus = block.status; // Confirmed: switch status in memory to "sold-out"
               historyDao?.recordSlotClosed(pool.slug, block.block);
 
               let eta = undefined;
@@ -277,9 +280,13 @@ export class SlotStateTracker {
               });
             } else {
               this.pendingDisappearances.set(key, count);
+              targetStatus = prevSlot.status; // K=1 unconfirmed: hold "available" in memory
             }
-          } else if (isAvailable) {
-            this.pendingDisappearances.delete(key);
+          } else {
+            if (isAvailable) {
+              this.pendingDisappearances.delete(key);
+            }
+            targetStatus = block.status;
           }
 
           // Price Change Detection & Staging
@@ -310,17 +317,14 @@ export class SlotStateTracker {
             }
           }
 
-          // Update in-memory state
-          const shouldUpdateStatus =
-            !(wasAvailable && !isAvailable && (this.pendingDisappearances.get(key) || 0) < 2);
-
+          // Update in-memory state with authoritative targetStatus
           this.inMemorySlots.set(key, {
             poolSlug: pool.slug,
             poolName: pool.modelName,
             models: pool.models || [],
             block: block.block,
             hoursUtc: block.hoursUtc,
-            status: shouldUpdateStatus ? block.status : prevSlot.status,
+            status: targetStatus,
             pricePerMonth: block.pricePerMonth,
             lastSeenAt: timestamp,
           });

@@ -6,6 +6,7 @@ export class DatabaseMaintenanceManager {
   private stmtPruneCatalogHistoryBatch: Database.Statement;
   private stmtPruneSlotPriceHistoryBatch: Database.Statement;
   private stmtPruneActiveDashboardsBatch: Database.Statement;
+  private stmtPruneOutboxBatch: Database.Statement;
   private stmtFreelistCount: Database.Statement;
 
   constructor(
@@ -55,6 +56,17 @@ export class DatabaseMaintenanceManager {
         SELECT chat_id FROM active_dashboards 
         WHERE last_interaction_at < datetime('now', '-48 hours')
            OR consecutive_errors >= 3
+        LIMIT 2000
+      )
+    `);
+
+    this.stmtPruneOutboxBatch = db.prepare(`
+      DELETE FROM notification_outbox 
+      WHERE id IN (
+        SELECT id FROM notification_outbox 
+        WHERE (status = 'dispatched' AND dispatched_at < datetime('now', '-24 hours'))
+           OR (status = 'failed' AND created_at < datetime('now', '-3 days'))
+           OR (status = 'pending' AND created_at < datetime('now', '-6 hours'))
         LIMIT 2000
       )
     `);
@@ -114,7 +126,16 @@ export class DatabaseMaintenanceManager {
       }
     } catch {}
 
-    // 6. Reclaim freed pages back to OS via dynamic incremental vacuum
+    // 6. Purge stale outbox records (>24 hours dispatched, >3 days failed, >6 hours pending)
+    try {
+      while (true) {
+        const outboxResult = this.stmtPruneOutboxBatch.run();
+        totalDeleted += outboxResult.changes;
+        if (outboxResult.changes < 2000) break;
+      }
+    } catch {}
+
+    // 7. Reclaim freed pages back to OS via dynamic incremental vacuum
     let pagesReclaimed = 0;
     try {
       let prevFreelist = Infinity;

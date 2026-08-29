@@ -271,4 +271,110 @@ describe("NotificationDispatcher Modern Alert & Bundling Test Suite", () => {
     expect(bundle.text).toContain("Core Pool • Оновлення моделей");
     expect(bundle.text).toContain("Flagship Pool • Оновлення тарифу");
   });
+
+  it("should deduplicate buttons in bundled alert when multiple slots disappear for the same pool", async () => {
+    const mockBot: any = {
+      api: {
+        sendMessage: async () => ({ message_id: 1 }),
+      },
+    };
+
+    // User is subscribed to sold_out alerts
+    db.exec("UPDATE subscriptions SET notify_on_sold_out = 1 WHERE user_id = 1");
+    index = new SubscriberInvertedIndex(db);
+
+    const dispatcher = new NotificationDispatcher(mockBot, userDao, logDao, historyDao, index);
+    dispatcher.enqueue = (msg) => {
+      enqueuedMessages.push(msg);
+    };
+
+    const duplicateDisappearEvents: DiffEvent[] = [
+      {
+        id: "d1",
+        type: "SLOT_DISAPPEARED",
+        poolSlug: "flagship",
+        poolName: "Flagship Pool",
+        block: "asia",
+        models: ["kimi-k3", "qwen3.8-max"],
+        hoursUtc: "00:00 – 08:00 UTC",
+        newStatus: "sold-out",
+        timestamp: Date.now(),
+      },
+      {
+        id: "d2",
+        type: "SLOT_DISAPPEARED",
+        poolSlug: "flagship",
+        poolName: "Flagship Pool",
+        block: "americas",
+        models: ["kimi-k3", "qwen3.8-max"],
+        hoursUtc: "16:00 – 24:00 UTC",
+        newStatus: "sold-out",
+        timestamp: Date.now(),
+      },
+    ];
+
+    await dispatcher.handleDiffEvents(duplicateDisappearEvents);
+
+    expect(enqueuedMessages).toHaveLength(1);
+    const bundle = enqueuedMessages[0];
+    const inlineButtons = bundle.keyboard?.inline_keyboard.flat() || [];
+
+    // There should be exactly 1 button for FLAGSHIP, not 2 duplicate buttons!
+    expect(inlineButtons).toHaveLength(1);
+    expect(inlineButtons[0].text).toBe("🔍 FLAGSHIP");
+    expect(inlineButtons[0].url).toBe("https://cheapestinference.com/pools/flagship");
+  });
+
+  it("should prioritize specific slot claim button over generic pool button for the same pool", async () => {
+    const mockBot: any = {
+      api: {
+        sendMessage: async () => ({ message_id: 1 }),
+      },
+    };
+
+    db.exec("UPDATE subscriptions SET notify_on_sold_out = 1, notify_on_available = 1 WHERE user_id = 1");
+    index = new SubscriberInvertedIndex(db);
+
+    const dispatcher = new NotificationDispatcher(mockBot, userDao, logDao, historyDao, index);
+    dispatcher.enqueue = (msg) => {
+      enqueuedMessages.push(msg);
+    };
+
+    const mixedPoolEvents: DiffEvent[] = [
+      {
+        id: "m1",
+        type: "SLOT_DISAPPEARED",
+        poolSlug: "flagship",
+        poolName: "Flagship Pool",
+        block: "asia",
+        models: ["kimi-k3"],
+        hoursUtc: "00:00 – 08:00 UTC",
+        newStatus: "sold-out",
+        timestamp: Date.now(),
+      },
+      {
+        id: "m2",
+        type: "SLOT_APPEARED",
+        poolSlug: "flagship",
+        poolName: "Flagship Pool",
+        block: "americas",
+        models: ["kimi-k3"],
+        hoursUtc: "16:00 – 24:00 UTC",
+        newPrice: "149.00",
+        newStatus: "available",
+        timestamp: Date.now(),
+      },
+    ];
+
+    await dispatcher.handleDiffEvents(mixedPoolEvents);
+
+    expect(enqueuedMessages).toHaveLength(1);
+    const bundle = enqueuedMessages[0];
+    const inlineButtons = bundle.keyboard?.inline_keyboard.flat() || [];
+
+    // The high-intent claim button should be present, and generic 🔍 FLAGSHIP suppressed
+    expect(inlineButtons).toHaveLength(1);
+    expect(inlineButtons[0].text).toContain("⚡ FLAGSHIP (Америка)");
+    expect(inlineButtons[0].url).toBe("https://cheapestinference.com/pools/flagship#americas");
+  });
 });

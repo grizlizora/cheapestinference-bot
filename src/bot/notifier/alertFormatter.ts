@@ -520,12 +520,21 @@ export function formatBundledAlertMessage(
     }
   }
 
-  let buttonCount = 0;
+  interface BundleButtonCandidate {
+    priority: number; // 1 = Claim, 2 = SlotPrice, 3 = BasePrice, 4 = PoolOverview
+    label: string;
+    url: string;
+    poolSlug: string;
+    isSpecificAction: boolean;
+  }
+
+  const candidates: BundleButtonCandidate[] = [];
 
   for (const { event } of matchedEvents) {
     const blockName = resolveBlockName(event.block, lang);
     const blockHash = event.block && event.block !== "ALL" ? `#${event.block}` : "";
     const checkoutUrl = `https://cheapestinference.com/pools/${event.poolSlug}${blockHash}`;
+    const poolUrl = `https://cheapestinference.com/pools/${event.poolSlug}`;
 
     if (event.type === "SLOT_APPEARED") {
       const cleanPrice = cleanPriceString(event.newPrice);
@@ -538,26 +547,38 @@ export function formatBundledAlertMessage(
         `${icon("ai_robot")} ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
       );
 
-      if (buttonCount < 3) {
-        const btnLabel = `⚡ ${event.poolSlug.toUpperCase()} (${blockName}) • $${cleanPrice}`;
-        keyboard.url(btnLabel, checkoutUrl).row();
-        buttonCount++;
-      }
+      candidates.push({
+        priority: 1,
+        label: `⚡ ${event.poolSlug.toUpperCase()} (${blockName}) • $${cleanPrice}`,
+        url: checkoutUrl,
+        poolSlug: event.poolSlug,
+        isSpecificAction: true,
+      });
     } else if (event.type === "SLOT_DISAPPEARED") {
+      const statusSoldOut = stripLeadingEmoji(translate(lang, "common.status_sold_out"));
       sectionLines.push(
-        `${icon("event_slot_sold")} <b>${escapeHtml(event.poolName)} • ${escapeHtml(blockName)}</b> — <i>${translate(lang, "common.status_sold_out")}</i>`
+        `${icon("event_slot_sold")} <b>${escapeHtml(event.poolName)} • ${escapeHtml(blockName)}</b> — ${icon("status_sold_out")} <i>${statusSoldOut}</i>`
       );
-      if (buttonCount < 3) {
-        const btnLabel = `🔍 ${event.poolSlug.toUpperCase()}`;
-        keyboard.url(btnLabel, `https://cheapestinference.com/pools/${event.poolSlug}`).row();
-        buttonCount++;
-      }
+      candidates.push({
+        priority: 4,
+        label: `🔍 ${event.poolSlug.toUpperCase()}`,
+        url: poolUrl,
+        poolSlug: event.poolSlug,
+        isSpecificAction: false,
+      });
     } else if (event.type === "MODEL_UPGRADE_EVENT") {
       const upgradeTitle = translate(lang, "alerts.bundle_title_models") || "Model Upgrade";
       sectionLines.push(
         `${icon("event_model_upgrade")} <b>${escapeHtml(event.poolName)} • ${upgradeTitle}</b>\n` +
         `${icon("ai_robot")} ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
       );
+      candidates.push({
+        priority: 4,
+        label: `🔍 ${event.poolSlug.toUpperCase()}`,
+        url: poolUrl,
+        poolSlug: event.poolSlug,
+        isSpecificAction: false,
+      });
     } else if (event.type === "SLOT_PRICE_CHANGED") {
       const deltaStr = event.slotPrice
         ? ` (${formatPriceDeltaBadge(event.slotPrice.priceDelta, event.slotPrice.percentageDelta, lang)})`
@@ -569,11 +590,13 @@ export function formatBundledAlertMessage(
         `${icon("price_tag")} <b>${escapeHtml(event.poolName)} • ${escapeHtml(blockName)}</b>\n` +
         `${icon("price_money")} <s>$${escapeHtml(cleanOld)}</s> ➔ <b>$${escapeHtml(cleanNew)}/${currencyMonth}</b>${deltaStr}${hoursStr}`
       );
-      if (buttonCount < 3) {
-        const btnLabel = `🏷 ${event.poolSlug.toUpperCase()} (${blockName}) • $${cleanNew}`;
-        keyboard.url(btnLabel, checkoutUrl).row();
-        buttonCount++;
-      }
+      candidates.push({
+        priority: 2,
+        label: `🏷 ${event.poolSlug.toUpperCase()} (${blockName}) • $${cleanNew}`,
+        url: checkoutUrl,
+        poolSlug: event.poolSlug,
+        isSpecificAction: true,
+      });
     } else if (event.type === "POOL_BASE_PRICE_CHANGED" || event.type === "PRICE_CHANGED") {
       const deltaStr = event.basePrice
         ? ` (${formatPriceDeltaBadge(event.basePrice.priceDelta, event.basePrice.percentageDelta, lang)})`
@@ -586,28 +609,96 @@ export function formatBundledAlertMessage(
         `${icon("price_dollar")} <s>$${escapeHtml(cleanOld)}</s> ➔ <b>$${escapeHtml(cleanNew)}/${currencyMonth}</b>${deltaStr}\n` +
         `${icon("ai_robot")} ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
       );
-      if (buttonCount < 3) {
-        const btnLabel = `💰 ${event.poolSlug.toUpperCase()} • $${cleanNew}`;
-        keyboard.url(btnLabel, `https://cheapestinference.com/pools/${event.poolSlug}`).row();
-        buttonCount++;
-      }
+      candidates.push({
+        priority: 3,
+        label: `💰 ${event.poolSlug.toUpperCase()} • $${cleanNew}`,
+        url: poolUrl,
+        poolSlug: event.poolSlug,
+        isSpecificAction: false,
+      });
     } else if (event.type === "TIER_UPDATED_EVENT") {
       const tierTitle = translate(lang, "alerts.bundle_title_tier") || "Tier Specification Updated";
       sectionLines.push(`${icon("event_tier_update")} <b>${escapeHtml(event.poolName)} • ${tierTitle}</b>`);
+      candidates.push({
+        priority: 4,
+        label: `🔍 ${event.poolSlug.toUpperCase()}`,
+        url: poolUrl,
+        poolSlug: event.poolSlug,
+        isSpecificAction: false,
+      });
     } else if (event.type === "NEW_POOL_EVENT") {
       const newPoolTitle = translate(lang, "alerts.bundle_title_new_pool") || "New Pool Launched";
       sectionLines.push(
         `${icon("event_new_pool")} <b>${escapeHtml(event.poolName)} • ${newPoolTitle}</b>\n` +
         `🤖 ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
       );
+      candidates.push({
+        priority: 4,
+        label: `🔍 ${event.poolSlug.toUpperCase()}`,
+        url: poolUrl,
+        poolSlug: event.poolSlug,
+        isSpecificAction: false,
+      });
     } else {
       sectionLines.push(`• <b>${escapeHtml(event.poolName)}</b> (${escapeHtml(blockName)}): ${escapeHtml(event.newStatus || "updated")}`);
     }
   }
 
-  if (buttonCount === 0) {
+  // 2. Sort by priority ASC (High urgency checkout buttons first)
+  candidates.sort((a, b) => a.priority - b.priority);
+
+  // 3. Deduplicate by URL and by Pool Slug
+  const selectedButtons: BundleButtonCandidate[] = [];
+  const seenUrls = new Set<string>();
+  const poolsWithSpecificAction = new Set<string>();
+  const poolsWithGenericButton = new Set<string>();
+  const MAX_BUNDLE_BUTTONS = 4;
+
+  for (const candidate of candidates) {
+    if (selectedButtons.length >= MAX_BUNDLE_BUTTONS) break;
+    if (seenUrls.has(candidate.url)) continue;
+
+    if (!candidate.isSpecificAction) {
+      if (poolsWithSpecificAction.has(candidate.poolSlug)) continue;
+      if (poolsWithGenericButton.has(candidate.poolSlug)) continue;
+    }
+
+    selectedButtons.push(candidate);
+    seenUrls.add(candidate.url);
+    if (candidate.isSpecificAction) {
+      poolsWithSpecificAction.add(candidate.poolSlug);
+    } else {
+      poolsWithGenericButton.add(candidate.poolSlug);
+    }
+  }
+
+  // 4. Construct InlineKeyboard with smart 1-col / 2-col row packing
+  if (selectedButtons.length === 0) {
     keyboard.url(translate(lang, "common.open_site"), "https://cheapestinference.com/pools");
-    buttonCount++;
+  } else {
+    let pendingShortBtn: BundleButtonCandidate | null = null;
+    for (const btn of selectedButtons) {
+      const isShort = btn.label.length <= 18;
+      if (isShort) {
+        if (pendingShortBtn) {
+          keyboard.url(pendingShortBtn.label, pendingShortBtn.url)
+                  .url(btn.label, btn.url)
+                  .row();
+          pendingShortBtn = null;
+        } else {
+          pendingShortBtn = btn;
+        }
+      } else {
+        if (pendingShortBtn) {
+          keyboard.url(pendingShortBtn.label, pendingShortBtn.url).row();
+          pendingShortBtn = null;
+        }
+        keyboard.url(btn.label, btn.url).row();
+      }
+    }
+    if (pendingShortBtn) {
+      keyboard.url(pendingShortBtn.label, pendingShortBtn.url).row();
+    }
   }
 
   const footer =
@@ -628,7 +719,7 @@ export function formatBundledAlertMessage(
     blockId: "BUNDLE",
     eventType: "BUNDLE_EVENT",
     text: truncateToTelegramLimit(text),
-    keyboard: buttonCount > 0 ? keyboard : undefined,
+    keyboard: (selectedButtons.length > 0 || keyboard.inline_keyboard.length > 0) ? keyboard : undefined,
     isMuted: user.isMuted,
     priority: highestPriority,
     retries: 0,

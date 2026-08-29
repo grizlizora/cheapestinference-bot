@@ -281,7 +281,8 @@ export function createPoolDetailMenu(
       async (ctx) => {
         await ctx.answerCallbackQuery().catch(() => {});
         if (ctx.chat) {
-          dashboardRegistry?.updateView(ctx.chat.id, "dashboard");
+          const msgId = ctx.callbackQuery?.message?.message_id;
+          dashboardRegistry?.updateView(ctx.chat.id, "dashboard", undefined, ctx.lang, msgId);
         }
         await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao, scraper));
         return ctx.menu.nav("main-dashboard-menu");

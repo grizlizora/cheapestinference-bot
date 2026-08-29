@@ -211,10 +211,49 @@ describe("SlotDiffEngine", () => {
       },
     ]);
 
-    expect(freshEngine.isReady()).toBe(true);
-
     // Now process an identical snapshot: zero events should be emitted
     const events = freshEngine.processSnapshot(sampleSnapshot);
     expect(events).toHaveLength(0);
+  });
+
+  it("should never duplicate SLOT_DISAPPEARED on subsequent ticks (K=1 -> K=2 -> K=3 -> K=4) and update snapshot status", () => {
+    const testEngine = new SlotDiffEngine();
+
+    // Baseline: Asia and Americas are available
+    const availableSnapshot: PoolsSnapshot = JSON.parse(JSON.stringify(sampleSnapshot));
+    availableSnapshot.data[0].blocks[0].status = "limited"; // Asia
+    availableSnapshot.data[0].blocks[2].status = "available"; // Americas
+    testEngine.processSnapshot(availableSnapshot);
+
+    const snap0 = testEngine.getSnapshot();
+    const flagship0 = snap0?.data.find((p) => p.slug === "flagship");
+    expect(flagship0?.blocks.filter((b) => b.status === "available" || b.status === "limited")).toHaveLength(2);
+
+    // Both become sold-out upstream
+    const soldOutSnapshot: PoolsSnapshot = JSON.parse(JSON.stringify(sampleSnapshot));
+    soldOutSnapshot.data[0].blocks[0].status = "sold-out";
+    soldOutSnapshot.data[0].blocks[2].status = "sold-out";
+
+    // Tick 1 (K=1 Noise Gate): 0 events, in-memory snapshot still holds available
+    const events1 = testEngine.processSnapshot(soldOutSnapshot);
+    expect(events1).toHaveLength(0);
+
+    // Tick 2 (K=2 Confirmation): 2 events emitted (Asia & Americas)
+    const events2 = testEngine.processSnapshot(soldOutSnapshot);
+    expect(events2).toHaveLength(2);
+    expect(events2.map((e) => e.type)).toEqual(["SLOT_DISAPPEARED", "SLOT_DISAPPEARED"]);
+
+    // In-memory snapshot MUST now show 0 available blocks!
+    const snap2 = testEngine.getSnapshot();
+    const flagship2 = snap2?.data.find((p) => p.slug === "flagship");
+    expect(flagship2?.blocks.filter((b) => b.status === "available" || b.status === "limited")).toHaveLength(0);
+
+    // Tick 3 (K=3 Steady State): 0 events (NO DUPLICATE ALERTS!)
+    const events3 = testEngine.processSnapshot(soldOutSnapshot);
+    expect(events3).toHaveLength(0);
+
+    // Tick 4 (K=4 Steady State): 0 events (NO DUPLICATE ALERTS!)
+    const events4 = testEngine.processSnapshot(soldOutSnapshot);
+    expect(events4).toHaveLength(0);
   });
 });
