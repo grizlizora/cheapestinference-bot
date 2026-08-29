@@ -130,6 +130,9 @@ export class ActiveDashboardRegistry {
       if (lang !== undefined) session.lang = lang;
       if (messageId !== undefined && messageId > 0) session.messageId = messageId;
       session.lastUserInteractionAt = Date.now();
+      // Re-insert at Map tail to ensure true LRU ordering
+      this.activeSessions.delete(chatId);
+      this.activeSessions.set(chatId, session);
     }
     this.dao?.updateView(chatId, viewType, poolSlug, lang, messageId);
   }
@@ -139,6 +142,9 @@ export class ActiveDashboardRegistry {
     if (session) {
       session.lastUserInteractionAt = Date.now();
       session.consecutiveErrors = 0;
+      // Re-insert at Map tail to ensure true LRU ordering
+      this.activeSessions.delete(chatId);
+      this.activeSessions.set(chatId, session);
     }
     this.dao?.touchInteraction(chatId);
   }

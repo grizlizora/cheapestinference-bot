@@ -103,10 +103,10 @@ export class SubscriptionDAO {
     ) => {
       const hasGlobal = this.hasSubscription(userId, "ALL", "ALL");
       const poolFlags = this.getPoolFlags(userId, poolSlug);
-      const avail = poolFlags.available ? 1 : 1;
+      const avail = poolFlags.available ? 1 : 0;
       const sold = poolFlags.soldOut ? 1 : 0;
-      const models = poolFlags.models ? 1 : 1;
-      const prices = poolFlags.prices ? 1 : 1;
+      const models = poolFlags.models ? 1 : 0;
+      const prices = poolFlags.prices ? 1 : 0;
 
       if (hasGlobal && !newState) {
         this.stmtRemoveSub.run(userId, "ALL", "ALL");
@@ -149,10 +149,10 @@ export class SubscriptionDAO {
       const hasPoolAll = this.hasSubscription(userId, poolSlug, "ALL");
 
       const poolFlags = this.getPoolFlags(userId, poolSlug);
-      const avail = poolFlags.available ? 1 : 1;
+      const avail = poolFlags.available ? 1 : 0;
       const sold = poolFlags.soldOut ? 1 : 0;
-      const models = poolFlags.models ? 1 : 1;
-      const prices = poolFlags.prices ? 1 : 1;
+      const models = poolFlags.models ? 1 : 0;
+      const prices = poolFlags.prices ? 1 : 0;
 
       if (hasGlobal) {
         this.stmtRemoveSub.run(userId, "ALL", "ALL");

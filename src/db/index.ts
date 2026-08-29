@@ -65,6 +65,7 @@ export function initSchema(db: Database.Database): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_users_active ON users(is_active);
+    CREATE INDEX IF NOT EXISTS idx_users_lower_username ON users(LOWER(username)) WHERE username IS NOT NULL;
 
     -- 2. Subscriptions Table
     CREATE TABLE IF NOT EXISTS subscriptions (
@@ -196,6 +197,8 @@ export function initSchema(db: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_active_dashboards_user ON active_dashboards(user_id);
     CREATE INDEX IF NOT EXISTS idx_active_dashboards_interaction ON active_dashboards(last_interaction_at);
+    CREATE INDEX IF NOT EXISTS idx_active_dashboards_errors ON active_dashboards(consecutive_errors) WHERE consecutive_errors >= 3;
+
     -- 10. Donations Table (Telegram Stars XTR)
     CREATE TABLE IF NOT EXISTS donations (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -211,6 +214,7 @@ export function initSchema(db: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_donations_user ON donations(user_id);
     CREATE INDEX IF NOT EXISTS idx_donations_amount ON donations(amount_stars DESC);
+    CREATE INDEX IF NOT EXISTS idx_donations_created_at ON donations(created_at DESC);
 
     -- 11. Notification Outbox Table (Zero-Loss Queue)
     CREATE TABLE IF NOT EXISTS notification_outbox (

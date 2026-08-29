@@ -66,6 +66,7 @@ export class TursoCloudSync {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ requests: formattedRequests }),
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!response.ok) {
@@ -74,7 +75,13 @@ export class TursoCloudSync {
     }
 
     const data: any = await response.json();
-    return data?.results || [];
+    const results = data?.results || [];
+    const hasErrors = results.some((r: any) => r.type === "error");
+    if (hasErrors) {
+      const firstErr = results.find((r: any) => r.type === "error")?.error?.message || "Statement error";
+      throw new Error(`Turso Pipeline Statement Error: ${firstErr}`);
+    }
+    return results;
   }
 
   /**
@@ -512,6 +519,7 @@ export class TursoCloudSync {
       this.flushTimer = setTimeout(() => {
         this.flush().catch(() => {});
       }, 1000);
+      this.flushTimer.unref?.();
     }
   }
 
@@ -552,6 +560,7 @@ export class TursoCloudSync {
         this.flushTimer = setTimeout(() => {
           this.flush().catch(() => {});
         }, 5000);
+        this.flushTimer.unref?.();
       }
     } finally {
       this.isFlushing = false;
@@ -559,6 +568,7 @@ export class TursoCloudSync {
         this.flushTimer = setTimeout(() => {
           this.flush().catch(() => {});
         }, 1000);
+        this.flushTimer.unref?.();
       }
     }
   }

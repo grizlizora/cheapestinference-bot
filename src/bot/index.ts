@@ -283,6 +283,15 @@ export function createTelegramBot(
     { registry: activeDashboardRegistry }
   );
 
+  // Reset custom stars donation state on any slash command
+  bot.use(async (ctx, next) => {
+    if (ctx.message?.text?.startsWith("/") && ctx.session) {
+      ctx.session.waitingForCustomStars = false;
+      ctx.session.pendingCustomStars = undefined;
+    }
+    await next();
+  });
+
   // 10. Command Handlers
   bot.command(
     "start",

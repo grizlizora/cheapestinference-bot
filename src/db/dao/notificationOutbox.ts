@@ -39,12 +39,11 @@ export class NotificationOutboxDAO {
       SELECT 
         id, user_id as userId, telegram_id as telegramId, priority, message_text as messageText,
         reply_markup_json as replyMarkupJson, disable_notification as disableNotification,
-        event_type as eventType, pool_slug as poolSlug, block_id as blockId, status, attempts
+        event_type as eventType, pool_slug as poolSlug, block_id as blockId, status, attempts,
+        created_at as createdAt
       FROM notification_outbox
       WHERE status = 'pending'
-      ORDER BY 
-        CASE priority WHEN 'P0' THEN 0 WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 ELSE 3 END ASC,
-        created_at ASC
+      ORDER BY priority ASC, created_at ASC
       LIMIT ?
     `);
 
@@ -56,7 +55,7 @@ export class NotificationOutboxDAO {
 
     this.stmtMarkFailed = db.prepare(`
       UPDATE notification_outbox 
-      SET attempts = attempts + 1, last_error = ?, status = CASE WHEN attempts >= 3 THEN 'failed' ELSE 'pending' END
+      SET attempts = attempts + 1, last_error = ?, status = CASE WHEN attempts + 1 >= 3 THEN 'failed' ELSE 'pending' END
       WHERE id = ?
     `);
 

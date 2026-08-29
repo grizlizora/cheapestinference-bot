@@ -339,14 +339,16 @@ export function createMainMenuHierarchy(
       for (const pool of summaries) {
         const badge = computePoolBadgeInfo(pool.available_count, pool.total_blocks);
         const rank = POOL_RANKS[pool.slug] || { rawIcons: "📦", tierName: { [ctx.lang]: pool.name } };
-        const poolName = rank.tierName[ctx.lang] || pool.name;
-        const btnLabel = `${rank.rawIcons} ${poolName} [${badge.capacityBarUnicode}]`;
+        const rawName = rank.tierName[ctx.lang] || pool.name;
+        const poolShortName = rawName.replace(/ Supercluster| Cluster| Суперкластер| Кластер/gi, "").trim();
+        const btnLabel = `${rank.rawIcons} ${poolShortName} [${badge.capacityBarUnicode}]`;
         range
           .text(btnLabel, async (c) => {
             await c.answerCallbackQuery().catch(() => {});
             c.session.tempPoolSlug = pool.slug;
             if (c.chat) {
-              dashboardRegistry?.updateView(c.chat.id, "pool_detail", pool.slug);
+              const msgId = c.callbackQuery?.message?.message_id;
+              dashboardRegistry?.updateView(c.chat.id, "pool_detail", pool.slug, c.lang, msgId);
             }
             await safeEditMessageText(
               c,
@@ -374,7 +376,7 @@ export function createMainMenuHierarchy(
       (ctx) => ctx.t("common.refresh"),
       async (ctx) => {
         const startTime = Date.now();
-        ctx.answerCallbackQuery({
+        await ctx.answerCallbackQuery({
           text: ctx.t("common.refreshed_toast"),
           show_alert: false,
         }).catch(() => {});
@@ -405,7 +407,7 @@ export function createMainMenuHierarchy(
     .text(
       (ctx) => ctx.t("menu.btn_settings"),
       async (ctx) => {
-        ctx.answerCallbackQuery().catch(() => {});
+        await ctx.answerCallbackQuery().catch(() => {});
         if (ctx.chat) {
           const msgId = ctx.callbackQuery?.message?.message_id;
           dashboardRegistry?.updateView(ctx.chat.id, "settings", undefined, ctx.lang, msgId);

@@ -79,11 +79,21 @@ export class NotificationDispatcher {
   private hydratePendingFromOutbox(): void {
     if (!this.outboxDao) return;
     try {
-      const pendingItems = this.outboxDao.getPending(100);
+      const pendingItems = this.outboxDao.getPending(1000);
       if (pendingItems.length === 0) return;
       console.log(`📦 [NotificationDispatcher] Hydrated ${pendingItems.length} pending alerts from SQLite outbox.`);
 
+      const now = Date.now();
       for (const item of pendingItems) {
+        const itemCreatedMs = item.createdAt
+          ? (Date.parse(item.createdAt.replace(" ", "T") + "Z") || Date.parse(item.createdAt) || now)
+          : now;
+
+        if (now - itemCreatedMs > this.MAX_MESSAGE_AGE_MS) {
+          this.outboxDao.markFailed(item.id, "Expired TTL on startup hydration");
+          continue;
+        }
+
         let keyboard: InlineKeyboard | undefined;
         if (item.replyMarkupJson) {
           try {
@@ -106,7 +116,7 @@ export class NotificationDispatcher {
           isMuted: item.disableNotification,
           priority: item.priority,
           retries: item.attempts,
-          enqueuedAt: Date.now(),
+          enqueuedAt: itemCreatedMs,
         };
 
         const q = this.getQueueByPriority(msg.priority);
@@ -267,6 +277,8 @@ export class NotificationDispatcher {
       return (b.user.lastActiveAt || 0) - (a.user.lastActiveAt || 0);
     });
 
+    const batchMessages: OutgoingAlertMessage[] = [];
+
     for (const { user, matchedEvents } of sortedUserEntries) {
       if (matchedEvents.length === 1) {
         const single = matchedEvents[0];
@@ -278,7 +290,7 @@ export class NotificationDispatcher {
           singleMsgTemplateCache.set(cacheKey, template);
         }
         // Flyweight shallow clone with recipient-specific IDs
-        this.enqueue({
+        batchMessages.push({
           ...template,
           id: crypto.randomUUID(),
           telegramId: user.telegramId,
@@ -299,7 +311,7 @@ export class NotificationDispatcher {
               template = formatAlertMessage(user, single.event, single.priority, cachedDuration);
               singleMsgTemplateCache.set(cacheKey, template);
             }
-            this.enqueue({
+            batchMessages.push({
               ...template,
               id: crypto.randomUUID(),
               telegramId: user.telegramId,
@@ -314,7 +326,7 @@ export class NotificationDispatcher {
               bundleTemplate = formatBundledAlertMessage(user, slice);
               bundleMsgTemplateCache.set(bundleKey, bundleTemplate);
             }
-            this.enqueue({
+            batchMessages.push({
               ...bundleTemplate,
               id: crypto.randomUUID(),
               telegramId: user.telegramId,
@@ -326,10 +338,44 @@ export class NotificationDispatcher {
         }
       }
     }
+
+    if (batchMessages.length > 0) {
+      this.enqueueBatch(batchMessages);
+    }
   }
 
-  public enqueue(msg: OutgoingAlertMessage): void {
+  public enqueueBatch(messages: OutgoingAlertMessage[]): void {
+    if (messages.length === 0) return;
     if (this.outboxDao) {
+      try {
+        this.outboxDao.enqueueBatch(
+          messages.map((msg) => ({
+            id: msg.id,
+            userId: msg.userId,
+            telegramId: msg.telegramId,
+            priority: msg.priority,
+            messageText: msg.text,
+            replyMarkupJson: msg.keyboard ? JSON.stringify(msg.keyboard) : undefined,
+            disableNotification: msg.isMuted,
+            eventType: msg.eventType,
+            poolSlug: msg.poolSlug,
+            blockId: msg.blockId,
+            status: "pending",
+            attempts: msg.retries || 0,
+          }))
+        );
+      } catch (e: any) {
+        console.error("[NotificationDispatcher] Error persisting outbox batch:", e.message);
+      }
+    }
+
+    for (const msg of messages) {
+      this.enqueue(msg, true);
+    }
+  }
+
+  public enqueue(msg: OutgoingAlertMessage, skipOutbox = false): void {
+    if (this.outboxDao && !skipOutbox) {
       try {
         this.outboxDao.enqueue({
           id: msg.id,
@@ -353,7 +399,7 @@ export class NotificationDispatcher {
     const q = this.getQueueByPriority(msg.priority);
     q.push(msg);
 
-    if (!this.isWorkerRunning) {
+    if (this.getTotalPending() > 0 && !this.isWorkerRunning) {
       this.startWorkerLoop();
     }
   }
@@ -431,12 +477,14 @@ export class NotificationDispatcher {
 
       // 1. Drop stale alerts (> 10 min old)
       if (now - candidate.enqueuedAt > this.MAX_MESSAGE_AGE_MS) {
+        this.outboxDao?.markFailed(candidate.id, "TTL expired in queue");
         continue;
       }
 
       // 2. Drop alerts for deactivated/blocked users
       const profile = this.index.getProfileByTgId(candidate.telegramId);
       if (profile && !profile.isActive) {
+        this.outboxDao?.markFailed(candidate.id, "User deactivated");
         continue;
       }
 

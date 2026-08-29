@@ -153,7 +153,10 @@ export class DatabaseMaintenanceManager {
 
     // 6. Non-blocking WAL checkpoint and truncate to 0 bytes
     try {
-      this.db.pragma("wal_checkpoint(TRUNCATE)");
+      const res = this.db.pragma("wal_checkpoint(TRUNCATE)", { simple: false }) as any;
+      if (res && res[0]?.busy === 1) {
+        this.db.pragma("wal_checkpoint(PASSIVE)");
+      }
     } catch {
       try {
         this.db.pragma("wal_checkpoint(PASSIVE)");
