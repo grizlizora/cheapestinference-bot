@@ -318,9 +318,10 @@ export function createSubscriptionsMenu(
     .text(
       (ctx) => ctx.t("common.back"),
       async (ctx) => {
-        ctx.answerCallbackQuery().catch(() => {});
+        await ctx.answerCallbackQuery().catch(() => {});
         if (ctx.chat) {
-          dashboardRegistry?.updateView(ctx.chat.id, "dashboard");
+          const msgId = ctx.callbackQuery?.message?.message_id;
+          dashboardRegistry?.updateView(ctx.chat.id, "dashboard", undefined, ctx.lang, msgId);
         }
         await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao, scraper));
         return ctx.menu.nav("main-dashboard-menu");

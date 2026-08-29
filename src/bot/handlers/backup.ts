@@ -244,7 +244,9 @@ export function createHistoryExportHandler(
 
       // Combine and sort chronologically DESC
       const combined = [...slotRows, ...catalogRows, ...priceRows].sort((a, b) => {
-        return new Date(b.event_time).getTime() - new Date(a.event_time).getTime();
+        const timeB = Date.parse(String(b.event_time).replace(" ", "T") + "Z") || Date.parse(String(b.event_time)) || 0;
+        const timeA = Date.parse(String(a.event_time).replace(" ", "T") + "Z") || Date.parse(String(a.event_time)) || 0;
+        return timeB - timeA;
       });
 
       const headers = [
