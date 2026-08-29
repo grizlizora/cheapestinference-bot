@@ -507,7 +507,6 @@ export function formatBundledAlertMessage(
   const rawTitle =
     translate(lang, "alerts.batch_title", { count }) ||
     `<b>CheapestInference — Slot Updates (${count})</b>`;
-  const title = `${icon("event_batch_drop")} ${stripLeadingEmoji(rawTitle)}`;
 
   const sectionLines: string[] = [];
   const keyboard = new InlineKeyboard();
@@ -530,11 +529,40 @@ export function formatBundledAlertMessage(
 
   const candidates: BundleButtonCandidate[] = [];
 
+  const allSoldOut = matchedEvents.every((e) => e.event.type === "SLOT_DISAPPEARED");
+  const allSamePool = matchedEvents.every((e) => e.event.poolSlug === matchedEvents[0].event.poolSlug);
+  const regionLabel = lang === "uk" ? "Регіон" : lang === "ru" ? "Регион" : "Region";
+  const statusSoldOut = stripLeadingEmoji(translate(lang, "common.status_sold_out"));
+  const botNotifyText = lang === "uk"
+    ? "Бот миттєво сповістить вас, щойно слоти знову стануть доступними!"
+    : lang === "ru"
+    ? "Бот моментально оповестит вас, как только слоты снова станут доступны!"
+    : "You will be alerted instantly as soon as slots re-open!";
+
+  let title = `${icon("event_batch_drop")} ${stripLeadingEmoji(rawTitle)}`;
+
+  if (allSoldOut && allSamePool) {
+    const pName = escapeHtml(matchedEvents[0].event.poolName);
+    title = lang === "uk"
+      ? `${icon("event_slot_sold")} <b>СЛОТИ РОЗПРОДАНО • ${pName}</b>`
+      : lang === "ru"
+      ? `${icon("event_slot_sold")} <b>СЛОТЫ РАСПРОДАНЫ • ${pName}</b>`
+      : `${icon("event_slot_sold")} <b>SLOTS SOLD OUT • ${pName}</b>`;
+  } else if (allSoldOut) {
+    title = lang === "uk"
+      ? `${icon("event_slot_sold")} <b>СЛОТИ РОЗПРОДАНО (${count})</b>`
+      : lang === "ru"
+      ? `${icon("event_slot_sold")} <b>СЛОТЫ РАСПРОДАНЫ (${count})</b>`
+      : `${icon("event_slot_sold")} <b>SLOTS SOLD OUT (${count})</b>`;
+  }
+
   for (const { event } of matchedEvents) {
     const blockName = resolveBlockName(event.block, lang);
     const blockHash = event.block && event.block !== "ALL" ? `#${event.block}` : "";
     const checkoutUrl = `https://cheapestinference.com/pools/${event.poolSlug}${blockHash}`;
     const poolUrl = `https://cheapestinference.com/pools/${event.poolSlug}`;
+    const hoursLocal = event.hoursUtc ? formatBlockHoursWithLocal(event.block, event.hoursUtc, lang) : "";
+    const hoursText = hoursLocal ? ` <code>(${escapeHtml(hoursLocal)})</code>` : "";
 
     if (event.type === "SLOT_APPEARED") {
       const cleanPrice = cleanPriceString(event.newPrice);
@@ -555,10 +583,16 @@ export function formatBundledAlertMessage(
         isSpecificAction: true,
       });
     } else if (event.type === "SLOT_DISAPPEARED") {
-      const statusSoldOut = stripLeadingEmoji(translate(lang, "common.status_sold_out"));
-      sectionLines.push(
-        `${icon("event_slot_sold")} <b>${escapeHtml(event.poolName)} • ${escapeHtml(blockName)}</b> — ${icon("status_sold_out")} <i>${statusSoldOut}</i>`
-      );
+      if (allSamePool) {
+        sectionLines.push(
+          `${getRegionIcon(event.block)} <b>${regionLabel}:</b> ${escapeHtml(blockName)}${hoursText} — ${icon("status_sold_out")} <i>${statusSoldOut}</i>`
+        );
+      } else {
+        sectionLines.push(
+          `${icon("event_slot_sold")} <b>${escapeHtml(event.poolName)}</b>\n` +
+          `  • ${getRegionIcon(event.block)} <b>${escapeHtml(blockName)}:</b> ${icon("status_sold_out")} <i>${statusSoldOut}</i>`
+        );
+      }
       candidates.push({
         priority: 4,
         label: `🔍 ${event.poolSlug.toUpperCase()}`,
@@ -708,7 +742,11 @@ export function formatBundledAlertMessage(
       ? `${icon("nav_clock")} <i>Время обновления: ${timeFormatted} UTC</i>`
       : `${icon("nav_clock")} <i>Updated at: ${timeFormatted} UTC</i>`;
 
-  const text = `${title}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${sectionLines.join("\n───\n")}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${footer}`;
+  const bodyContent = allSoldOut
+    ? `${sectionLines.join(allSamePool ? "\n" : "\n───\n")}\n\n${icon("notify_bell_on")} <i>${botNotifyText}</i>`
+    : sectionLines.join("\n───\n");
+
+  const text = `${title}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${bodyContent}\n━━━━━━━━━━━━━━━━━━━━━━━━\n${footer}`;
   const firstEvent = matchedEvents[0].event;
 
   return {
