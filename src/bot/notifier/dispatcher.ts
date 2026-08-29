@@ -22,6 +22,9 @@ import {
   createTestAlertMessage,
 } from "./alertFormatter.js";
 
+import { NotificationOutboxDAO } from "../../db/dao/notificationOutbox.js";
+import { InlineKeyboard } from "grammy";
+
 export type { BroadcastPriority, OutgoingAlertMessage };
 export { formatAlertMessage, formatBundledAlertMessage, createTestAlertMessage };
 
@@ -58,13 +61,61 @@ export class NotificationDispatcher {
     private logDao: NotificationLogDAO,
     private historyDao?: SlotHistoryDAO,
     index?: SubscriberInvertedIndex,
-    rateLimiter?: NotificationRateLimiter
+    rateLimiter?: NotificationRateLimiter,
+    private outboxDao?: NotificationOutboxDAO
   ) {
     this.index = index ?? new SubscriberInvertedIndex((userDao as any).db);
     this.rateLimiter = rateLimiter ?? new NotificationRateLimiter();
 
     this.batchFlushTimer = setInterval(() => this.flushBlockedUsersToDb(), 5000);
     this.batchFlushTimer.unref();
+
+    this.hydratePendingFromOutbox();
+  }
+
+  private hydratePendingFromOutbox(): void {
+    if (!this.outboxDao) return;
+    try {
+      const pendingItems = this.outboxDao.getPending(100);
+      if (pendingItems.length === 0) return;
+      console.log(`📦 [NotificationDispatcher] Hydrated ${pendingItems.length} pending alerts from SQLite outbox.`);
+
+      for (const item of pendingItems) {
+        let keyboard: InlineKeyboard | undefined;
+        if (item.replyMarkupJson) {
+          try {
+            const parsed = JSON.parse(item.replyMarkupJson);
+            if (parsed.inline_keyboard) {
+              keyboard = new InlineKeyboard(parsed.inline_keyboard);
+            }
+          } catch {}
+        }
+
+        const msg: OutgoingAlertMessage = {
+          id: item.id,
+          telegramId: item.telegramId,
+          userId: item.userId,
+          poolSlug: item.poolSlug || "",
+          blockId: item.blockId || "",
+          eventType: item.eventType,
+          text: item.messageText,
+          keyboard,
+          isMuted: item.disableNotification,
+          priority: item.priority,
+          retries: item.attempts,
+          enqueuedAt: Date.now(),
+        };
+
+        const q = this.getQueueByPriority(msg.priority);
+        q.push(msg);
+      }
+
+      if (this.getTotalPending() > 0 && !this.isWorkerRunning) {
+        this.startWorkerLoop();
+      }
+    } catch (e: any) {
+      console.error("[NotificationDispatcher] Error hydrating outbox:", e.message);
+    }
   }
 
   public getInvertedIndex(): SubscriberInvertedIndex {
@@ -242,6 +293,27 @@ export class NotificationDispatcher {
   }
 
   public enqueue(msg: OutgoingAlertMessage): void {
+    if (this.outboxDao) {
+      try {
+        this.outboxDao.enqueue({
+          id: msg.id,
+          userId: msg.userId,
+          telegramId: msg.telegramId,
+          priority: msg.priority,
+          messageText: msg.text,
+          replyMarkupJson: msg.keyboard ? JSON.stringify(msg.keyboard) : undefined,
+          disableNotification: msg.isMuted,
+          eventType: msg.eventType,
+          poolSlug: msg.poolSlug,
+          blockId: msg.blockId,
+          status: "pending",
+          attempts: msg.retries || 0,
+        });
+      } catch (e: any) {
+        console.error("[NotificationDispatcher] Error persisting outbox item:", e.message);
+      }
+    }
+
     const q = this.getQueueByPriority(msg.priority);
     q.push(msg);
 
@@ -263,6 +335,8 @@ export class NotificationDispatcher {
         return this.p3Queue;
     }
   }
+
+  private inFlightDispatches = new Set<Promise<void>>();
 
   private startWorkerLoop(): void {
     if (this.isWorkerRunning) return;
@@ -288,7 +362,10 @@ export class NotificationDispatcher {
         const item = this.selectNextItemDWRR();
         if (item) {
           this.rateLimiter.consumeGlobalToken();
-          this.dispatchSingleMessage(item).catch(() => {});
+          const p = this.dispatchSingleMessage(item).finally(() => {
+            this.inFlightDispatches.delete(p);
+          });
+          this.inFlightDispatches.add(p);
         }
       }
 
@@ -302,7 +379,10 @@ export class NotificationDispatcher {
 
   private readonly deferredScratch: OutgoingAlertMessage[] = [];
 
-  private popValidCandidate(q: CircularRingBuffer<OutgoingAlertMessage>): OutgoingAlertMessage | undefined {
+  private popValidCandidate(
+    q: CircularRingBuffer<OutgoingAlertMessage>,
+    bypassUserRateLimit = false
+  ): OutgoingAlertMessage | undefined {
     const now = Date.now();
     this.deferredScratch.length = 0;
     let chosen: OutgoingAlertMessage | undefined;
@@ -324,8 +404,8 @@ export class NotificationDispatcher {
         continue;
       }
 
-      // 3. Check per-user rate limit (1.05s gap)
-      if (!this.rateLimiter.canDispatchToUser(candidate.telegramId)) {
+      // 3. Check per-user rate limit (1.05s gap) unless draining
+      if (!bypassUserRateLimit && !this.rateLimiter.canDispatchToUser(candidate.telegramId)) {
         this.deferredScratch.push(candidate);
         continue;
       }
@@ -342,10 +422,10 @@ export class NotificationDispatcher {
     return chosen;
   }
 
-  private selectNextItemDWRR(): OutgoingAlertMessage | undefined {
+  private selectNextItemDWRR(bypassUserRateLimit = false): OutgoingAlertMessage | undefined {
     // P0 Interactive messages always take absolute immediate precedence
     if (!this.p0Queue.isEmpty()) {
-      return this.popValidCandidate(this.p0Queue);
+      return this.popValidCandidate(this.p0Queue, bypassUserRateLimit);
     }
 
     if (this.p1Queue.isEmpty()) this.p1Deficit = 0;
@@ -361,7 +441,7 @@ export class NotificationDispatcher {
 
     // Drain P1
     if (!this.p1Queue.isEmpty() && this.p1Deficit > 0) {
-      const item = this.popValidCandidate(this.p1Queue);
+      const item = this.popValidCandidate(this.p1Queue, bypassUserRateLimit);
       if (item) {
         this.p1Deficit--;
         return item;
@@ -370,7 +450,7 @@ export class NotificationDispatcher {
 
     // Drain P2
     if (!this.p2Queue.isEmpty() && this.p2Deficit > 0) {
-      const item = this.popValidCandidate(this.p2Queue);
+      const item = this.popValidCandidate(this.p2Queue, bypassUserRateLimit);
       if (item) {
         this.p2Deficit--;
         return item;
@@ -379,7 +459,7 @@ export class NotificationDispatcher {
 
     // Drain P3
     if (!this.p3Queue.isEmpty() && this.p3Deficit > 0) {
-      const item = this.popValidCandidate(this.p3Queue);
+      const item = this.popValidCandidate(this.p3Queue, bypassUserRateLimit);
       if (item) {
         this.p3Deficit--;
         return item;
@@ -388,15 +468,15 @@ export class NotificationDispatcher {
 
     // Fallback: Priority order
     if (!this.p1Queue.isEmpty()) {
-      const item = this.popValidCandidate(this.p1Queue);
+      const item = this.popValidCandidate(this.p1Queue, bypassUserRateLimit);
       if (item) return item;
     }
     if (!this.p2Queue.isEmpty()) {
-      const item = this.popValidCandidate(this.p2Queue);
+      const item = this.popValidCandidate(this.p2Queue, bypassUserRateLimit);
       if (item) return item;
     }
     if (!this.p3Queue.isEmpty()) {
-      const item = this.popValidCandidate(this.p3Queue);
+      const item = this.popValidCandidate(this.p3Queue, bypassUserRateLimit);
       if (item) return item;
     }
 
@@ -405,7 +485,7 @@ export class NotificationDispatcher {
 
   private async dispatchSingleMessage(msg: OutgoingAlertMessage): Promise<void> {
     try {
-      this.rateLimiter.recordUserDispatch(msg.telegramId, Date.now());
+      this.rateLimiter.recordUserDispatch(msg.telegramId);
 
       const sanitizedText = toValidUtf8(msg.text);
 
@@ -431,6 +511,7 @@ export class NotificationDispatcher {
         }
       }
 
+      this.outboxDao?.markDispatched(msg.id);
       this.logDao.logNotification(msg.userId, msg.poolSlug, msg.blockId, msg.eventType);
     } catch (err: any) {
       this.handleTelegramError(err, msg);
@@ -445,6 +526,7 @@ export class NotificationDispatcher {
     if (errorCode === 403 || (errorCode === 400 && description.includes("chat not found"))) {
       this.index.markUserDeactivated(msg.telegramId);
       this.blockedUsersBatch.push(msg.telegramId);
+      this.outboxDao?.markFailed(msg.id, "User deactivated or blocked");
       return;
     }
 
@@ -464,6 +546,7 @@ export class NotificationDispatcher {
       const targetQ = this.getQueueByPriority(msg.priority);
       targetQ.push(msg);
     } else {
+      this.outboxDao?.markFailed(msg.id, err.message);
       console.error(`❌ [NotificationDispatcher] Dropping message to ${msg.telegramId} after 3 retries: ${err.message}`);
     }
   }
@@ -506,7 +589,24 @@ export class NotificationDispatcher {
   }
 
   public async flushPending(): Promise<void> {
-    console.log(`⏳ [NotificationDispatcher] Flushing pending queues (${this.getTotalPending()} items)...`);
+    const total = this.getTotalPending();
+    console.log(`⏳ [NotificationDispatcher] Flushing pending queues (${total} items)...`);
+    
+    // Aggressive synchronous drain before shutdown (up to 3 seconds)
+    const startTime = Date.now();
+    while (this.getTotalPending() > 0 && Date.now() - startTime < 3000) {
+      const msg = this.selectNextItemDWRR(true);
+      if (!msg) break;
+      const p = this.dispatchSingleMessage(msg).finally(() => {
+        this.inFlightDispatches.delete(p);
+      });
+      this.inFlightDispatches.add(p);
+    }
+
+    if (this.inFlightDispatches.size > 0) {
+      await Promise.all(Array.from(this.inFlightDispatches));
+    }
+
     this.flushBlockedUsersToDb();
   }
 

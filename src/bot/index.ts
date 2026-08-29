@@ -30,6 +30,7 @@ import {
 
 import { ActiveDashboardDAO } from "../db/dao/activeDashboards.js";
 import { DonationDAO } from "../db/dao/donations.js";
+import { NotificationOutboxDAO } from "../db/dao/notificationOutbox.js";
 import { LiveDashboardManager } from "./liveSync/liveDashboardManager.js";
 import { ActiveDashboardRegistry } from "./liveSync/dashboardRegistry.js";
 import { icon } from "./views/iconTheme.js";
@@ -46,8 +47,9 @@ export function createTelegramBot(
   proxyPool: ProxyPool,
   historyDao?: SlotHistoryDAO,
   activeDashboardDao?: ActiveDashboardDAO,
-  donationDao?: DonationDAO
-): { bot: Bot<BotContext>; dispatcher: NotificationDispatcher; liveDashboardManager: LiveDashboardManager; donationDao: DonationDAO } {
+  donationDao?: DonationDAO,
+  outboxDao?: NotificationOutboxDAO
+): { bot: Bot<BotContext>; dispatcher: NotificationDispatcher; liveDashboardManager: LiveDashboardManager; donationDao: DonationDAO; outboxDao: NotificationOutboxDAO } {
   const bot = new Bot<BotContext>(token, {
     client: config.TELEGRAM_API_ROOT
       ? {
@@ -57,6 +59,7 @@ export function createTelegramBot(
   });
   const resolvedHistoryDao = historyDao;
   const resolvedDonationDao = donationDao || new DonationDAO(userDao.db);
+  const resolvedOutboxDao = outboxDao || new NotificationOutboxDAO(userDao.db);
 
   // 1. Global Error Boundary
   bot.catch((err) => {
@@ -88,12 +91,15 @@ export function createTelegramBot(
     })
   );
 
-  // 4. Shared Notification Dispatcher with In-Memory Inverted Index
+  // 4. Shared Notification Dispatcher with In-Memory Inverted Index & SQLite Outbox
   const dispatcher = new NotificationDispatcher(
     bot,
     userDao,
     logDao,
-    resolvedHistoryDao
+    resolvedHistoryDao,
+    undefined,
+    undefined,
+    resolvedOutboxDao
   );
 
   // Helper function: Admin verification guard
@@ -640,5 +646,5 @@ export function createTelegramBot(
     }
   });
 
-  return { bot, dispatcher, liveDashboardManager, donationDao: resolvedDonationDao };
+  return { bot, dispatcher, liveDashboardManager, donationDao: resolvedDonationDao, outboxDao: resolvedOutboxDao };
 }

@@ -20,6 +20,8 @@ export interface PackedUserProfile {
 export class SubscriberInvertedIndex {
   // Composite Key: "pool_slug:block_id:event_type" -> Set of User Primary Keys (id)
   private index = new Map<string, Set<number>>();
+  // Explicit Exclusions: "pool_slug:block_id:event_type" -> Set of User Primary Keys (id)
+  private exclusions = new Map<string, Set<number>>();
   // poolSlug -> Set of known blockIds
   private poolBlocks = new Map<string, Set<string>>();
   // User Primary Key (id) -> Packed Profile
@@ -39,6 +41,7 @@ export class SubscriberInvertedIndex {
     const startTime = performance.now();
 
     this.index.clear();
+    this.exclusions.clear();
     this.profiles.clear();
     this.tgIdToUserId.clear();
 
@@ -116,15 +119,26 @@ export class SubscriberInvertedIndex {
     }>) {
       if (row.notify_on_available === 1) {
         this.addIndexEntry(`${row.pool_slug}:${row.block_id}:available`, row.user_id);
+      } else {
+        this.addExclusionEntry(`${row.pool_slug}:${row.block_id}:available`, row.user_id);
       }
+
       if (row.notify_on_sold_out === 1) {
         this.addIndexEntry(`${row.pool_slug}:${row.block_id}:sold_out`, row.user_id);
+      } else {
+        this.addExclusionEntry(`${row.pool_slug}:${row.block_id}:sold_out`, row.user_id);
       }
+
       if (row.notify_on_models === 1) {
         this.addIndexEntry(`${row.pool_slug}:${row.block_id}:models`, row.user_id);
+      } else {
+        this.addExclusionEntry(`${row.pool_slug}:${row.block_id}:models`, row.user_id);
       }
+
       if (row.notify_on_prices === 1) {
         this.addIndexEntry(`${row.pool_slug}:${row.block_id}:prices`, row.user_id);
+      } else {
+        this.addExclusionEntry(`${row.pool_slug}:${row.block_id}:prices`, row.user_id);
       }
       subCount++;
     }
@@ -157,8 +171,27 @@ export class SubscriberInvertedIndex {
     }
   }
 
+  private addExclusionEntry(key: string, userId: number): void {
+    let set = this.exclusions.get(key);
+    if (!set) {
+      set = new Set<number>();
+      this.exclusions.set(key, set);
+    }
+    set.add(userId);
+  }
+
+  private removeExclusionEntry(key: string, userId: number): void {
+    const set = this.exclusions.get(key);
+    if (set) {
+      set.delete(userId);
+      if (set.size === 0) {
+        this.exclusions.delete(key);
+      }
+    }
+  }
+
   /**
-   * O(1) Hierarchical Subscriber Resolution with 3-Tier Priority Queue Sorting:
+   * O(1) Hierarchical Subscriber Resolution with 3-Tier Priority Queue Sorting & Exclusion Filtering:
    * 1. Admins first (instant delivery)
    * 2. Top Donors (totalDonatedStars DESC — higher Stars = earlier alert delivery)
    * 3. Engagement-based active users (lastActiveAt DESC)
@@ -189,6 +222,21 @@ export class SubscriberInvertedIndex {
         const regionalSet = this.index.get(`${poolSlug}:${b}:${eventType}`);
         if (regionalSet) for (const id of regionalSet) matchedUserIds.add(id);
       }
+    }
+
+    // Apply explicit exclusions (block-specific, pool-specific, or global)
+    const blockExclusions = blockId !== "ALL" ? this.exclusions.get(`${poolSlug}:${blockId}:${eventType}`) : undefined;
+    const poolExclusions = this.exclusions.get(`${poolSlug}:ALL:${eventType}`);
+    const globalExclusions = this.exclusions.get(`ALL:ALL:${eventType}`);
+
+    if (blockExclusions) {
+      for (const id of blockExclusions) matchedUserIds.delete(id);
+    }
+    if (poolExclusions) {
+      for (const id of poolExclusions) matchedUserIds.delete(id);
+    }
+    if (globalExclusions) {
+      for (const id of globalExclusions) matchedUserIds.delete(id);
     }
 
     // 3-Bucket Linear Partition (Dial's Scheme): O(k) linear separation
@@ -257,20 +305,40 @@ export class SubscriberInvertedIndex {
     const priceKey = `${poolSlug}:${blockId}:prices`;
 
     if (flags.available !== undefined) {
-      if (flags.available) this.addIndexEntry(availKey, userId);
-      else this.removeIndexEntry(availKey, userId);
+      if (flags.available) {
+        this.addIndexEntry(availKey, userId);
+        this.removeExclusionEntry(availKey, userId);
+      } else {
+        this.removeIndexEntry(availKey, userId);
+        this.addExclusionEntry(availKey, userId);
+      }
     }
     if (flags.soldOut !== undefined) {
-      if (flags.soldOut) this.addIndexEntry(soldKey, userId);
-      else this.removeIndexEntry(soldKey, userId);
+      if (flags.soldOut) {
+        this.addIndexEntry(soldKey, userId);
+        this.removeExclusionEntry(soldKey, userId);
+      } else {
+        this.removeIndexEntry(soldKey, userId);
+        this.addExclusionEntry(soldKey, userId);
+      }
     }
     if (flags.models !== undefined) {
-      if (flags.models) this.addIndexEntry(modelKey, userId);
-      else this.removeIndexEntry(modelKey, userId);
+      if (flags.models) {
+        this.addIndexEntry(modelKey, userId);
+        this.removeExclusionEntry(modelKey, userId);
+      } else {
+        this.removeIndexEntry(modelKey, userId);
+        this.addExclusionEntry(modelKey, userId);
+      }
     }
     if (flags.prices !== undefined) {
-      if (flags.prices) this.addIndexEntry(priceKey, userId);
-      else this.removeIndexEntry(priceKey, userId);
+      if (flags.prices) {
+        this.addIndexEntry(priceKey, userId);
+        this.removeExclusionEntry(priceKey, userId);
+      } else {
+        this.removeIndexEntry(priceKey, userId);
+        this.addExclusionEntry(priceKey, userId);
+      }
     }
   }
 

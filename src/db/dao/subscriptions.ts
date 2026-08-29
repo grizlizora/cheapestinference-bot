@@ -286,6 +286,18 @@ export class SubscriptionDAO {
     });
   }
 
+  public upsertSubscriptionWithFlags(
+    userId: number,
+    poolSlug: string,
+    blockId: string,
+    avail: number,
+    sold: number,
+    models: number,
+    prices: number
+  ): void {
+    this.stmtUpsertSubWithFlags.run(userId, poolSlug, blockId, avail, sold, models, prices);
+  }
+
   setSubscription(userId: number, poolSlug: string, blockId: string, enabled: boolean): void {
     if (enabled) {
       this.stmtAddSub.run(userId, poolSlug, blockId);

@@ -138,7 +138,9 @@ export class ScraperOrchestrator extends EventEmitter {
 
     this.timer = setTimeout(async () => {
       try {
-        await this.executeSingleflightPoll(false);
+        // Every 12 cycles (~60s), force bypassEtag to guarantee fresh origin validation against CDN 304 locks
+        const shouldBypassEtag = this.totalScrapes % 12 === 0;
+        await this.executeSingleflightPoll(shouldBypassEtag);
       } catch (err: any) {
         this.emit("error", err);
       } finally {

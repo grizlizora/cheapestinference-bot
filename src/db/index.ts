@@ -211,6 +211,28 @@ export function initSchema(db: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_donations_user ON donations(user_id);
     CREATE INDEX IF NOT EXISTS idx_donations_amount ON donations(amount_stars DESC);
+
+    -- 11. Notification Outbox Table (Zero-Loss Queue)
+    CREATE TABLE IF NOT EXISTS notification_outbox (
+      id TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      telegram_id INTEGER NOT NULL,
+      priority TEXT NOT NULL DEFAULT 'P1',
+      message_text TEXT NOT NULL,
+      reply_markup_json TEXT,
+      disable_notification INTEGER NOT NULL DEFAULT 0,
+      event_type TEXT NOT NULL DEFAULT 'available',
+      pool_slug TEXT,
+      block_id TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      attempts INTEGER NOT NULL DEFAULT 0,
+      last_error TEXT,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      dispatched_at DATETIME
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_outbox_pending ON notification_outbox(status, priority, created_at) WHERE status = 'pending';
+    CREATE INDEX IF NOT EXISTS idx_outbox_user ON notification_outbox(user_id);
   `);
 
   // Safe schema migrations for existing database files
