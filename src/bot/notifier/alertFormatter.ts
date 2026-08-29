@@ -548,6 +548,8 @@ export function formatBundledAlertMessage(
 
   let title = `${icon("event_batch_drop")} ${stripLeadingEmoji(rawTitle)}`;
 
+  const allAppeared = matchedEvents.every((e) => e.event.type === "SLOT_APPEARED");
+
   if (allSoldOut && allSamePool) {
     const pName = escapeHtml(matchedEvents[0].event.poolName);
     title = lang === "uk"
@@ -561,6 +563,13 @@ export function formatBundledAlertMessage(
       : lang === "ru"
       ? `${icon("event_slot_sold")} <b>СЛОТЫ РАСПРОДАНЫ (${count})</b>`
       : `${icon("event_slot_sold")} <b>SLOTS SOLD OUT (${count})</b>`;
+  } else if (allAppeared && allSamePool) {
+    const pName = escapeHtml(matchedEvents[0].event.poolName);
+    title = lang === "uk"
+      ? `${icon("event_slot_drop")} <b>ВІЛЬНІ СЛОТИ • ${pName} (${count})</b>`
+      : lang === "ru"
+      ? `${icon("event_slot_drop")} <b>СВОБОДНЫЕ СЛОТЫ • ${pName} (${count})</b>`
+      : `${icon("event_slot_drop")} <b>AVAILABLE SLOTS • ${pName} (${count})</b>`;
   }
 
   for (const { event } of matchedEvents) {
