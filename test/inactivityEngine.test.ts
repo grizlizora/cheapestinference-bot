@@ -50,10 +50,10 @@ describe("14-Day Inactivity Engine & Dormant User Alert Filtering Invariants", (
     expect(resolved[0].telegramId).toBe(1001);
   });
 
-  it("2. Proportional Star Retention & Admin Immunity: Star donors get +1 day per Star, Admins get infinite immunity", () => {
+  it("2. Progressive Tiered Star Booster & Recency Decay Invariants", () => {
     const now = Date.now();
 
-    // 1. Admin inactive for 100 days -> Always immune (P0)
+    // 1. Admin inactive for 500 days -> Infinite Immunity (P0)
     const adminUser = userDao.upsertUser({
       telegram_id: 2001,
       username: "admin_inactive",
@@ -61,49 +61,69 @@ describe("14-Day Inactivity Engine & Dormant User Alert Filtering Invariants", (
       language: "uk",
     });
     userDao.setAdmin(2001, true);
-    db.prepare(`UPDATE users SET last_active_at = ? WHERE id = ?`).run(new Date(now - 100 * 86400 * 1000).toISOString(), adminUser.id);
+    db.prepare(`UPDATE users SET last_active_at = ? WHERE id = ?`).run(new Date(now - 500 * 86400 * 1000).toISOString(), adminUser.id);
 
-    // 2. Donor A: 1 Star (Cutoff: 14 + 1 = 15 days) -> Inactive 14.5 days -> INCLUDED
-    const donor1StarActive = userDao.upsertUser({
+    // 2. Micro-donor (5 Stars, donated 5 days ago):
+    // Raw bonus: 5 * 2.0 = 10 days. Recency <= 30d -> factor 1.0. Total: 14 + 10 = 24 days.
+    // Inactive 20 days -> INCLUDED (20 <= 24)
+    const donorMicro = userDao.upsertUser({
       telegram_id: 2002,
-      username: "donor_1_star_active",
-      first_name: "Donor1",
+      username: "donor_micro",
+      first_name: "MicroDonor",
       language: "en",
     });
-    donationDao.recordDonation(donor1StarActive.id, 2002, 1, "ch_star_1_ok");
-    db.prepare(`UPDATE users SET last_active_at = ? WHERE id = ?`).run(new Date(now - 14.5 * 86400 * 1000).toISOString(), donor1StarActive.id);
+    donationDao.recordDonation(donorMicro.id, 2002, 5, "ch_star_micro");
+    db.prepare(`UPDATE users SET last_active_at = ? WHERE id = ?`).run(new Date(now - 20 * 86400 * 1000).toISOString(), donorMicro.id);
 
-    // 3. Donor B: 1 Star (Cutoff: 14 + 1 = 15 days) -> Inactive 16 days -> EXCLUDED
-    const donor1StarExpired = userDao.upsertUser({
+    // 3. Coffee donor (15 Stars, donated 20 days ago):
+    // Raw bonus: 15 * 2.0 = 30 days. Recency <= 30d -> factor 1.0. Total: 14 + 30 = 44 days.
+    // Inactive 40 days -> INCLUDED (40 <= 44)
+    const donorCoffee = userDao.upsertUser({
       telegram_id: 2003,
-      username: "donor_1_star_expired",
-      first_name: "Donor1Exp",
+      username: "donor_coffee",
+      first_name: "Coffee",
       language: "en",
     });
-    donationDao.recordDonation(donor1StarExpired.id, 2003, 1, "ch_star_1_exp");
-    db.prepare(`UPDATE users SET last_active_at = ? WHERE id = ?`).run(new Date(now - 16 * 86400 * 1000).toISOString(), donor1StarExpired.id);
+    donationDao.recordDonation(donorCoffee.id, 2003, 15, "ch_star_coffee");
+    db.prepare(`UPDATE users SET last_active_at = ? WHERE id = ?`).run(new Date(now - 40 * 86400 * 1000).toISOString(), donorCoffee.id);
 
-    // 4. Donor C: 50 Stars (Cutoff: 14 + 50 = 64 days) -> Inactive 50 days -> INCLUDED
-    const donor50Stars = userDao.upsertUser({
+    // 4. Large Donor 500 Stars (donated 200 days ago -> 180-360d range, factor 0.50):
+    // Raw bonus: 452.5 days. With factor 0.50 -> 226.25 days. Total: 14 + 226.25 = 240.25 days.
+    // Inactive 210 days -> INCLUDED (210 <= 240.25)
+    const donor500Recent = userDao.upsertUser({
       telegram_id: 2004,
-      username: "donor_50_stars",
-      first_name: "Donor50",
+      username: "donor_500_half_year",
+      first_name: "Donor500Recent",
       language: "uk",
     });
-    donationDao.recordDonation(donor50Stars.id, 2004, 50, "ch_star_50_ok");
-    db.prepare(`UPDATE users SET last_active_at = ? WHERE id = ?`).run(new Date(now - 50 * 86400 * 1000).toISOString(), donor50Stars.id);
+    donationDao.recordDonation(donor500Recent.id, 2004, 500, "ch_star_500_rec");
+    db.prepare(`UPDATE donations SET created_at = ? WHERE user_id = ?`).run(new Date(now - 200 * 86400 * 1000).toISOString(), donor500Recent.id);
+    db.prepare(`UPDATE users SET last_active_at = ? WHERE id = ?`).run(new Date(now - 210 * 86400 * 1000).toISOString(), donor500Recent.id);
 
-    // 5. Free user inactive for 15 days -> EXCLUDED
-    const freeUser = userDao.upsertUser({
+    // 5. Very Old 500 Stars Donor (donated 800 days ago -> >2 years / 730d, factor 0.20):
+    // Raw bonus: 452.5 days * 0.20 = 90.5 days. Total: 14 + 90.5 = 104.5 days.
+    // Inactive 120 days -> EXCLUDED (120 > 104.5)
+    const donor500Ancient = userDao.upsertUser({
       telegram_id: 2005,
+      username: "donor_500_ancient",
+      first_name: "Donor500Ancient",
+      language: "uk",
+    });
+    donationDao.recordDonation(donor500Ancient.id, 2005, 500, "ch_star_500_anc");
+    db.prepare(`UPDATE donations SET created_at = ? WHERE user_id = ?`).run(new Date(now - 800 * 86400 * 1000).toISOString(), donor500Ancient.id);
+    db.prepare(`UPDATE users SET last_active_at = ? WHERE id = ?`).run(new Date(now - 120 * 86400 * 1000).toISOString(), donor500Ancient.id);
+
+    // 6. Free user inactive for 16 days -> EXCLUDED (16 > 14)
+    const freeUser = userDao.upsertUser({
+      telegram_id: 2006,
       username: "free_inactive",
       first_name: "Free",
       language: "uk",
     });
-    db.prepare(`UPDATE users SET last_active_at = ? WHERE id = ?`).run(new Date(now - 15 * 86400 * 1000).toISOString(), freeUser.id);
+    db.prepare(`UPDATE users SET last_active_at = ? WHERE id = ?`).run(new Date(now - 16 * 86400 * 1000).toISOString(), freeUser.id);
 
-    // All 5 subscribe to Frontier Americas
-    for (const u of [adminUser, donor1StarActive, donor1StarExpired, donor50Stars, freeUser]) {
+    // All 6 subscribe to Frontier Americas
+    for (const u of [adminUser, donorMicro, donorCoffee, donor500Recent, donor500Ancient, freeUser]) {
       db.exec(`INSERT INTO subscriptions (user_id, pool_slug, block_id, notify_on_available) VALUES (${u.id}, 'frontier', 'americas', 1)`);
     }
 
@@ -112,16 +132,19 @@ describe("14-Day Inactivity Engine & Dormant User Alert Filtering Invariants", (
 
     // Invariant:
     // [0] Admin (P0) -> tgId: 2001
-    // [1] Donor 50 Stars (P1) -> tgId: 2004
-    // [2] Donor 1 Star (P1) -> tgId: 2002
-    // Excluded: Donor 1 Star expired (2003) and Free user (2005)
-    expect(resolved).toHaveLength(3);
+    // [1] Donor 500 Stars (P1) -> tgId: 2004
+    // [2] Donor 15 Stars (P1) -> tgId: 2003
+    // [3] Donor 5 Stars (P1) -> tgId: 2002
+    // Excluded: Donor 500 ancient expired (2005) and Free user (2006)
+    expect(resolved).toHaveLength(4);
     expect(resolved[0].telegramId).toBe(2001); // Admin (P0)
     expect(resolved[0].isAdmin).toBe(true);
-    expect(resolved[1].telegramId).toBe(2004); // 50 Stars (P1)
-    expect(resolved[1].totalDonatedStars).toBe(50);
-    expect(resolved[2].telegramId).toBe(2002); // 1 Star (P1)
-    expect(resolved[2].totalDonatedStars).toBe(1);
+    expect(resolved[1].telegramId).toBe(2004); // 500 Stars
+    expect(resolved[1].totalDonatedStars).toBe(500);
+    expect(resolved[2].telegramId).toBe(2003); // 15 Stars
+    expect(resolved[2].totalDonatedStars).toBe(15);
+    expect(resolved[3].telegramId).toBe(2002); // 5 Stars
+    expect(resolved[3].totalDonatedStars).toBe(5);
   });
 
   it("3. Instant Zero-Loss Revival: Interacting with bot resets lastActiveAt and immediately restores dispatch", () => {

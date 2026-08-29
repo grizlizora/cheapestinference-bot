@@ -1,11 +1,93 @@
 import Database from "better-sqlite3";
 import { SupportedLanguage } from "../../types/db.js";
 
-export const FREE_USER_INACTIVITY_LIMIT_MS = 14 * 24 * 60 * 60 * 1000; // 14 days = 1,209,600,000 ms
-export const STAR_GRACE_EXTENSION_MS = 24 * 60 * 60 * 1000;            // +1 day per 1 Star = 86,400,000 ms
+export const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+export const FREE_USER_INACTIVITY_LIMIT_MS = 14 * ONE_DAY_MS; // 14 days = 1,209,600,000 ms
 
-export function computeUserInactivityLimitMs(stars: number = 0): number {
-  return FREE_USER_INACTIVITY_LIMIT_MS + Math.max(0, stars) * STAR_GRACE_EXTENSION_MS;
+/**
+ * Calculates raw bonus retention days from total donated stars using progressive tiers:
+ * - Tier 1: 1 - 15 Stars   -> 2.0 days / star (up to 30 days)
+ * - Tier 2: 16 - 50 Stars  -> 1.5 days / star (up to +52.5 days -> 82.5 days)
+ * - Tier 3: 51 - 100 Stars -> 1.0 days / star (up to +50 days -> 132.5 days)
+ * - Tier 4: 101 - 500 Stars-> 0.8 days / star (up to +320 days -> 452.5 days)
+ * - Tier 5: 500+ Stars     -> 0.5 days / star
+ */
+export function calculateStarBonusDays(stars: number): number {
+  if (stars <= 0) return 0;
+  let remaining = stars;
+  let bonusDays = 0;
+
+  // Tier 1: 1 - 15
+  const t1 = Math.min(remaining, 15);
+  bonusDays += t1 * 2.0;
+  remaining -= t1;
+  if (remaining <= 0) return bonusDays;
+
+  // Tier 2: 16 - 50 (35 stars)
+  const t2 = Math.min(remaining, 35);
+  bonusDays += t2 * 1.5;
+  remaining -= t2;
+  if (remaining <= 0) return bonusDays;
+
+  // Tier 3: 51 - 100 (50 stars)
+  const t3 = Math.min(remaining, 50);
+  bonusDays += t3 * 1.0;
+  remaining -= t3;
+  if (remaining <= 0) return bonusDays;
+
+  // Tier 4: 101 - 500 (400 stars)
+  const t4 = Math.min(remaining, 400);
+  bonusDays += t4 * 0.8;
+  remaining -= t4;
+  if (remaining <= 0) return bonusDays;
+
+  // Tier 5: > 500
+  bonusDays += remaining * 0.5;
+  return bonusDays;
+}
+
+/**
+ * Computes recency freshness coefficient based on elapsed time since the most recent donation:
+ * - <= 30 days:  1.00 (100% full value)
+ * - 31 - 90 days: 0.85 (85%)
+ * - 91 - 180 days: 0.70 (70%)
+ * - 181 - 360 days (~1 year): 0.50 (50%)
+ * - 361 - 730 days (1 - 2 years = 360 - 730 days): 0.35 (35%)
+ * - > 730 days (> 2 years): 0.20 (20% permanent veteran patron baseline)
+ */
+export function calculateRecencyDecayFactor(donationAgeDays: number): number {
+  if (donationAgeDays <= 30) return 1.0;
+  if (donationAgeDays <= 90) return 0.85;
+  if (donationAgeDays <= 180) return 0.70;
+  if (donationAgeDays <= 360) return 0.50;
+  if (donationAgeDays <= 730) return 0.35;
+  return 0.20;
+}
+
+export function computeAdaptiveInactivityLimitMs(
+  stars: number = 0,
+  lastDonatedAt?: number,
+  now = Date.now()
+): number {
+  if (stars <= 0) {
+    return FREE_USER_INACTIVITY_LIMIT_MS;
+  }
+
+  const rawBonusDays = calculateStarBonusDays(stars);
+  const donationAgeMs = lastDonatedAt ? Math.max(0, now - lastDonatedAt) : 0;
+  const donationAgeDays = donationAgeMs / ONE_DAY_MS;
+  const freshnessFactor = calculateRecencyDecayFactor(donationAgeDays);
+
+  const effectiveBonusDays = rawBonusDays * freshnessFactor;
+  return FREE_USER_INACTIVITY_LIMIT_MS + effectiveBonusDays * ONE_DAY_MS;
+}
+
+export function computeUserInactivityLimitMs(
+  stars: number = 0,
+  lastDonatedAt?: number,
+  now = Date.now()
+): number {
+  return computeAdaptiveInactivityLimitMs(stars, lastDonatedAt, now);
 }
 
 export interface PackedUserProfile {
@@ -22,6 +104,7 @@ export interface PackedUserProfile {
   notifyPricesGlobal: boolean;
   lastActiveAt?: number;
   lastDbTouchAt?: number;
+  lastDonatedAt?: number;
 }
 
 export class SubscriberInvertedIndex {
@@ -55,21 +138,32 @@ export class SubscriberInvertedIndex {
     // 1. Stream Users (with dynamic schema backward compatibility)
     const tableInfo = this.db.prepare(`PRAGMA table_info(users)`).all() as Array<{ name: string }>;
     const cols = new Set(tableInfo.map((c) => c.name));
-    const hasAdmin = cols.has("is_admin") ? "COALESCE(is_admin, 0) as is_admin" : "0 as is_admin";
-    const hasStars = cols.has("total_donated_stars") ? "COALESCE(total_donated_stars, 0) as total_donated_stars" : "0 as total_donated_stars";
+    const hasAdmin = cols.has("is_admin") ? "COALESCE(u.is_admin, 0) as is_admin" : "0 as is_admin";
+    const hasStars = cols.has("total_donated_stars") ? "COALESCE(u.total_donated_stars, 0) as total_donated_stars" : "0 as total_donated_stars";
 
-    const userStmt = this.db.prepare(`
+    const hasDonationsTable = this.db.prepare(
+      `SELECT name FROM sqlite_master WHERE type='table' AND name='donations'`
+    ).get() !== undefined;
+
+    let userSql = `
       SELECT 
-        id, telegram_id, language, is_muted, is_active,
+        u.id, u.telegram_id, u.language, u.is_muted, u.is_active,
         ${hasAdmin},
         ${hasStars},
-        COALESCE(notify_available_global, 1) as notify_available_global,
-        COALESCE(notify_sold_out_global, 0) as notify_sold_out_global,
-        COALESCE(notify_models_global, 1) as notify_models_global,
-        COALESCE(notify_prices_global, 1) as notify_prices_global,
-        last_active_at
-      FROM users
-    `);
+        COALESCE(u.notify_available_global, 1) as notify_available_global,
+        COALESCE(u.notify_sold_out_global, 0) as notify_sold_out_global,
+        COALESCE(u.notify_models_global, 1) as notify_models_global,
+        COALESCE(u.notify_prices_global, 1) as notify_prices_global,
+        u.last_active_at
+    `;
+
+    if (hasDonationsTable) {
+      userSql += `, d.last_donated_at FROM users u LEFT JOIN (SELECT user_id, MAX(created_at) as last_donated_at FROM donations GROUP BY user_id) d ON u.id = d.user_id`;
+    } else {
+      userSql += ` FROM users u`;
+    }
+
+    const userStmt = this.db.prepare(userSql);
 
     for (const row of userStmt.iterate() as Iterable<{
       id: number;
@@ -84,10 +178,15 @@ export class SubscriberInvertedIndex {
       notify_models_global: number;
       notify_prices_global: number;
       last_active_at?: string;
+      last_donated_at?: string;
     }>) {
         const parsedLastActive = row.last_active_at
           ? (Date.parse(row.last_active_at.replace(" ", "T") + "Z") || Date.parse(row.last_active_at) || Date.now())
           : Date.now();
+
+        const parsedLastDonated = row.last_donated_at
+          ? (Date.parse(row.last_donated_at.replace(" ", "T") + "Z") || Date.parse(row.last_donated_at) || undefined)
+          : undefined;
 
         this.profiles.set(row.id, {
           userId: row.id,
@@ -103,6 +202,7 @@ export class SubscriberInvertedIndex {
           notifyPricesGlobal: row.notify_prices_global === 1,
           lastActiveAt: parsedLastActive,
           lastDbTouchAt: parsedLastActive,
+          lastDonatedAt: parsedLastDonated,
         });
         this.tgIdToUserId.set(row.telegram_id, row.id);
       }
@@ -268,10 +368,13 @@ export class SubscriberInvertedIndex {
         continue;
       }
 
-      // Invariant 2: Smart Proportional Star Retention Window
-      // Base: 14 days. Each donated Star dynamically adds +1 day of active notification retention!
+      // Invariant 2: Smart Adaptive Multi-Tier & Recency Star Retention Window
       const userStars = profile.totalDonatedStars || 0;
-      const userCutoffLimitMs = computeUserInactivityLimitMs(userStars);
+      const userCutoffLimitMs = computeAdaptiveInactivityLimitMs(
+        userStars,
+        profile.lastDonatedAt,
+        now
+      );
 
       if (timeSinceActive <= userCutoffLimitMs) {
         if (userStars > 0) {
@@ -410,12 +513,14 @@ export class SubscriberInvertedIndex {
     }
   }
 
-  public addDonationStars(telegramId: number, stars: number): void {
+  public addDonationStars(telegramId: number, stars: number, donatedAt: number = Date.now()): void {
     const userId = this.tgIdToUserId.get(telegramId);
     if (userId) {
       const profile = this.profiles.get(userId);
       if (profile) {
         profile.totalDonatedStars = (profile.totalDonatedStars || 0) + stars;
+        profile.lastDonatedAt = donatedAt;
+        profile.lastActiveAt = donatedAt;
       }
     }
   }
