@@ -92,11 +92,11 @@ export function formatPriceRatingBadge(
   }
   if (pa.rating === "below_average" && pa.avgPrice != null) {
     const rawText = stripLeadingEmoji(translate(lang, "alerts.price_below_average", { current: currStr, avg: avgStr }) || `Нижче середнього ($${currStr} vs сер. $${avgStr})`);
-    return `${icon("status_available")} ${rawText.startsWith("<b>") ? rawText : `<b>${rawText}</b>`}`;
+    return `${icon("event_price_drop")} ${rawText.startsWith("<b>") ? rawText : `<b>${rawText}</b>`}`;
   }
   if (pa.rating === "above_average" && pa.avgPrice != null) {
     const rawText = stripLeadingEmoji(translate(lang, "alerts.price_above_average", { current: currStr, avg: avgStr }) || `Вище середнього ($${currStr} vs сер. $${avgStr})`);
-    return `${icon("status_sold_out")} ${rawText.startsWith("<b>") ? rawText : `<b>${rawText}</b>`}`;
+    return `${icon("event_price_hike")} ${rawText.startsWith("<b>") ? rawText : `<b>${rawText}</b>`}`;
   }
   if (pa.rating === "fair" && pa.avgPrice != null) {
     const rawText = stripLeadingEmoji(translate(lang, "alerts.price_fair_value") || "Стандартна ціна (в межах норми)");
