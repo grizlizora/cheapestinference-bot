@@ -17,6 +17,16 @@ import { renderSubscriptionsText } from "./menus/subscriptions.js";
 import { createStartHandler } from "./handlers/start.js";
 import { createLanguageHandler } from "./handlers/language.js";
 import { createAdminHandler, renderAdminText, createAdminKeyboard } from "./handlers/admin.js";
+import {
+  renderBroadcastStagingText,
+  renderBroadcastPromptText,
+  renderBroadcastPreview,
+  renderBroadcastPreflight,
+  renderBroadcastModalConfirm,
+  getOrCreateBroadcastSession,
+  resetBroadcastSession,
+} from "./handlers/adminBroadcast.js";
+import { extractMessageContent } from "./notifier/telegramEntitySerializer.js";
 import { createBackupHandler, createUsersExportHandler, createHistoryExportHandler } from "./handlers/backup.js";
 import { NotificationDispatcher } from "./notifier/dispatcher.js";
 import { config, isUserAdmin } from "../config/env.js";
@@ -444,6 +454,162 @@ export function createTelegramBot(
     await dispatcher.sendTestAlert(ctx.from!.id, ctx.lang, "slot");
   });
 
+  // 11.1 Admin Multi-Language Broadcast Callbacks
+  bot.callbackQuery("admin_open_broadcast", async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    await ctx.answerCallbackQuery().catch(() => {});
+    if (ctx.chat) {
+      activeDashboardRegistry.updateView(ctx.chat.id, "other");
+    }
+    const { text, keyboard } = renderBroadcastStagingText(ctx, userDao, dispatcher);
+    await safeEditMessageText(ctx, text, keyboard);
+  });
+
+  bot.callbackQuery("admin_bc_hub", async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    await ctx.answerCallbackQuery().catch(() => {});
+    const session = getOrCreateBroadcastSession(ctx);
+    session.stage = "language_select";
+    const { text, keyboard } = renderBroadcastStagingText(ctx, userDao, dispatcher);
+    await safeEditMessageText(ctx, text, keyboard);
+  });
+
+  bot.callbackQuery(/^admin_bc_edit:(uk|en|ru)$/, async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    const lang = ctx.match[1] as SupportedLanguage;
+    await ctx.answerCallbackQuery().catch(() => {});
+    const session = getOrCreateBroadcastSession(ctx);
+    session.stage = "awaiting_text";
+    session.activeEditLang = lang;
+
+    const promptText = renderBroadcastPromptText(lang);
+    const cancelKeyboard = new InlineKeyboard().text("◀️ Скасувати введення", "admin_bc_hub");
+    await safeEditMessageText(ctx, promptText, cancelKeyboard);
+  });
+
+  bot.callbackQuery(/^admin_bc_confirm_draft:(uk|en|ru)$/, async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    const lang = ctx.match[1] as SupportedLanguage;
+    const session = getOrCreateBroadcastSession(ctx);
+    if (session.drafts[lang]) {
+      session.drafts[lang]!.isConfirmed = true;
+    }
+    session.stage = "language_select";
+    await ctx.answerCallbackQuery({ text: `✅ Чернетку для ${lang.toUpperCase()} збережено!` }).catch(() => {});
+    const { text, keyboard } = renderBroadcastStagingText(ctx, userDao, dispatcher);
+    await safeEditMessageText(ctx, text, keyboard);
+  });
+
+  bot.callbackQuery(/^admin_bc_test_self:(uk|en|ru)$/, async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    const lang = ctx.match[1] as SupportedLanguage;
+    const session = getOrCreateBroadcastSession(ctx);
+    const draft = session.drafts[lang];
+    if (draft && draft.htmlText) {
+      await ctx.reply(draft.htmlText, {
+        parse_mode: "HTML",
+        link_preview_options: { is_disabled: true },
+      }).catch(() => {});
+      await ctx.answerCallbackQuery({ text: `🧪 Тестове повідомлення (${lang.toUpperCase()}) надіслано!` }).catch(() => {});
+    } else {
+      await ctx.answerCallbackQuery({ text: "❌ Чернетка порожня", show_alert: true }).catch(() => {});
+    }
+  });
+
+  bot.callbackQuery("admin_bc_test_all", async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    const session = getOrCreateBroadcastSession(ctx);
+    const langs: SupportedLanguage[] = ["uk", "en", "ru"];
+    let sentCount = 0;
+    for (const l of langs) {
+      const draft = session.drafts[l];
+      if (draft && draft.htmlText) {
+        await ctx.reply(`[${l.toUpperCase()}]\n\n${draft.htmlText}`, {
+          parse_mode: "HTML",
+          link_preview_options: { is_disabled: true },
+        }).catch(() => {});
+        sentCount++;
+      }
+    }
+    await ctx.answerCallbackQuery({ text: `🧪 Надіслано ${sentCount} тестових повідомлень!` }).catch(() => {});
+  });
+
+  bot.callbackQuery("admin_bc_toggle_silent", async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    const session = getOrCreateBroadcastSession(ctx);
+    session.sendSilent = !session.sendSilent;
+    await ctx.answerCallbackQuery({
+      text: session.sendSilent ? "🔕 Сповіщення надходитимуть без звуку" : "🔔 Сповіщення надходитимуть зі звуком",
+    }).catch(() => {});
+    const { text, keyboard } = renderBroadcastStagingText(ctx, userDao, dispatcher);
+    await safeEditMessageText(ctx, text, keyboard);
+  });
+
+  bot.callbackQuery("admin_bc_clear", async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    const session = getOrCreateBroadcastSession(ctx);
+    session.drafts = {};
+    session.stage = "language_select";
+    await ctx.answerCallbackQuery({ text: "🗑 Усі чернетки очищено" }).catch(() => {});
+    const { text, keyboard } = renderBroadcastStagingText(ctx, userDao, dispatcher);
+    await safeEditMessageText(ctx, text, keyboard);
+  });
+
+  bot.callbackQuery("admin_bc_staging_noop", async (ctx) => {
+    await ctx.answerCallbackQuery({
+      text: "⏳ Підготуйте хоча б одну чернетку (UK або EN) для запуску розсилки.",
+      show_alert: true,
+    }).catch(() => {});
+  });
+
+  bot.callbackQuery("admin_bc_preflight", async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    await ctx.answerCallbackQuery().catch(() => {});
+    const { text, keyboard } = renderBroadcastPreflight(ctx, dispatcher);
+    await safeEditMessageText(ctx, text, keyboard);
+  });
+
+  bot.callbackQuery("admin_bc_modal_confirm", async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    await ctx.answerCallbackQuery().catch(() => {});
+    const { text, keyboard } = renderBroadcastModalConfirm(ctx, dispatcher);
+    await safeEditMessageText(ctx, text, keyboard);
+  });
+
+  bot.callbackQuery("admin_bc_execute", async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    const session = getOrCreateBroadcastSession(ctx);
+    const drafts = {
+      uk: session.drafts.uk?.htmlText,
+      en: session.drafts.en?.htmlText,
+      ru: session.drafts.ru?.htmlText,
+    };
+
+    await ctx.answerCallbackQuery({ text: "🚀 Розсилку запущено у фоновому режимі!" }).catch(() => {});
+
+    const result = await dispatcher.dispatchBroadcastBatch(drafts, {
+      sendSilent: session.sendSilent,
+      filter: session.filter || "active_only",
+    });
+
+    // 100% Reset session draft state after dispatch
+    resetBroadcastSession(ctx);
+
+    const completionText =
+      `✅ <b>Масову розсилку успішно передано до черги відправки!</b>\n\n` +
+      `📊 <b>Статистика черги:</b>\n` +
+      `• 👥 Всього адресатів: <b>${result.totalEnqueued}</b>\n` +
+      `• 🇺🇦 UK: <b>${result.statsByLang.uk || 0}</b>\n` +
+      `• 🇬🇧 EN: <b>${result.statsByLang.en || 0}</b>\n` +
+      `• 🇷🇺 RU: <b>${result.statsByLang.ru || 0}</b>\n` +
+      `• ⚡ Швидкість відправки: ~27-30 повідомлень/сек\n` +
+      `• 🎯 Пріоритет: <b>P0 (Найвищий)</b> з захистом від блокування слотів\n\n` +
+      `<i>Усі чернетки автоматично скинуто. Ви можете створити наступну нову розсилку в будь-який час.</i>`;
+
+    const keyboard = new InlineKeyboard().text("📊 До адмін-панелі", "admin_refresh");
+    await safeEditMessageText(ctx, completionText, keyboard);
+  });
+
   bot.command("help", async (ctx) => {
     const keyboard = new InlineKeyboard()
       .url(ctx.t("help.btn_open_site"), "https://cheapestinference.com/pools")
@@ -596,6 +762,49 @@ export function createTelegramBot(
       }
     }
   });
+
+  // 12.1 Admin Broadcast Message Input Interceptor
+  bot.on(
+    ["message:text", "message:photo", "message:video", "message:document", "message:animation"],
+    async (ctx, next) => {
+      const bSession = ctx.session?.broadcast;
+      if (bSession && bSession.stage === "awaiting_text" && bSession.activeEditLang) {
+        if (!isUserAdmin(ctx.from?.id, userDao, ctx.from?.username)) {
+          return next();
+        }
+
+        const lang = bSession.activeEditLang;
+        const extracted = extractMessageContent(ctx.message);
+
+        if (!extracted.rawText || extracted.rawText.trim().length === 0) {
+          await ctx.reply("⚠️ Повідомлення не містить тексту. Будь ласка, надішліть текст або медіа з підписом.");
+          return;
+        }
+
+        bSession.drafts[lang] = {
+          htmlText: extracted.html,
+          rawText: extracted.rawText,
+          entitiesCount: extracted.entitiesCount,
+          hasCustomEmoji: extracted.hasCustomEmoji,
+          mediaType: extracted.mediaType,
+          fileId: extracted.fileId,
+          createdAt: Date.now(),
+          isConfirmed: false,
+        };
+
+        bSession.stage = "preview";
+
+        const preview = renderBroadcastPreview(ctx, lang, dispatcher);
+        await ctx.reply(preview.text, {
+          parse_mode: "HTML",
+          reply_markup: preview.keyboard,
+          link_preview_options: { is_disabled: true },
+        });
+        return;
+      }
+      return next();
+    }
+  );
 
   // 13. Custom Stars Input & Confirmation Flow
   bot.on("message:text", async (ctx, next) => {

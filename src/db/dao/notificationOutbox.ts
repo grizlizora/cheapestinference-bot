@@ -12,6 +12,8 @@ export interface OutboxItem {
   eventType: string;
   poolSlug?: string;
   blockId?: string;
+  isBroadcast?: boolean;
+  language?: string;
   status: "pending" | "dispatched" | "failed";
   attempts: number;
   lastError?: string;
@@ -32,15 +34,16 @@ export class NotificationOutboxDAO {
     this.stmtEnqueue = db.prepare(`
       INSERT OR IGNORE INTO notification_outbox (
         id, user_id, telegram_id, priority, message_text, reply_markup_json,
-        disable_notification, event_type, pool_slug, block_id, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+        disable_notification, event_type, pool_slug, block_id, is_broadcast, language, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
     `);
 
     this.stmtGetPending = db.prepare(`
       SELECT 
         id, user_id as userId, telegram_id as telegramId, priority, message_text as messageText,
         reply_markup_json as replyMarkupJson, disable_notification as disableNotification,
-        event_type as eventType, pool_slug as poolSlug, block_id as blockId, status, attempts,
+        event_type as eventType, pool_slug as poolSlug, block_id as blockId,
+        is_broadcast as isBroadcast, language, status, attempts,
         created_at as createdAt
       FROM notification_outbox
       WHERE status = 'pending'
@@ -85,7 +88,9 @@ export class NotificationOutboxDAO {
           item.disableNotification ? 1 : 0,
           item.eventType,
           item.poolSlug || null,
-          item.blockId || null
+          item.blockId || null,
+          item.isBroadcast ? 1 : 0,
+          item.language || "en"
         );
       }
     });
@@ -107,7 +112,9 @@ export class NotificationOutboxDAO {
       item.disableNotification ? 1 : 0,
       item.eventType,
       item.poolSlug || null,
-      item.blockId || null
+      item.blockId || null,
+      item.isBroadcast ? 1 : 0,
+      item.language || "en"
     );
   }
 
@@ -116,6 +123,7 @@ export class NotificationOutboxDAO {
     return rows.map((r) => ({
       ...r,
       disableNotification: r.disableNotification === 1,
+      isBroadcast: r.isBroadcast === 1,
     }));
   }
 

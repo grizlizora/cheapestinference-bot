@@ -543,6 +543,63 @@ export class SubscriberInvertedIndex {
     return userId ? this.profiles.get(userId) : undefined;
   }
 
+  /**
+   * Returns all active user profiles partitioned by priority (Admins -> Donors -> Active Users)
+   * for broadcast dispatching.
+   */
+  public getActiveProfiles(filter: "all" | "active_only" | "donors_only" = "active_only"): PackedUserProfile[] {
+    const admins: PackedUserProfile[] = [];
+    const donors: PackedUserProfile[] = [];
+    const freeUsers: PackedUserProfile[] = [];
+    const now = Date.now();
+
+    for (const profile of this.profiles.values()) {
+      if (!profile.isActive) continue;
+
+      if (profile.isAdmin) {
+        admins.push(profile);
+        continue;
+      }
+
+      if (filter === "donors_only" && (profile.totalDonatedStars || 0) <= 0) {
+        continue;
+      }
+
+      const userStars = profile.totalDonatedStars || 0;
+      const userLastActive = profile.lastActiveAt || 0;
+      const timeSinceActive = now - userLastActive;
+
+      // Inactivity limit
+      const userCutoffLimitMs = computeAdaptiveInactivityLimitMs(
+        userStars,
+        profile.lastDonatedAt,
+        now
+      );
+
+      if (filter === "all" || timeSinceActive <= userCutoffLimitMs) {
+        if (userStars > 0) {
+          donors.push(profile);
+        } else {
+          freeUsers.push(profile);
+        }
+      }
+    }
+
+    if (donors.length > 1) {
+      donors.sort((a, b) => {
+        const diff = (b.totalDonatedStars || 0) - (a.totalDonatedStars || 0);
+        if (diff !== 0) return diff;
+        return (b.lastActiveAt || 0) - (a.lastActiveAt || 0);
+      });
+    }
+
+    if (freeUsers.length > 1) {
+      freeUsers.sort((a, b) => (b.lastActiveAt || 0) - (a.lastActiveAt || 0));
+    }
+
+    return [...admins, ...donors, ...freeUsers];
+  }
+
   public getMemoryStats(): { userCount: number; indexKeys: number; approxBytes: number } {
     let setEntries = 0;
     for (const set of this.index.values()) {

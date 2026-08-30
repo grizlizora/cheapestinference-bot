@@ -229,6 +229,8 @@ export function initSchema(db: Database.Database): void {
       event_type TEXT NOT NULL DEFAULT 'available',
       pool_slug TEXT,
       block_id TEXT,
+      is_broadcast INTEGER NOT NULL DEFAULT 0,
+      language TEXT NOT NULL DEFAULT 'en',
       status TEXT NOT NULL DEFAULT 'pending',
       attempts INTEGER NOT NULL DEFAULT 0,
       last_error TEXT,
@@ -238,6 +240,7 @@ export function initSchema(db: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_outbox_pending ON notification_outbox(status, priority, created_at) WHERE status = 'pending';
     CREATE INDEX IF NOT EXISTS idx_outbox_user ON notification_outbox(user_id);
+    CREATE INDEX IF NOT EXISTS idx_outbox_broadcast ON notification_outbox(is_broadcast, status, priority, created_at);
   `);
 
   // Safe schema migrations for existing database files
@@ -260,10 +263,19 @@ export function initSchema(db: Database.Database): void {
     db.exec(`ALTER TABLE slot_price_history ADD COLUMN new_price_num REAL NOT NULL DEFAULT 0.0;`);
   } catch {}
   try {
+    db.exec(`ALTER TABLE notification_outbox ADD COLUMN is_broadcast INTEGER NOT NULL DEFAULT 0;`);
+  } catch {}
+  try {
+    db.exec(`ALTER TABLE notification_outbox ADD COLUMN language TEXT NOT NULL DEFAULT 'en';`);
+  } catch {}
+  try {
     db.exec(`CREATE INDEX IF NOT EXISTS idx_users_admins ON users(telegram_id) WHERE is_admin = 1 AND is_active = 1;`);
   } catch {}
   try {
     db.exec(`CREATE INDEX IF NOT EXISTS idx_users_donors ON users(total_donated_stars DESC) WHERE total_donated_stars > 0;`);
+  } catch {}
+  try {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_outbox_broadcast ON notification_outbox(is_broadcast, status, priority, created_at);`);
   } catch {}
 }
 

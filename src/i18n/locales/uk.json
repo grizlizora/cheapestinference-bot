@@ -205,6 +205,7 @@
     "stats_title": "📊 <b>Панель адміністратора & Телеметрія</b>\n\n🟢 <b>Статус системи:</b> {status}\n⏱ <b>Аптайм:</b> {uptime}\n\n👥 <b>Користувачі:</b>\n• Всього зареєстровано: <b>{total_users}</b>\n• Активних спостерігачів: <b>{active_users}</b>\n• Заблокували бота: <b>{blocked_users}</b>\n• Активних правил підписок: <b>{active_subscriptions}</b>\n\n🕷 <b>Скрейпер & Anti-Ban:</b>\n• Останнє опитування: <b>{last_scrape_ago}</b> (Затримка: {latency}мс)\n• Джерело даних: <code>{source}</code>\n• Помилок поспіль: <b>{consecutive_failures}</b>\n• Режим Tor / Проксі: <b>{proxy_status}</b>\n\n💾 <b>Пам'ять процесу:</b> <b>{memory_mb} MB</b>\n🔔 <b>Сповіщення про нових користувачів:</b> <b>{new_users_status}</b>",
     "unauthorized": "⛔ <b>Доступ обмежено.</b> Ця команда доступна лише адміністраторам бота.\n\n🆔 <b>Ваш Telegram ID:</b> <code>{telegram_id}</code>\n\nℹ️ <i>Щоб активувати права, додайте ваш Telegram ID у змінну ADMIN_USER_IDS на хостингу або введіть команду <code>/admin &lt;пароль&gt;</code>.</i>",
     "claim_success": "🎉 <b>Вітаємо!</b> Ви успішно активували права адміністратора бота.",
+    "btn_broadcast": "📢 Розсилка користувачам",
     "btn_test_alert": "🧪 Надіслати тест",
     "btn_export_users": "👥 Експорт користувачів (Excel/CSV)",
     "btn_export_history": "📜 Експорт історії змін (Excel/CSV)",

@@ -14,6 +14,7 @@ import { ProxyPool } from "../../proxy/proxyPool.js";
 import { NotificationDispatcher } from "../notifier/dispatcher.js";
 import { isUserAdmin } from "../../config/env.js";
 import { renderAdminText } from "../handlers/admin.js";
+import { renderBroadcastStagingText } from "../handlers/adminBroadcast.js";
 import { createBackupHandler, createUsersExportHandler, createHistoryExportHandler } from "../handlers/backup.js";
 import { ActiveDashboardRegistry } from "../liveSync/dashboardRegistry.js";
 
@@ -43,6 +44,22 @@ export function createMainMenuHierarchy(
   const subscriptionsMenu = createSubscriptionsMenu(subDao, userDao, poolStateDao, invertedIndex, historyDao, scraper, dashboardRegistry);
 
   const adminMenu = new Menu<BotContext>("admin-menu")
+    .text(
+      (ctx) => ctx.t("admin.btn_broadcast"),
+      async (ctx) => {
+        if (!isUserAdmin(ctx.from?.id, userDao, ctx.from?.username) || !dispatcher) {
+          ctx.answerCallbackQuery({ text: ctx.t("admin.unauthorized", { telegram_id: String(ctx.from?.id || 0) }), show_alert: true }).catch(() => {});
+          return;
+        }
+        await ctx.answerCallbackQuery().catch(() => {});
+        if (ctx.chat) {
+          dashboardRegistry?.updateView(ctx.chat.id, "other");
+        }
+        const { text, keyboard } = renderBroadcastStagingText(ctx, userDao, dispatcher);
+        await safeEditMessageText(ctx, text, keyboard);
+      }
+    )
+    .row()
     .text(
       (ctx) => {
         const adminUser = ctx.from ? userDao.getByTelegramId(ctx.from.id) : undefined;

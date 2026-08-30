@@ -137,8 +137,11 @@ export function createAdminKeyboard(ctx: BotContext, userDao: UserDAO): InlineKe
   const newUsersEnabled = (adminUser?.notify_admin_new_users ?? 1) === 1;
 
   const dashboardLabel = ctx.lang === "uk" ? "📊 Головний дашборд" : ctx.lang === "ru" ? "📊 Главный дашборд" : "📊 Main Dashboard";
+  const broadcastLabel = ctx.lang === "uk" ? "📢 Розсилка користувачам" : ctx.lang === "ru" ? "📢 Рассылка пользователям" : "📢 Broadcast to Users";
 
   return new InlineKeyboard()
+    .text(broadcastLabel, "admin_open_broadcast")
+    .row()
     .text(
       newUsersEnabled
         ? ctx.t("admin.btn_toggle_new_users_on")

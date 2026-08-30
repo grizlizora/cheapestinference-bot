@@ -507,23 +507,29 @@ export class NotificationDispatcher {
   }
 
   private selectNextItemDWRR(bypassUserRateLimit = false): OutgoingAlertMessage | undefined {
-    // P0 Interactive messages always take absolute immediate precedence
-    if (!this.p0Queue.isEmpty()) {
-      return this.popValidCandidate(this.p0Queue, bypassUserRateLimit);
-    }
-
+    if (this.p0Queue.isEmpty()) this.p0Deficit = 0;
     if (this.p1Queue.isEmpty()) this.p1Deficit = 0;
     if (this.p2Queue.isEmpty()) this.p2Deficit = 0;
     if (this.p3Queue.isEmpty()) this.p3Deficit = 0;
 
     // Allocate deficit quanta if all active queues are depleted of deficit
-    if (this.p1Deficit <= 0 && this.p2Deficit <= 0 && this.p3Deficit <= 0) {
-      if (!this.p1Queue.isEmpty()) this.p1Deficit += this.quantumP1;
-      if (!this.p2Queue.isEmpty()) this.p2Deficit += this.quantumP2;
-      if (!this.p3Queue.isEmpty()) this.p3Deficit += this.quantumP3;
+    if (this.p0Deficit <= 0 && this.p1Deficit <= 0 && this.p2Deficit <= 0 && this.p3Deficit <= 0) {
+      if (!this.p0Queue.isEmpty()) this.p0Deficit += this.quantumP0; // 10
+      if (!this.p1Queue.isEmpty()) this.p1Deficit += this.quantumP1; // 6
+      if (!this.p2Queue.isEmpty()) this.p2Deficit += this.quantumP2; // 3
+      if (!this.p3Queue.isEmpty()) this.p3Deficit += this.quantumP3; // 1
     }
 
-    // Drain P1
+    // Drain P0 (Admin Broadcast & Interactive)
+    if (!this.p0Queue.isEmpty() && this.p0Deficit > 0) {
+      const item = this.popValidCandidate(this.p0Queue, bypassUserRateLimit);
+      if (item) {
+        this.p0Deficit--;
+        return item;
+      }
+    }
+
+    // Drain P1 (Slot Drops)
     if (!this.p1Queue.isEmpty() && this.p1Deficit > 0) {
       const item = this.popValidCandidate(this.p1Queue, bypassUserRateLimit);
       if (item) {
@@ -532,7 +538,7 @@ export class NotificationDispatcher {
       }
     }
 
-    // Drain P2
+    // Drain P2 (Model upgrades & Prices)
     if (!this.p2Queue.isEmpty() && this.p2Deficit > 0) {
       const item = this.popValidCandidate(this.p2Queue, bypassUserRateLimit);
       if (item) {
@@ -541,7 +547,7 @@ export class NotificationDispatcher {
       }
     }
 
-    // Drain P3
+    // Drain P3 (Sold Out)
     if (!this.p3Queue.isEmpty() && this.p3Deficit > 0) {
       const item = this.popValidCandidate(this.p3Queue, bypassUserRateLimit);
       if (item) {
@@ -551,6 +557,10 @@ export class NotificationDispatcher {
     }
 
     // Fallback: Priority order
+    if (!this.p0Queue.isEmpty()) {
+      const item = this.popValidCandidate(this.p0Queue, bypassUserRateLimit);
+      if (item) return item;
+    }
     if (!this.p1Queue.isEmpty()) {
       const item = this.popValidCandidate(this.p1Queue, bypassUserRateLimit);
       if (item) return item;
@@ -565,6 +575,90 @@ export class NotificationDispatcher {
     }
 
     return undefined;
+  }
+
+  /**
+   * Dispatches a multi-language broadcast campaign in bulk with O(1) RAM user resolution,
+   * SQLite Outbox persistence, and DWRR P0 rate-limited streaming.
+   */
+  public async dispatchBroadcastBatch(
+    drafts: { uk?: string; en?: string; ru?: string },
+    options: {
+      sendSilent?: boolean;
+      filter?: "all" | "active_only" | "donors_only";
+    } = {}
+  ): Promise<{ totalEnqueued: number; statsByLang: Record<string, number> }> {
+    const filter = options.filter || "active_only";
+    const profiles = this.index.getActiveProfiles(filter);
+    const now = Date.now();
+
+    const outboxBatch: OutboxItem[] = [];
+    const statsByLang: Record<string, number> = { uk: 0, en: 0, ru: 0 };
+
+    for (const p of profiles) {
+      let chosenText = drafts[p.language];
+      let resolvedLang: SupportedLanguage = p.language;
+
+      // 4-tier fallback resolution
+      if (!chosenText || chosenText.trim().length === 0) {
+        if (drafts.en && drafts.en.trim().length > 0) {
+          chosenText = drafts.en;
+          resolvedLang = "en";
+        } else if (drafts.uk && drafts.uk.trim().length > 0) {
+          chosenText = drafts.uk;
+          resolvedLang = "uk";
+        } else if (drafts.ru && drafts.ru.trim().length > 0) {
+          chosenText = drafts.ru;
+          resolvedLang = "ru";
+        }
+      }
+
+      if (!chosenText || chosenText.trim().length === 0) continue;
+
+      statsByLang[resolvedLang] = (statsByLang[resolvedLang] || 0) + 1;
+      const isMuted = options.sendSilent ?? (p.isMuted === 1);
+      const itemId = crypto.randomUUID();
+
+      const outboxItem: OutboxItem = {
+        id: itemId,
+        userId: p.userId,
+        telegramId: p.telegramId,
+        priority: "P0",
+        messageText: chosenText,
+        disableNotification: isMuted,
+        eventType: "admin_broadcast",
+        isBroadcast: true,
+        language: resolvedLang,
+        status: "pending",
+        attempts: 0,
+      };
+      outboxBatch.push(outboxItem);
+
+      // Enqueue directly into memory queue with skipOutbox flag
+      this.p0Queue.push({
+        id: itemId,
+        telegramId: p.telegramId,
+        userId: p.userId,
+        poolSlug: "broadcast",
+        blockId: "all",
+        eventType: "admin_broadcast",
+        text: chosenText,
+        isMuted,
+        priority: "P0",
+        retries: 0,
+        enqueuedAt: now,
+      });
+    }
+
+    if (this.outboxDao && outboxBatch.length > 0) {
+      this.outboxDao.enqueueBatch(outboxBatch);
+    }
+
+    if (this.getTotalPending() > 0 && !this.isWorkerRunning) {
+      this.startWorkerLoop();
+    }
+
+    return { totalEnqueued: outboxBatch.length, statsByLang };
   }
 
   private async dispatchSingleMessage(msg: OutgoingAlertMessage): Promise<void> {

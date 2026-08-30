@@ -1,0 +1,321 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import Database from "better-sqlite3";
+import { UserDAO } from "../src/db/dao/users.js";
+import { NotificationLogDAO } from "../src/db/dao/notificationLogs.js";
+import { NotificationOutboxDAO } from "../src/db/dao/notificationOutbox.js";
+import { SubscriberInvertedIndex } from "../src/bot/notifier/subscriberIndex.js";
+import { NotificationDispatcher } from "../src/bot/notifier/dispatcher.js";
+import { Bot } from "grammy";
+import { BotContext } from "../src/types/context.js";
+
+describe("Admin Multi-Language Broadcast System", () => {
+  let db: Database.Database;
+  let userDao: UserDAO;
+  let logDao: NotificationLogDAO;
+  let outboxDao: NotificationOutboxDAO;
+  let invertedIndex: SubscriberInvertedIndex;
+  let mockBot: Bot<BotContext>;
+
+  beforeEach(() => {
+    db = new Database(":memory:");
+    db.exec(`
+      CREATE TABLE users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        telegram_id INTEGER UNIQUE NOT NULL,
+        username TEXT,
+        first_name TEXT,
+        language TEXT NOT NULL DEFAULT 'en',
+        is_active INTEGER NOT NULL DEFAULT 1,
+        is_muted INTEGER NOT NULL DEFAULT 0,
+        is_admin INTEGER NOT NULL DEFAULT 0,
+        notify_admin_new_users INTEGER NOT NULL DEFAULT 1,
+        notify_available_global INTEGER NOT NULL DEFAULT 1,
+        notify_sold_out_global INTEGER NOT NULL DEFAULT 0,
+        notify_models_global INTEGER NOT NULL DEFAULT 1,
+        notify_prices_global INTEGER NOT NULL DEFAULT 1,
+        total_donated_stars INTEGER NOT NULL DEFAULT 0,
+        last_active_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE subscriptions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        pool_slug TEXT NOT NULL,
+        block_id TEXT NOT NULL,
+        notify_on_available INTEGER NOT NULL DEFAULT 1,
+        notify_on_sold_out INTEGER NOT NULL DEFAULT 0,
+        notify_on_models INTEGER NOT NULL DEFAULT 1,
+        notify_on_prices INTEGER NOT NULL DEFAULT 1,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(user_id, pool_slug, block_id)
+      );
+
+      CREATE TABLE notification_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        pool_slug TEXT NOT NULL,
+        block_id TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE notification_outbox (
+        id TEXT PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        telegram_id INTEGER NOT NULL,
+        priority TEXT NOT NULL DEFAULT 'P1',
+        message_text TEXT NOT NULL,
+        reply_markup_json TEXT,
+        disable_notification INTEGER NOT NULL DEFAULT 0,
+        event_type TEXT NOT NULL DEFAULT 'available',
+        pool_slug TEXT,
+        block_id TEXT,
+        is_broadcast INTEGER NOT NULL DEFAULT 0,
+        language TEXT NOT NULL DEFAULT 'en',
+        status TEXT NOT NULL DEFAULT 'pending',
+        attempts INTEGER NOT NULL DEFAULT 0,
+        last_error TEXT,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        dispatched_at DATETIME
+      );
+    `);
+
+    userDao = new UserDAO(db);
+    logDao = new NotificationLogDAO(db);
+    outboxDao = new NotificationOutboxDAO(db);
+
+    // Seed users with different languages and donor statuses
+    userDao.upsertUser({
+      telegram_id: 101,
+      first_name: "Admin User",
+      username: "admin_test",
+      language: "uk",
+    });
+    db.prepare("UPDATE users SET is_admin = 1, language = 'uk' WHERE telegram_id = 101").run();
+
+    userDao.upsertUser({
+      telegram_id: 102,
+      first_name: "Donor User EN",
+      username: "donor_en",
+      language: "en",
+    });
+    db.prepare("UPDATE users SET total_donated_stars = 100, language = 'en' WHERE telegram_id = 102").run();
+
+    userDao.upsertUser({
+      telegram_id: 103,
+      first_name: "Active User RU",
+      username: "active_ru",
+      language: "ru",
+    });
+    db.prepare("UPDATE users SET language = 'ru' WHERE telegram_id = 103").run();
+
+    userDao.upsertUser({
+      telegram_id: 104,
+      first_name: "Free User UK",
+      username: "free_uk",
+      language: "uk",
+    });
+    db.prepare("UPDATE users SET language = 'uk' WHERE telegram_id = 104").run();
+
+    invertedIndex = new SubscriberInvertedIndex(db);
+
+    mockBot = {
+      api: {
+        sendMessage: vi.fn().mockResolvedValue({ message_id: 999 }),
+      },
+    } as any;
+  });
+
+  afterEach(() => {
+    db.close();
+  });
+
+  it("1. SubscriberInvertedIndex: accurately returns active profiles partitioned by language and priority", () => {
+    const profiles = invertedIndex.getActiveProfiles("active_only");
+    expect(profiles.length).toBe(4);
+
+    // Priority ordering: Admin (101) -> Donor (102) -> Free Users (103, 104)
+    expect(profiles[0].telegramId).toBe(101);
+    expect(profiles[0].isAdmin).toBe(true);
+    expect(profiles[1].telegramId).toBe(102);
+    expect(profiles[1].totalDonatedStars).toBe(100);
+
+    const ukUsers = profiles.filter((p) => p.language === "uk");
+    const enUsers = profiles.filter((p) => p.language === "en");
+    const ruUsers = profiles.filter((p) => p.language === "ru");
+
+    expect(ukUsers.length).toBe(2);
+    expect(enUsers.length).toBe(1);
+    expect(ruUsers.length).toBe(1);
+  });
+
+  it("2. NotificationOutboxDAO: batch enqueues broadcast items and preserves is_broadcast and language fields", () => {
+    outboxDao.enqueueBatch([
+      {
+        id: "bc-1",
+        userId: 1,
+        telegramId: 101,
+        priority: "P0",
+        messageText: "<b>Оновлення бота</b>",
+        disableNotification: false,
+        eventType: "admin_broadcast",
+        isBroadcast: true,
+        language: "uk",
+        status: "pending",
+        attempts: 0,
+      },
+      {
+        id: "bc-2",
+        userId: 2,
+        telegramId: 102,
+        priority: "P0",
+        messageText: "<b>Bot Update</b>",
+        disableNotification: false,
+        eventType: "admin_broadcast",
+        isBroadcast: true,
+        language: "en",
+        status: "pending",
+        attempts: 0,
+      },
+    ]);
+
+    const pending = outboxDao.getPending(10);
+    expect(pending.length).toBe(2);
+    expect(pending[0].isBroadcast).toBe(true);
+    expect(pending[0].language).toBe("uk");
+    expect(pending[1].isBroadcast).toBe(true);
+    expect(pending[1].language).toBe("en");
+  });
+
+  it("3. NotificationDispatcher: dispatchBroadcastBatch distributes localized texts and enqueues to P0 queue", async () => {
+    const dispatcher = new NotificationDispatcher(
+      mockBot,
+      userDao,
+      logDao,
+      undefined,
+      invertedIndex,
+      undefined,
+      outboxDao
+    );
+
+    const drafts = {
+      uk: "📢 <b>Оновлення для українських користувачів!</b>",
+      en: "📢 <b>Update for English users!</b>",
+      ru: "📢 <b>Обновление для русских пользователей!</b>",
+    };
+
+    const res = await dispatcher.dispatchBroadcastBatch(drafts, {
+      sendSilent: false,
+      filter: "active_only",
+    });
+
+    expect(res.totalEnqueued).toBe(4);
+    expect(res.statsByLang.uk).toBe(2);
+    expect(res.statsByLang.en).toBe(1);
+    expect(res.statsByLang.ru).toBe(1);
+
+    // Verify persisted in SQLite Outbox
+    const outboxRows = outboxDao.getPending(10);
+    expect(outboxRows.length).toBe(4);
+
+    const ukOutbox = outboxRows.find((r) => r.telegramId === 101);
+    expect(ukOutbox?.messageText).toContain("Оновлення для українських користувачів");
+    expect(ukOutbox?.language).toBe("uk");
+
+    const enOutbox = outboxRows.find((r) => r.telegramId === 102);
+    expect(enOutbox?.messageText).toContain("Update for English users");
+    expect(enOutbox?.language).toBe("en");
+  });
+
+  it("4. NotificationDispatcher: applies 4-tier language fallback when specific language draft is missing", async () => {
+    const dispatcher = new NotificationDispatcher(
+      mockBot,
+      userDao,
+      logDao,
+      undefined,
+      invertedIndex,
+      undefined,
+      outboxDao
+    );
+
+    // Only English draft provided
+    const drafts = {
+      en: "📢 <b>Global Announcement in English</b>",
+    };
+
+    const res = await dispatcher.dispatchBroadcastBatch(drafts, {
+      sendSilent: false,
+      filter: "active_only",
+    });
+
+    expect(res.totalEnqueued).toBe(4);
+    // All 4 users received English draft as fallback
+    expect(res.statsByLang.en).toBe(4);
+
+    const outboxRows = outboxDao.getPending(10);
+    for (const row of outboxRows) {
+      expect(row.messageText).toBe("📢 <b>Global Announcement in English</b>");
+      expect(row.language).toBe("en");
+    }
+  });
+
+  it("5. DWRR Scheduler: interleaves P0 broadcast items with P1 slot drops to ensure zero starvation of hot slots", async () => {
+    const dispatcher = new NotificationDispatcher(
+      mockBot,
+      userDao,
+      logDao,
+      undefined,
+      invertedIndex,
+      undefined,
+      outboxDao
+    );
+
+    // Populate P0 with broadcast items
+    for (let i = 0; i < 20; i++) {
+      (dispatcher as any).p0Queue.push({
+        id: `bc-${i}`,
+        telegramId: 1000 + i,
+        userId: i,
+        poolSlug: "broadcast",
+        blockId: "all",
+        eventType: "admin_broadcast",
+        text: `Broadcast message ${i}`,
+        isMuted: false,
+        priority: "P0",
+        retries: 0,
+        enqueuedAt: Date.now(),
+      });
+    }
+
+    // Populate P1 with a hot slot drop
+    (dispatcher as any).p1Queue.push({
+      id: "slot-drop-1",
+      telegramId: 9999,
+      userId: 9999,
+      poolSlug: "flagship-supercluster",
+      blockId: "europe",
+      eventType: "available",
+      text: "⚡ <b>Гарячий слот відкрився!</b>",
+      isMuted: false,
+      priority: "P1",
+      retries: 0,
+      enqueuedAt: Date.now(),
+    });
+
+    // Run DWRR selector multiple times
+    const poppedPriorities: string[] = [];
+    for (let i = 0; i < 15; i++) {
+      const item = (dispatcher as any).selectNextItemDWRR(true);
+      if (item) {
+        poppedPriorities.push(item.priority);
+      }
+    }
+
+    // Must have popped P0 items AND the P1 slot drop item during the cycle without waiting for all 20 P0 items to finish!
+    expect(poppedPriorities).toContain("P0");
+    expect(poppedPriorities).toContain("P1");
+  });
+});

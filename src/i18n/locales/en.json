@@ -205,6 +205,7 @@
     "stats_title": "📊 <b>Admin Dashboard & Telemetry</b>\n\n🟢 <b>System Status:</b> {status}\n⏱ <b>Uptime:</b> {uptime}\n\n👥 <b>Users:</b>\n• Total Registered: <b>{total_users}</b>\n• Active Watchers: <b>{active_users}</b>\n• Blocked Bot: <b>{blocked_users}</b>\n• Active Subscription Rules: <b>{active_subscriptions}</b>\n\n🕷 <b>Scraper & Anti-Ban:</b>\n• Last Scrape: <b>{last_scrape_ago}</b> (Latency: {latency}ms)\n• Source: <code>{source}</code>\n• Consecutive Errors: <b>{consecutive_failures}</b>\n• Tor / Proxy Status: <b>{proxy_status}</b>\n\n💾 <b>Process Memory:</b> <b>{memory_mb} MB</b>\n🔔 <b>New User Notifications:</b> <b>{new_users_status}</b>",
     "unauthorized": "⛔ <b>Access Restricted.</b> This command is restricted to bot administrators.\n\n🆔 <b>Your Telegram ID:</b> <code>{telegram_id}</code>\n\nℹ️ <i>To gain access, add your Telegram ID to ADMIN_USER_IDS in host settings or run <code>/admin &lt;secret&gt;</code>.</i>",
     "claim_success": "🎉 <b>Congratulations!</b> You have successfully claimed admin privileges.",
+    "btn_broadcast": "📢 Broadcast to Users",
     "btn_test_alert": "🧪 Send Test Alert",
     "btn_export_users": "👥 Export Users (Excel/CSV)",
     "btn_export_history": "📜 Export History (Excel/CSV)",

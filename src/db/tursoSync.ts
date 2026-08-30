@@ -279,6 +279,8 @@ export class TursoCloudSync {
         "ALTER TABLE active_dashboards ADD COLUMN consecutive_errors INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE active_dashboards ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
         "ALTER TABLE active_dashboards ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
+        "ALTER TABLE notification_outbox ADD COLUMN is_broadcast INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE notification_outbox ADD COLUMN language TEXT NOT NULL DEFAULT 'en'",
       ];
       for (const sql of migrations) {
         await this.executePipeline([{ type: "execute", stmt: { sql } }]).catch(() => {});
