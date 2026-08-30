@@ -380,19 +380,6 @@ export function createMainMenuHierarchy(
       }
     })
     .text(
-      (ctx) => ctx.t("menu.btn_subscriptions"),
-      async (ctx) => {
-        await ctx.answerCallbackQuery().catch(() => {});
-        if (ctx.chat) {
-          const msgId = ctx.callbackQuery?.message?.message_id;
-          dashboardRegistry?.updateView(ctx.chat.id, "subscriptions", undefined, ctx.lang, msgId, ctx.user?.id);
-        }
-        await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
-        return ctx.menu.nav("subscriptions-menu");
-      }
-    )
-    .row()
-    .text(
       (ctx) => ctx.t("common.refresh"),
       async (ctx) => {
         const startTime = Date.now();

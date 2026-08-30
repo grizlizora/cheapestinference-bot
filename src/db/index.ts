@@ -79,6 +79,7 @@ export function initSchema(db: Database.Database): void {
       notify_on_models INTEGER NOT NULL DEFAULT 1,
       notify_on_prices INTEGER NOT NULL DEFAULT 1,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
       UNIQUE(user_id, pool_slug, block_id)
     );
@@ -276,6 +277,9 @@ export function initSchema(db: Database.Database): void {
   } catch {}
   try {
     db.exec(`ALTER TABLE notification_outbox ADD COLUMN file_id TEXT;`);
+  } catch {}
+  try {
+    db.exec(`ALTER TABLE subscriptions ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP;`);
   } catch {}
   try {
     db.exec(`CREATE INDEX IF NOT EXISTS idx_users_admins ON users(telegram_id) WHERE is_admin = 1 AND is_active = 1;`);

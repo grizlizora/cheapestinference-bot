@@ -103,6 +103,7 @@ export class PoolStateDAO {
               description = excluded.description,
               infra_spec = excluded.infra_spec,
               manual_provisioning = excluded.manual_provisioning,
+              last_changed_at = CASE WHEN pool_state.status != excluded.status THEN CURRENT_TIMESTAMP ELSE pool_state.last_changed_at END,
               updated_at = CURRENT_TIMESTAMP`,
             [
               pool.slug,
