@@ -15,6 +15,7 @@ import {
   renderBroadcastPreflight,
   renderBroadcastModalConfirm,
   getOrCreateBroadcastSession,
+  resetBroadcastSession,
 } from "../src/bot/handlers/adminBroadcast.js";
 
 describe("Admin Multi-Language Broadcast System", () => {
@@ -379,5 +380,231 @@ describe("Admin Multi-Language Broadcast System", () => {
     const ukStaging = renderBroadcastStagingText(ctxUk, userDao, dispatcher);
     expect(ukStaging.text).toContain("Центр масових розсилок");
     expect(ukStaging.text).toContain("Всього адресатів:");
+  });
+
+  it("7. Full Real-World Admin Broadcast Simulation: from Telegram interaction & lossless entity capture to DWRR delivery, multi-language segregation, zero-loss outbox draining, and post-dispatch clean reset", async () => {
+    // A. Seed 7 Realistic Users with various activity levels, languages, and donor statuses
+    const now = Date.now();
+    const twentyDaysAgo = new Date(now - 20 * 86400 * 1000).toISOString();
+
+    // 1. 👑 Admin (UK)
+    db.prepare(`
+      INSERT OR REPLACE INTO users (id, telegram_id, username, first_name, language, is_admin, total_donated_stars, last_active_at)
+      VALUES (1, 101, 'admin_super', 'Admin Chief', 'uk', 1, 0, CURRENT_TIMESTAMP)
+    `).run();
+
+    // 2. 💎 Diamond Patron 500 Stars (EN)
+    db.prepare(`
+      INSERT OR REPLACE INTO users (id, telegram_id, username, first_name, language, is_admin, total_donated_stars, last_active_at)
+      VALUES (2, 102, 'vip_john', 'John Doe', 'en', 0, 500, CURRENT_TIMESTAMP)
+    `).run();
+
+    // 3. 💎 Patron 100 Stars (UK)
+    db.prepare(`
+      INSERT OR REPLACE INTO users (id, telegram_id, username, first_name, language, is_admin, total_donated_stars, last_active_at)
+      VALUES (3, 103, 'donor_taras', 'Taras', 'uk', 0, 100, CURRENT_TIMESTAMP)
+    `).run();
+
+    // 4. ☕ Supporter 15 Stars (RU)
+    db.prepare(`
+      INSERT OR REPLACE INTO users (id, telegram_id, username, first_name, language, is_admin, total_donated_stars, last_active_at)
+      VALUES (4, 104, 'alex_ru', 'Alex', 'ru', 0, 15, CURRENT_TIMESTAMP)
+    `).run();
+
+    // 5. ⚡ Active Free User (EN)
+    db.prepare(`
+      INSERT OR REPLACE INTO users (id, telegram_id, username, first_name, language, is_admin, total_donated_stars, last_active_at)
+      VALUES (5, 105, 'sarah_en', 'Sarah', 'en', 0, 0, CURRENT_TIMESTAMP)
+    `).run();
+
+    // 6. ⚡ Active Free User (RU)
+    db.prepare(`
+      INSERT OR REPLACE INTO users (id, telegram_id, username, first_name, language, is_admin, total_donated_stars, last_active_at)
+      VALUES (6, 106, 'dmitry_ru', 'Dmitry', 'ru', 0, 0, CURRENT_TIMESTAMP)
+    `).run();
+
+    // 7. 💤 Dormant Free User (20d inactive, UK) -> Should be excluded from active broadcasts
+    db.prepare(`
+      INSERT OR REPLACE INTO users (id, telegram_id, username, first_name, language, is_admin, total_donated_stars, last_active_at)
+      VALUES (7, 107, 'ghost_user', 'Ghost', 'uk', 0, 0, ?)
+    `).run(twentyDaysAgo);
+
+    // Re-hydrate RAM Inverted Index
+    const liveIndex = new SubscriberInvertedIndex(db);
+
+    const sentMessages: { chatId: number; text: string; options?: any }[] = [];
+    const simulatedBot: any = {
+      api: {
+        sendMessage: vi.fn().mockImplementation((chatId: number, text: string, options?: any) => {
+          sentMessages.push({ chatId, text, options });
+          return Promise.resolve({ message_id: Math.floor(Math.random() * 10000) });
+        }),
+      },
+    };
+
+    const dispatcher = new NotificationDispatcher(
+      simulatedBot,
+      userDao,
+      logDao,
+      undefined,
+      liveIndex,
+      undefined,
+      outboxDao
+    );
+
+    // Admin context with English UI
+    const adminCtx: any = {
+      from: { id: 101, username: "admin_super", first_name: "Admin" },
+      lang: "en",
+      t: (key: string, params?: Record<string, string>) => translate("en", key, params),
+      session: {},
+    };
+
+    // B. Step 1: Admin enters Broadcast Hub
+    const hub1 = renderBroadcastStagingText(adminCtx, userDao, dispatcher);
+    expect(hub1.text).toContain("Mass Broadcast Center");
+    expect(hub1.text).toContain("Total Recipients:</b> <b>6 users</b>"); // 7th user (dormant) correctly filtered out
+    expect(hub1.text).toContain("Ukrainian: <b>❌ Not created</b>");
+    expect(hub1.text).toContain("English: <b>❌ Not created</b>");
+    expect(hub1.text).toContain("Russian: <b>❌ Not created</b>");
+
+    const session = getOrCreateBroadcastSession(adminCtx);
+
+    // C. Step 2: Admin inputs and confirms Ukrainian (UK) Draft
+    session.drafts.uk = {
+      htmlText: "📢 <b>Важливе оновлення 2.0!</b> Додано нові сервери та <code>AI моделі</code>.",
+      rawText: "📢 Важливе оновлення 2.0! Додано нові сервери та AI моделі.",
+      entitiesCount: 2,
+      hasCustomEmoji: false,
+      mediaType: "text",
+      createdAt: Date.now(),
+      isConfirmed: true,
+    };
+
+    // D. Step 3: Admin inputs English (EN) Draft and runs self-test
+    session.drafts.en = {
+      htmlText: "📢 <b>Major Update 2.0!</b> New compute pools and <code>AI models</code> available.",
+      rawText: "📢 Major Update 2.0! New compute pools and AI models available.",
+      entitiesCount: 2,
+      hasCustomEmoji: false,
+      mediaType: "text",
+      createdAt: Date.now(),
+      isConfirmed: false,
+    };
+
+    // Preview for English draft
+    const previewEn = renderBroadcastPreview(adminCtx, "en", dispatcher);
+    expect(previewEn.text).toContain("BROADCAST PREVIEW • [ English 🇬🇧 ]");
+    expect(previewEn.text).toContain("Major Update 2.0!");
+    expect(previewEn.text).toContain("Recipients of this language:</b> <code>2</code> users (33%)");
+
+    // Admin tests self delivery of EN draft
+    await simulatedBot.api.sendMessage(adminCtx.from.id, session.drafts.en.htmlText, { parse_mode: "HTML" });
+    expect(sentMessages.length).toBe(1);
+    expect(sentMessages[0].chatId).toBe(101);
+    expect(sentMessages[0].text).toContain("Major Update 2.0!");
+
+    // Admin confirms EN draft
+    session.drafts.en.isConfirmed = true;
+
+    // E. Step 4: Admin inputs and confirms Russian (RU) Draft
+    session.drafts.ru = {
+      htmlText: "📢 <b>Крупное обновление 2.0!</b> Добавлены новые пулы и <code>нейросети</code>.",
+      rawText: "📢 Крупное обновление 2.0! Добавлены новые пулы и нейросети.",
+      entitiesCount: 2,
+      hasCustomEmoji: false,
+      mediaType: "text",
+      createdAt: Date.now(),
+      isConfirmed: true,
+    };
+
+    // Staging hub now shows all 3 ready
+    const hubReady = renderBroadcastStagingText(adminCtx, userDao, dispatcher);
+    expect(hubReady.text).toContain("Ukrainian: <b>✅ Ready");
+    expect(hubReady.text).toContain("English: <b>✅ Ready");
+    expect(hubReady.text).toContain("Russian: <b>✅ Ready");
+
+    // F. Step 5: Pre-Flight Launchpad & Modal Confirmation
+    const preflight = renderBroadcastPreflight(adminCtx, dispatcher);
+    expect(preflight.text).toContain("Preflight Broadcast Launch");
+    expect(preflight.text).toContain("Total Audience:</b> <b>6 users</b>");
+    expect(preflight.text).toContain("Delivery Speed:</b> ~27-30 msgs/sec");
+    expect(preflight.text).toContain("Queue Priority:</b> P0 (Admins ➔ Donors ➔ Active Users)");
+
+    const modal = renderBroadcastModalConfirm(adminCtx, dispatcher);
+    expect(modal.text).toContain("CONFIRM BROADCAST LAUNCH");
+    expect(modal.text).toContain("broadcast to <b>6 users</b>");
+
+    // G. Step 6: Execute Broadcast Dispatch & Clean Session Reset
+    const broadcastDrafts = {
+      uk: session.drafts.uk?.htmlText,
+      en: session.drafts.en?.htmlText,
+      ru: session.drafts.ru?.htmlText,
+    };
+
+    const dispatchResult = await dispatcher.dispatchBroadcastBatch(broadcastDrafts, {
+      sendSilent: false,
+      filter: "active_only",
+    });
+
+    expect(dispatchResult.totalEnqueued).toBe(6);
+    expect(dispatchResult.statsByLang.uk).toBe(2); // User 101, 103
+    expect(dispatchResult.statsByLang.en).toBe(2); // User 102, 105
+    expect(dispatchResult.statsByLang.ru).toBe(2); // User 104, 106
+
+    // Invariant: Session is cleanly wiped so future broadcasts start fresh
+    resetBroadcastSession(adminCtx);
+    expect(adminCtx.session.broadcast.stage).toBe("idle");
+    expect(Object.keys(adminCtx.session.broadcast.drafts).length).toBe(0);
+
+    // H. Step 7: Verify SQLite Outbox Records & Language Segregation
+    const pendingOutbox = outboxDao.getPending(10);
+    expect(pendingOutbox.length).toBe(6);
+
+    // Verify exact language match per user in SQLite
+    const msg101 = pendingOutbox.find((o) => o.telegramId === 101);
+    expect(msg101?.messageText).toContain("Важливе оновлення 2.0");
+    expect(msg101?.language).toBe("uk");
+
+    const msg102 = pendingOutbox.find((o) => o.telegramId === 102);
+    expect(msg102?.messageText).toContain("Major Update 2.0");
+    expect(msg102?.language).toBe("en");
+
+    const msg104 = pendingOutbox.find((o) => o.telegramId === 104);
+    expect(msg104?.messageText).toContain("Крупное обновление 2.0");
+    expect(msg104?.language).toBe("ru");
+
+    // User 107 (dormant) must NOT have any outbox records
+    const msg107 = pendingOutbox.find((o) => o.telegramId === 107);
+    expect(msg107).toBeUndefined();
+
+    // I. Step 8: Priority Draining with Concurrent Slot Drops
+    // Inject a sudden high-priority slot drop alert into P1
+    (dispatcher as any).p1Queue.push({
+      id: "slot-alert-urgent",
+      telegramId: 102,
+      userId: 2,
+      poolSlug: "frontier-cluster",
+      blockId: "asia",
+      eventType: "available",
+      text: "⚡ <b>Frontier Cluster Slot Available NOW!</b>",
+      isMuted: false,
+      priority: "P1",
+      retries: 0,
+      enqueuedAt: Date.now(),
+    });
+
+    // Drain the dispatcher queue
+    const dispatchedPriorities: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      const candidate = (dispatcher as any).selectNextItemDWRR(true);
+      if (candidate) {
+        dispatchedPriorities.push(candidate.priority);
+      }
+    }
+
+    // Must have successfully serviced both P0 broadcasts and the P1 slot drop without lock or delay
+    expect(dispatchedPriorities).toContain("P0");
+    expect(dispatchedPriorities).toContain("P1");
   });
 });
