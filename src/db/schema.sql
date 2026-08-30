@@ -186,6 +186,8 @@ CREATE TABLE IF NOT EXISTS notification_outbox (
   event_type TEXT NOT NULL DEFAULT 'available',
   pool_slug TEXT,
   block_id TEXT,
+  is_broadcast INTEGER NOT NULL DEFAULT 0,
+  language TEXT NOT NULL DEFAULT 'en',
   status TEXT NOT NULL DEFAULT 'pending',
   attempts INTEGER NOT NULL DEFAULT 0,
   last_error TEXT,
@@ -195,4 +197,5 @@ CREATE TABLE IF NOT EXISTS notification_outbox (
 
 CREATE INDEX IF NOT EXISTS idx_outbox_pending ON notification_outbox(status, priority, created_at) WHERE status = 'pending';
 CREATE INDEX IF NOT EXISTS idx_outbox_user ON notification_outbox(user_id);
+CREATE INDEX IF NOT EXISTS idx_outbox_broadcast ON notification_outbox(is_broadcast, language, status);
 

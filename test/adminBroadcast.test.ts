@@ -7,6 +7,15 @@ import { SubscriberInvertedIndex } from "../src/bot/notifier/subscriberIndex.js"
 import { NotificationDispatcher } from "../src/bot/notifier/dispatcher.js";
 import { Bot } from "grammy";
 import { BotContext } from "../src/types/context.js";
+import { translate } from "../src/i18n/index.js";
+import {
+  renderBroadcastStagingText,
+  renderBroadcastPromptText,
+  renderBroadcastPreview,
+  renderBroadcastPreflight,
+  renderBroadcastModalConfirm,
+  getOrCreateBroadcastSession,
+} from "../src/bot/handlers/adminBroadcast.js";
 
 describe("Admin Multi-Language Broadcast System", () => {
   let db: Database.Database;
@@ -317,5 +326,58 @@ describe("Admin Multi-Language Broadcast System", () => {
     // Must have popped P0 items AND the P1 slot drop item during the cycle without waiting for all 20 P0 items to finish!
     expect(poppedPriorities).toContain("P0");
     expect(poppedPriorities).toContain("P1");
+  });
+
+  it("6. Admin Broadcast UI Localization: renders all screens in admin's selected interface language (EN, RU, UK)", () => {
+    const dispatcher = new NotificationDispatcher(
+      mockBot,
+      userDao,
+      logDao,
+      undefined,
+      invertedIndex,
+      undefined,
+      outboxDao
+    );
+
+    // Context with English interface language
+    const ctxEn: any = {
+      lang: "en",
+      t: (key: string, params?: Record<string, string>) => translate("en", key, params),
+      session: {},
+    };
+
+    const enStaging = renderBroadcastStagingText(ctxEn, userDao, dispatcher);
+    expect(enStaging.text).toContain("Mass Broadcast Center");
+    expect(enStaging.text).toContain("Total Recipients:");
+
+    const enPrompt = renderBroadcastPromptText("uk", ctxEn);
+    expect(enPrompt).toContain("Enter Message Content [ Українська 🇺🇦 ]");
+    expect(enPrompt).toContain("100% Telegram formatting supported:");
+
+    // Context with Russian interface language
+    const ctxRu: any = {
+      lang: "ru",
+      t: (key: string, params?: Record<string, string>) => translate("ru", key, params),
+      session: {},
+    };
+
+    const ruStaging = renderBroadcastStagingText(ctxRu, userDao, dispatcher);
+    expect(ruStaging.text).toContain("Центр массовых рассылок");
+    expect(ruStaging.text).toContain("Всего адресатов:");
+
+    const ruPrompt = renderBroadcastPromptText("en", ctxRu);
+    expect(ruPrompt).toContain("Ввод текста сообщения [ English 🇬🇧 ]");
+    expect(ruPrompt).toContain("Поддерживается 100% форматирование Telegram:");
+
+    // Context with Ukrainian interface language
+    const ctxUk: any = {
+      lang: "uk",
+      t: (key: string, params?: Record<string, string>) => translate("uk", key, params),
+      session: {},
+    };
+
+    const ukStaging = renderBroadcastStagingText(ctxUk, userDao, dispatcher);
+    expect(ukStaging.text).toContain("Центр масових розсилок");
+    expect(ukStaging.text).toContain("Всього адресатів:");
   });
 });

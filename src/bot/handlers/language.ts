@@ -3,6 +3,9 @@ import { renderChangeLanguageText } from "../views/dashboardView.js";
 
 export function createLanguageHandler(languageMenu: any) {
   return async (ctx: BotContext) => {
+    if (ctx.session) {
+      ctx.session.fromSettings = undefined;
+    }
     await ctx.reply(renderChangeLanguageText(ctx), {
       reply_markup: languageMenu,
       parse_mode: "HTML",

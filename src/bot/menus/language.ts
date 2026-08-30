@@ -35,12 +35,16 @@ export function createLanguageMenu(
       delete ctx.session.pendingDeepLink;
       if (pendingDeepLink.startsWith("pool_")) {
         const slug = pendingDeepLink.replace("pool_", "");
-        ctx.session.tempPoolSlug = slug;
-        if (ctx.chat && msgId && dashboardRegistry) {
-          dashboardRegistry.register(ctx.chat.id, msgId, ctx.user.id, lang, "pool_detail", slug);
+        const knownPools = poolStateDao.getPoolSummaries();
+        const poolExists = knownPools.some((p) => p.slug === slug);
+        if (poolExists) {
+          ctx.session.tempPoolSlug = slug;
+          if (ctx.chat && msgId && dashboardRegistry) {
+            dashboardRegistry.register(ctx.chat.id, msgId, ctx.user.id, lang, "pool_detail", slug);
+          }
+          await safeEditMessageText(ctx, renderPoolDetailText(ctx, poolStateDao, historyDao, scraper));
+          return ctx.menu.nav("pool-detail-menu");
         }
-        await safeEditMessageText(ctx, renderPoolDetailText(ctx, poolStateDao, historyDao, scraper));
-        return ctx.menu.nav("pool-detail-menu");
       }
       if ((pendingDeepLink === "alerts" || pendingDeepLink === "subscriptions") && subDao) {
         if (ctx.chat && msgId && dashboardRegistry) {

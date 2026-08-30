@@ -327,11 +327,15 @@ export function createTelegramBot(
     { registry: activeDashboardRegistry }
   );
 
-  // Reset custom stars donation state on any slash command
+  // Reset custom stars donation and staging states on any slash command
   bot.use(async (ctx, next) => {
     if (ctx.message?.text?.startsWith("/") && ctx.session) {
       ctx.session.waitingForCustomStars = false;
       ctx.session.pendingCustomStars = undefined;
+      ctx.session.fromSettings = undefined;
+      if (ctx.session.broadcast?.stage === "awaiting_text") {
+        ctx.session.broadcast.stage = "idle";
+      }
     }
     await next();
   });
@@ -482,8 +486,8 @@ export function createTelegramBot(
     session.stage = "awaiting_text";
     session.activeEditLang = lang;
 
-    const promptText = renderBroadcastPromptText(lang);
-    const cancelKeyboard = new InlineKeyboard().text("◀️ Скасувати введення", "admin_bc_hub");
+    const promptText = renderBroadcastPromptText(lang, ctx);
+    const cancelKeyboard = new InlineKeyboard().text(ctx.t("admin.broadcast.btn_cancel_input"), "admin_bc_hub");
     await safeEditMessageText(ctx, promptText, cancelKeyboard);
   });
 
@@ -495,7 +499,7 @@ export function createTelegramBot(
       session.drafts[lang]!.isConfirmed = true;
     }
     session.stage = "language_select";
-    await ctx.answerCallbackQuery({ text: `✅ Чернетку для ${lang.toUpperCase()} збережено!` }).catch(() => {});
+    await ctx.answerCallbackQuery({ text: ctx.t("admin.broadcast.toast_draft_saved", { lang: lang.toUpperCase() }) }).catch(() => {});
     const { text, keyboard } = renderBroadcastStagingText(ctx, userDao, dispatcher);
     await safeEditMessageText(ctx, text, keyboard);
   });
@@ -510,9 +514,9 @@ export function createTelegramBot(
         parse_mode: "HTML",
         link_preview_options: { is_disabled: true },
       }).catch(() => {});
-      await ctx.answerCallbackQuery({ text: `🧪 Тестове повідомлення (${lang.toUpperCase()}) надіслано!` }).catch(() => {});
+      await ctx.answerCallbackQuery({ text: ctx.t("admin.broadcast.toast_test_sent", { lang: lang.toUpperCase() }) }).catch(() => {});
     } else {
-      await ctx.answerCallbackQuery({ text: "❌ Чернетка порожня", show_alert: true }).catch(() => {});
+      await ctx.answerCallbackQuery({ text: ctx.t("admin.broadcast.toast_draft_empty"), show_alert: true }).catch(() => {});
     }
   });
 
@@ -531,7 +535,7 @@ export function createTelegramBot(
         sentCount++;
       }
     }
-    await ctx.answerCallbackQuery({ text: `🧪 Надіслано ${sentCount} тестових повідомлень!` }).catch(() => {});
+    await ctx.answerCallbackQuery({ text: ctx.t("admin.broadcast.toast_test_all_sent", { count: String(sentCount) }) }).catch(() => {});
   });
 
   bot.callbackQuery("admin_bc_toggle_silent", async (ctx) => {
@@ -539,7 +543,7 @@ export function createTelegramBot(
     const session = getOrCreateBroadcastSession(ctx);
     session.sendSilent = !session.sendSilent;
     await ctx.answerCallbackQuery({
-      text: session.sendSilent ? "🔕 Сповіщення надходитимуть без звуку" : "🔔 Сповіщення надходитимуть зі звуком",
+      text: session.sendSilent ? ctx.t("admin.broadcast.toast_silent_on") : ctx.t("admin.broadcast.toast_silent_off"),
     }).catch(() => {});
     const { text, keyboard } = renderBroadcastStagingText(ctx, userDao, dispatcher);
     await safeEditMessageText(ctx, text, keyboard);
@@ -550,14 +554,14 @@ export function createTelegramBot(
     const session = getOrCreateBroadcastSession(ctx);
     session.drafts = {};
     session.stage = "language_select";
-    await ctx.answerCallbackQuery({ text: "🗑 Усі чернетки очищено" }).catch(() => {});
+    await ctx.answerCallbackQuery({ text: ctx.t("admin.broadcast.toast_cleared") }).catch(() => {});
     const { text, keyboard } = renderBroadcastStagingText(ctx, userDao, dispatcher);
     await safeEditMessageText(ctx, text, keyboard);
   });
 
   bot.callbackQuery("admin_bc_staging_noop", async (ctx) => {
     await ctx.answerCallbackQuery({
-      text: "⏳ Підготуйте хоча б одну чернетку (UK або EN) для запуску розсилки.",
+      text: ctx.t("admin.broadcast.toast_noop_warning"),
       show_alert: true,
     }).catch(() => {});
   });
@@ -585,7 +589,7 @@ export function createTelegramBot(
       ru: session.drafts.ru?.htmlText,
     };
 
-    await ctx.answerCallbackQuery({ text: "🚀 Розсилку запущено у фоновому режимі!" }).catch(() => {});
+    await ctx.answerCallbackQuery({ text: ctx.t("admin.broadcast.toast_dispatched") }).catch(() => {});
 
     const result = await dispatcher.dispatchBroadcastBatch(drafts, {
       sendSilent: session.sendSilent,
@@ -596,17 +600,17 @@ export function createTelegramBot(
     resetBroadcastSession(ctx);
 
     const completionText =
-      `✅ <b>Масову розсилку успішно передано до черги відправки!</b>\n\n` +
-      `📊 <b>Статистика черги:</b>\n` +
-      `• 👥 Всього адресатів: <b>${result.totalEnqueued}</b>\n` +
-      `• 🇺🇦 UK: <b>${result.statsByLang.uk || 0}</b>\n` +
-      `• 🇬🇧 EN: <b>${result.statsByLang.en || 0}</b>\n` +
-      `• 🇷🇺 RU: <b>${result.statsByLang.ru || 0}</b>\n` +
-      `• ⚡ Швидкість відправки: ~27-30 повідомлень/сек\n` +
-      `• 🎯 Пріоритет: <b>P0 (Найвищий)</b> з захистом від блокування слотів\n\n` +
-      `<i>Усі чернетки автоматично скинуто. Ви можете створити наступну нову розсилку в будь-який час.</i>`;
+      `${ctx.t("admin.broadcast.completion_title")}\n\n` +
+      `${ctx.t("admin.broadcast.completion_stats_header")}\n` +
+      `${ctx.t("admin.broadcast.completion_total", { total: String(result.totalEnqueued) })}\n` +
+      `${ctx.t("admin.broadcast.completion_uk", { count: String(result.statsByLang.uk || 0) })}\n` +
+      `${ctx.t("admin.broadcast.completion_en", { count: String(result.statsByLang.en || 0) })}\n` +
+      `${ctx.t("admin.broadcast.completion_ru", { count: String(result.statsByLang.ru || 0) })}\n` +
+      `${ctx.t("admin.broadcast.completion_speed")}\n` +
+      `${ctx.t("admin.broadcast.completion_priority")}\n\n` +
+      `${ctx.t("admin.broadcast.completion_footer")}`;
 
-    const keyboard = new InlineKeyboard().text("📊 До адмін-панелі", "admin_refresh");
+    const keyboard = new InlineKeyboard().text(ctx.t("admin.broadcast.btn_to_admin"), "admin_refresh");
     await safeEditMessageText(ctx, completionText, keyboard);
   });
 
@@ -777,7 +781,7 @@ export function createTelegramBot(
         const extracted = extractMessageContent(ctx.message);
 
         if (!extracted.rawText || extracted.rawText.trim().length === 0) {
-          await ctx.reply("⚠️ Повідомлення не містить тексту. Будь ласка, надішліть текст або медіа з підписом.");
+          await ctx.reply(ctx.t("admin.broadcast.toast_empty_input"));
           return;
         }
 

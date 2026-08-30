@@ -19,8 +19,8 @@ export function getDatabase(): Database.Database {
   dbInstance.pragma("journal_mode = WAL");
   dbInstance.pragma("synchronous = NORMAL");
   dbInstance.pragma("foreign_keys = ON");
-  dbInstance.pragma("cache_size = -2000"); // 2MB RAM cache (optimal for constrained cgroups)
-  dbInstance.pragma("mmap_size = 33554432"); // 32MB Memory-Mapped I/O
+  dbInstance.pragma("cache_size = -16000"); // 16MB RAM cache for instant B-tree traversals
+  dbInstance.pragma("mmap_size = 67108864"); // 64MB Memory-Mapped I/O
   dbInstance.pragma("busy_timeout = 5000"); // 5s timeout on lock
   dbInstance.pragma("temp_store = MEMORY");
   dbInstance.pragma("wal_autocheckpoint = 1000");

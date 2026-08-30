@@ -7,7 +7,6 @@ import { InlineKeyboard } from "grammy";
 import { BotContext, BroadcastSessionState } from "../../types/context.js";
 import { UserDAO } from "../../db/dao/users.js";
 import { NotificationDispatcher } from "../notifier/dispatcher.js";
-import { extractMessageContent } from "../notifier/telegramEntitySerializer.js";
 import { SupportedLanguage } from "../../types/db.js";
 import { icon } from "../views/iconTheme.js";
 
@@ -39,7 +38,6 @@ export function renderBroadcastStagingText(
 ): { text: string; keyboard: InlineKeyboard } {
   const session = getOrCreateBroadcastSession(ctx);
   const index = dispatcher.getInvertedIndex();
-  const allProfiles = index.getActiveProfiles("all");
   const activeProfiles = index.getActiveProfiles(session.filter || "active_only");
 
   const countUk = activeProfiles.filter((p) => p.language === "uk").length;
@@ -52,65 +50,84 @@ export function renderBroadcastStagingText(
   const ruDraft = session.drafts.ru;
 
   const ukStatus = ukDraft?.isConfirmed
-    ? `✅ Готово (${ukDraft.rawText.length} симв.)`
-    : `❌ Не створено`;
+    ? ctx.t("admin.broadcast.status_ready", { chars: String(ukDraft.rawText.length) })
+    : ctx.t("admin.broadcast.status_not_created");
   const enStatus = enDraft?.isConfirmed
-    ? `✅ Ready (${enDraft.rawText.length} chars)`
-    : `❌ Not created`;
+    ? ctx.t("admin.broadcast.status_ready", { chars: String(enDraft.rawText.length) })
+    : ctx.t("admin.broadcast.status_not_created");
   const ruStatus = ruDraft?.isConfirmed
-    ? `✅ Готово (${ruDraft.rawText.length} симв.)`
-    : `❌ Не создано`;
+    ? ctx.t("admin.broadcast.status_ready", { chars: String(ruDraft.rawText.length) })
+    : ctx.t("admin.broadcast.status_not_created");
 
   const confirmedCount = [ukDraft, enDraft, ruDraft].filter((d) => d?.isConfirmed).length;
+  const filterName =
+    session.filter === "donors_only"
+      ? ctx.t("admin.broadcast.filter_donors")
+      : ctx.t("admin.broadcast.filter_active");
+
+  const pctUk = totalCount > 0 ? Math.round((countUk / totalCount) * 100) : 0;
+  const pctEn = totalCount > 0 ? Math.round((countEn / totalCount) * 100) : 0;
+  const pctRu = totalCount > 0 ? Math.round((countRu / totalCount) * 100) : 0;
 
   const header =
-    `${icon("notify_bell_on")} <b>Центр масових розсилок</b>\n\n` +
-    `Створіть повідомлення для кожної підтримуваної мови. Користувачі автоматично отримають текст відповідно до своєї мови інтерфейсу (або fallback на English/Ukrainian).\n\n` +
-    `👥 <b>Цільова аудиторія (${session.filter === "donors_only" ? "Тільки Донатери" : "Активні користувачі"}):</b>\n` +
-    `• 🇺🇦 <b>Українська:</b> <code>${countUk}</code> користувачів (${totalCount > 0 ? Math.round((countUk / totalCount) * 100) : 0}%)\n` +
-    `• 🇬🇧 <b>English:</b> <code>${countEn}</code> користувачів (${totalCount > 0 ? Math.round((countEn / totalCount) * 100) : 0}%)\n` +
-    `• 🇷🇺 <b>Русский:</b> <code>${countRu}</code> користувачів (${totalCount > 0 ? Math.round((countRu / totalCount) * 100) : 0}%)\n` +
-    `• 🌐 <b>Всього адресатів:</b> <b>${totalCount} користувачів</b>\n\n` +
-    `📋 <b>Стан чернеток розсилки:</b>\n` +
-    `• 🇺🇦 Українська: <b>${ukStatus}</b>\n` +
-    `• 🇬🇧 English: <b>${enStatus}</b>\n` +
-    `• 🇷🇺 Русский: <b>${ruStatus}</b>\n\n` +
-    `<i>Оберіть мову для введення або перезапису тексту:</i>`;
+    `${icon("notify_bell_on")} <b>${ctx.t("admin.broadcast.hub_title")}</b>\n\n` +
+    `${ctx.t("admin.broadcast.hub_desc")}\n\n` +
+    `${ctx.t("admin.broadcast.target_audience", { filter: filterName })}\n` +
+    `${ctx.t("admin.broadcast.users_count_uk", { count: String(countUk), pct: String(pctUk) })}\n` +
+    `${ctx.t("admin.broadcast.users_count_en", { count: String(countEn), pct: String(pctEn) })}\n` +
+    `${ctx.t("admin.broadcast.users_count_ru", { count: String(countRu), pct: String(pctRu) })}\n` +
+    `${ctx.t("admin.broadcast.users_total", { total: String(totalCount) })}\n\n` +
+    `${ctx.t("admin.broadcast.drafts_status_header")}\n` +
+    `${ctx.t("admin.broadcast.draft_status_uk", { status: ukStatus })}\n` +
+    `${ctx.t("admin.broadcast.draft_status_en", { status: enStatus })}\n` +
+    `${ctx.t("admin.broadcast.draft_status_ru", { status: ruStatus })}\n\n` +
+    `${ctx.t("admin.broadcast.select_lang_prompt")}`;
+
+  const ukBtnStatus = ukDraft?.isConfirmed
+    ? ctx.t("admin.broadcast.btn_draft_ready")
+    : ctx.t("admin.broadcast.btn_draft_none");
+  const enBtnStatus = enDraft?.isConfirmed
+    ? ctx.t("admin.broadcast.btn_draft_ready")
+    : ctx.t("admin.broadcast.btn_draft_none");
+  const ruBtnStatus = ruDraft?.isConfirmed
+    ? ctx.t("admin.broadcast.btn_draft_ready")
+    : ctx.t("admin.broadcast.btn_draft_none");
+
+  const soundBtnLabel = session.sendSilent
+    ? ctx.t("admin.broadcast.btn_sound_muted")
+    : ctx.t("admin.broadcast.btn_sound_enabled");
 
   const keyboard = new InlineKeyboard()
-    .text(`🇺🇦 UK: ${ukDraft?.isConfirmed ? "✅ Готово" : "❌ Немає"}`, "admin_bc_edit:uk")
+    .text(`🇺🇦 UK: ${ukBtnStatus}`, "admin_bc_edit:uk")
     .row()
-    .text(`🇬🇧 EN: ${enDraft?.isConfirmed ? "✅ Ready" : "❌ None"}`, "admin_bc_edit:en")
+    .text(`🇬🇧 EN: ${enBtnStatus}`, "admin_bc_edit:en")
     .row()
-    .text(`🇷🇺 RU: ${ruDraft?.isConfirmed ? "✅ Готово" : "❌ Нет"}`, "admin_bc_edit:ru")
+    .text(`🇷🇺 RU: ${ruBtnStatus}`, "admin_bc_edit:ru")
     .row()
-    .text(
-      session.sendSilent ? "🔕 Звук: ВИМКНЕНО (Silent)" : "🔔 Звук: УВІМКНЕНО",
-      "admin_bc_toggle_silent"
-    );
+    .text(soundBtnLabel, "admin_bc_toggle_silent");
 
   if (confirmedCount === 3 || (confirmedCount > 0 && (ukDraft?.isConfirmed || enDraft?.isConfirmed))) {
     keyboard.row().text(
-      `🚀 Запустити розсилку (${confirmedCount}/3 готово)`,
+      ctx.t("admin.broadcast.btn_launch_ready", { count: String(confirmedCount) }),
       "admin_bc_preflight"
     );
   } else {
     keyboard.row().text(
-      `⏳ Заповніть мови (${confirmedCount}/3)`,
+      ctx.t("admin.broadcast.btn_launch_incomplete", { count: String(confirmedCount) }),
       "admin_bc_staging_noop"
     );
   }
 
   if (confirmedCount > 0) {
-    keyboard.row().text("🗑️ Очистити всі чернетки", "admin_bc_clear");
+    keyboard.row().text(ctx.t("admin.broadcast.btn_clear_drafts"), "admin_bc_clear");
   }
 
-  keyboard.row().text("⬅️ Назад до адмінки", "admin_refresh");
+  keyboard.row().text(ctx.t("admin.broadcast.btn_back_admin"), "admin_refresh");
 
   return { text: header, keyboard };
 }
 
-export function renderBroadcastPromptText(lang: SupportedLanguage): string {
+export function renderBroadcastPromptText(targetLang: SupportedLanguage, ctx: BotContext): string {
   const flags: Record<SupportedLanguage, string> = {
     uk: "Українська 🇺🇦",
     en: "English 🇬🇧",
@@ -118,14 +135,14 @@ export function renderBroadcastPromptText(lang: SupportedLanguage): string {
   };
 
   return (
-    `✍️ <b>Введення тексту повідомлення [ ${flags[lang]} ]</b>\n\n` +
-    `Надішліть наступним повідомленням текст (або фото/медіа з підписом).\n\n` +
-    `✨ <b>Підтримується 100% форматування Telegram:</b>\n` +
-    `• <b>Жирний</b>, <i>курсив</i>, <u>підкреслений</u>, <s>закреслений</s>\n` +
-    `• <code>моноширинний код</code> та блоки <pre>pre</pre>\n` +
-    `• <tg-spoiler>спойлери</tg-spoiler> та цитати <blockquote>quote</blockquote>\n` +
-    `• 3D Telegram Premium емодзі та клікабельні гіперпосилання\n\n` +
-    `<i>Надішліть повідомлення у чат або натисніть «Скасувати».</i>`
+    `${ctx.t("admin.broadcast.prompt_title", { target_flag: flags[targetLang] })}\n\n` +
+    `${ctx.t("admin.broadcast.prompt_desc")}\n\n` +
+    `${ctx.t("admin.broadcast.prompt_formatting_header")}\n` +
+    `${ctx.t("admin.broadcast.prompt_format_basic")}\n` +
+    `${ctx.t("admin.broadcast.prompt_format_code")}\n` +
+    `${ctx.t("admin.broadcast.prompt_format_spoilers")}\n` +
+    `${ctx.t("admin.broadcast.prompt_format_emoji")}\n\n` +
+    `${ctx.t("admin.broadcast.prompt_footer")}`
   );
 }
 
@@ -139,8 +156,8 @@ export function renderBroadcastPreview(
 
   if (!draft) {
     return {
-      text: "❌ Чернетку не знайдено.",
-      keyboard: new InlineKeyboard().text("◀️ До вибору мов", "admin_bc_hub"),
+      text: ctx.t("admin.broadcast.preview_not_found"),
+      keyboard: new InlineKeyboard().text(ctx.t("admin.broadcast.btn_back_languages"), "admin_bc_hub"),
     };
   }
 
@@ -157,22 +174,22 @@ export function renderBroadcastPreview(
   const pct = totalCount > 0 ? Math.round((recipientsCount / totalCount) * 100) : 0;
 
   const header =
-    `👁 <b>ПОПЕРЕДНІЙ ПЕРЕГЛЯД РОЗСИЛКИ • [ ${flags[lang]} ]</b>\n` +
+    `${ctx.t("admin.broadcast.preview_header", { target_flag: flags[lang] })}\n` +
     `──────────────────────────\n\n` +
     `${draft.htmlText}\n\n` +
     `──────────────────────────\n` +
-    `👥 <b>Отримувачів цієї мови:</b> <code>${recipientsCount}</code> користувачів (${pct}%)\n` +
-    `📏 <b>Довжина:</b> ${draft.rawText.length} / 4096 символів\n` +
-    `🛡 <b>HTML валідація:</b> ✅ Усі теги коректно збалансовані`;
+    `${ctx.t("admin.broadcast.preview_recipients", { count: String(recipientsCount), pct: String(pct) })}\n` +
+    `${ctx.t("admin.broadcast.preview_length", { len: String(draft.rawText.length) })}\n` +
+    `${ctx.t("admin.broadcast.preview_html_valid")}`;
 
   const keyboard = new InlineKeyboard()
-    .text("✅ Підтвердити чернетку", `admin_bc_confirm_draft:${lang}`)
+    .text(ctx.t("admin.broadcast.btn_confirm_draft"), `admin_bc_confirm_draft:${lang}`)
     .row()
-    .text("🔄 Переписати текст", `admin_bc_edit:${lang}`)
+    .text(ctx.t("admin.broadcast.btn_rewrite_text"), `admin_bc_edit:${lang}`)
     .row()
-    .text("🧪 Надіслати тестове мені", `admin_bc_test_self:${lang}`)
+    .text(ctx.t("admin.broadcast.btn_test_self"), `admin_bc_test_self:${lang}`)
     .row()
-    .text("◀️ До вибору мов", "admin_bc_hub");
+    .text(ctx.t("admin.broadcast.btn_back_languages"), "admin_bc_hub");
 
   return { text: header, keyboard };
 }
@@ -195,27 +212,30 @@ export function renderBroadcastPreflight(
   const ruSnippet = session.drafts.ru?.rawText?.slice(0, 60)?.replace(/\n/g, " ") || "—";
 
   const estSec = Math.max(1, Math.ceil(totalTargets / 27));
+  const soundModeStr = session.sendSilent
+    ? ctx.t("admin.broadcast.sound_silent")
+    : ctx.t("admin.broadcast.sound_with_sound");
 
   const text =
-    `🚀 <b>Підготовка до запуску розсилки</b>\n\n` +
-    `Усі мовні версії успішно підготовлені та перевірені:\n\n` +
-    `• 🇺🇦 <b>Українська (${countUk} ос.):</b> <i>"${ukSnippet}..."</i>\n` +
-    `• 🇬🇧 <b>English (${countEn} users):</b> <i>"${enSnippet}..."</i>\n` +
-    `• 🇷🇺 <b>Русский (${countRu} польз.):</b> <i>"${ruSnippet}..."</i>\n\n` +
-    `📊 <b>Параметри відправки:</b>\n` +
-    `• 👥 <b>Загальна аудиторія:</b> <b>${totalTargets} користувачів</b>\n` +
-    `• ⚡ <b>Швидкість доставки:</b> ~27-30 повідомлень/сек\n` +
-    `• ⏱ <b>Орієнтовний час (ETA):</b> ~${estSec} секунд\n` +
-    `• 🎯 <b>Пріоритет черги:</b> P0 (Admins ➔ Donors ➔ Active Users)\n` +
-    `• 🔔 <b>Режим звуку:</b> ${session.sendSilent ? "🔕 Без звуку" : "🔔 Зі звуком"}\n\n` +
-    `⚠️ <b>УВАГА:</b> Після підтвердження повідомлення буде негайно розіслано всім активним користувачам.`;
+    `${ctx.t("admin.broadcast.preflight_title")}\n\n` +
+    `${ctx.t("admin.broadcast.preflight_subtitle")}\n\n` +
+    `${ctx.t("admin.broadcast.preflight_item_uk", { count: String(countUk), snippet: ukSnippet })}\n` +
+    `${ctx.t("admin.broadcast.preflight_item_en", { count: String(countEn), snippet: enSnippet })}\n` +
+    `${ctx.t("admin.broadcast.preflight_item_ru", { count: String(countRu), snippet: ruSnippet })}\n\n` +
+    `${ctx.t("admin.broadcast.preflight_params_header")}\n` +
+    `${ctx.t("admin.broadcast.preflight_total_audience", { total: String(totalTargets) })}\n` +
+    `${ctx.t("admin.broadcast.preflight_speed")}\n` +
+    `${ctx.t("admin.broadcast.preflight_eta", { sec: String(estSec) })}\n` +
+    `${ctx.t("admin.broadcast.preflight_priority")}\n` +
+    `${ctx.t("admin.broadcast.preflight_sound", { sound_mode: soundModeStr })}\n\n` +
+    `${ctx.t("admin.broadcast.preflight_warning")}`;
 
   const keyboard = new InlineKeyboard()
-    .text("🚀 ПІДТВЕРДИТИ ТА ЗАПУСТИТИ", "admin_bc_modal_confirm")
+    .text(ctx.t("admin.broadcast.btn_preflight_confirm"), "admin_bc_modal_confirm")
     .row()
-    .text("🧪 Тест усіх 3-х мов мені", "admin_bc_test_all")
+    .text(ctx.t("admin.broadcast.btn_preflight_test_all"), "admin_bc_test_all")
     .row()
-    .text("◀️ Повернутися до чернеток", "admin_bc_hub");
+    .text(ctx.t("admin.broadcast.btn_preflight_back"), "admin_bc_hub");
 
   return { text, keyboard };
 }
@@ -230,14 +250,13 @@ export function renderBroadcastModalConfirm(
   const totalTargets = activeProfiles.length;
 
   const text =
-    `⚠️ <b>ПІДТВЕРДЖЕННЯ ЗАПУСКУ РОЗСИЛКИ</b>\n\n` +
-    `Ви впевнені, що бажаєте запустити розсилку на <b>${totalTargets} користувачів</b>?\n\n` +
-    `Цю дію <b>неможливо скасувати</b>.`;
+    `${ctx.t("admin.broadcast.modal_title")}\n\n` +
+    `${ctx.t("admin.broadcast.modal_body", { total: String(totalTargets) })}`;
 
   const keyboard = new InlineKeyboard()
-    .text(`🔴 ТАК, РОЗІСЛАТИ ВСІМ (${totalTargets}) 🚀`, "admin_bc_execute")
+    .text(ctx.t("admin.broadcast.btn_modal_confirm", { total: String(totalTargets) }), "admin_bc_execute")
     .row()
-    .text("❌ Скасувати та вийти", "admin_bc_hub");
+    .text(ctx.t("admin.broadcast.btn_modal_cancel"), "admin_bc_hub");
 
   return { text, keyboard };
 }

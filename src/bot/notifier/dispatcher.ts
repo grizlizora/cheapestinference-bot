@@ -22,7 +22,7 @@ import {
   createTestAlertMessage,
 } from "./alertFormatter.js";
 
-import { NotificationOutboxDAO } from "../../db/dao/notificationOutbox.js";
+import { NotificationOutboxDAO, OutboxItem } from "../../db/dao/notificationOutbox.js";
 import { InlineKeyboard } from "grammy";
 
 export type { BroadcastPriority, OutgoingAlertMessage };
@@ -616,7 +616,7 @@ export class NotificationDispatcher {
       if (!chosenText || chosenText.trim().length === 0) continue;
 
       statsByLang[resolvedLang] = (statsByLang[resolvedLang] || 0) + 1;
-      const isMuted = options.sendSilent ?? (p.isMuted === 1);
+      const isMuted = options.sendSilent ?? Boolean(p.isMuted);
       const itemId = crypto.randomUUID();
 
       const outboxItem: OutboxItem = {
