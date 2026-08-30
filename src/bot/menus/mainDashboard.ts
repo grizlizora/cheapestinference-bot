@@ -13,7 +13,7 @@ import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
 import { ProxyPool } from "../../proxy/proxyPool.js";
 import { NotificationDispatcher } from "../notifier/dispatcher.js";
 import { isUserAdmin } from "../../config/env.js";
-import { renderAdminText } from "../handlers/admin.js";
+import { renderAdminText, createAdminKeyboard } from "../handlers/admin.js";
 import { renderBroadcastStagingText } from "../handlers/adminBroadcast.js";
 import { createBackupHandler, createUsersExportHandler, createHistoryExportHandler } from "../handlers/backup.js";
 import { ActiveDashboardRegistry } from "../liveSync/dashboardRegistry.js";
@@ -171,9 +171,10 @@ export function createMainMenuHierarchy(
                 dashboardRegistry?.updateView(c.chat.id, "admin");
               }
               if (scraper && proxyPool) {
-                await safeEditMessageText(c, renderAdminText(c, userDao, subDao, scraper, proxyPool));
+                const text = renderAdminText(c, userDao, subDao, scraper, proxyPool);
+                const keyboard = createAdminKeyboard(c, userDao);
+                await safeEditMessageText(c, text, keyboard);
               }
-              return c.menu.nav("admin-menu");
             }
           )
           .row();

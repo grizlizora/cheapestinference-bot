@@ -59,27 +59,55 @@ export async function safeReply(
   }
 }
 
-/**
- * Safely edit message text ignoring Telegram 400 "message is not modified",
- * with automatic fallback if custom emoji IDs are invalid (DOCUMENT_INVALID).
- */
 export async function safeEditMessageText(
   ctx: BotContext,
   text: string,
   extra?: any
 ): Promise<void> {
   try {
-    if ((ctx as any).menu && typeof (ctx as any).menu.update === "function") {
+    const hasCustomMarkup =
+      extra &&
+      (extra.inline_keyboard !== undefined ||
+        extra.reply_markup !== undefined ||
+        typeof extra.pack === "function");
+
+    if (!hasCustomMarkup && (ctx as any).menu && typeof (ctx as any).menu.update === "function") {
       try {
         (ctx as any).menu.update();
       } catch {}
     }
+
     const options: any = {
       parse_mode: "HTML",
       link_preview_options: { is_disabled: true },
-      ...(extra && extra.inline_keyboard ? { reply_markup: extra } : extra),
+      ...(extra && (extra.inline_keyboard || typeof extra.pack === "function")
+        ? { reply_markup: extra }
+        : extra),
     };
+
     const safeText = clampMessageText(toValidUtf8(text));
+    const chatId = ctx.chat?.id;
+    const messageId = ctx.callbackQuery?.message?.message_id || ctx.msg?.message_id;
+
+    // When custom reply_markup is provided, use ctx.api directly so Grammy Menu plugin does not overwrite it!
+    if (hasCustomMarkup && chatId && messageId && ctx.api) {
+      try {
+        await ctx.api.editMessageText(chatId, messageId, safeText, options);
+        return;
+      } catch (err: any) {
+        const desc = err?.description || err?.message || "";
+        if (desc.includes("DOCUMENT_INVALID") || desc.includes("CUSTOM_EMOJI_INVALID")) {
+          const stripped = stripTgEmoji(safeText);
+          await ctx.api.editMessageText(chatId, messageId, stripped, options);
+          return;
+        }
+        if (desc.includes("message is not modified") || desc.includes("query is too old")) {
+          return;
+        }
+        throw err;
+      }
+    }
+
     try {
       await ctx.editMessageText(safeText, options);
     } catch (err: any) {
