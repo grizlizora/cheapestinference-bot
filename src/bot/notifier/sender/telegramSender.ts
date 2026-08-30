@@ -80,40 +80,55 @@ export class TelegramSender {
     try {
       const sanitizedText = toValidUtf8(msg.text);
 
-      if (msg.mediaType === "photo" && msg.fileId) {
-        await this.bot.api.sendPhoto(msg.telegramId, msg.fileId, {
-          caption: sanitizedText,
-          parse_mode: "HTML",
-          reply_markup: msg.keyboard,
-          disable_notification: msg.isMuted,
-        });
-      } else if (msg.mediaType === "video" && msg.fileId) {
-        await this.bot.api.sendVideo(msg.telegramId, msg.fileId, {
-          caption: sanitizedText,
-          parse_mode: "HTML",
-          reply_markup: msg.keyboard,
-          disable_notification: msg.isMuted,
-        });
-      } else if (msg.mediaType === "document" && msg.fileId) {
-        await this.bot.api.sendDocument(msg.telegramId, msg.fileId, {
-          caption: sanitizedText,
-          parse_mode: "HTML",
-          reply_markup: msg.keyboard,
-          disable_notification: msg.isMuted,
-        });
-      } else if (msg.mediaType === "animation" && msg.fileId) {
-        await this.bot.api.sendAnimation(msg.telegramId, msg.fileId, {
-          caption: sanitizedText,
-          parse_mode: "HTML",
-          reply_markup: msg.keyboard,
-          disable_notification: msg.isMuted,
-        });
-      } else {
-        await this.bot.api.sendMessage(msg.telegramId, sanitizedText, {
-          parse_mode: "HTML",
-          reply_markup: msg.keyboard,
-          disable_notification: msg.isMuted,
-        });
+      const sendHelper = async (text: string) => {
+        if (msg.mediaType === "photo" && msg.fileId) {
+          return await this.bot.api.sendPhoto(msg.telegramId, msg.fileId, {
+            caption: text,
+            parse_mode: "HTML",
+            reply_markup: msg.keyboard,
+            disable_notification: msg.isMuted,
+          });
+        } else if (msg.mediaType === "video" && msg.fileId) {
+          return await this.bot.api.sendVideo(msg.telegramId, msg.fileId, {
+            caption: text,
+            parse_mode: "HTML",
+            reply_markup: msg.keyboard,
+            disable_notification: msg.isMuted,
+          });
+        } else if (msg.mediaType === "document" && msg.fileId) {
+          return await this.bot.api.sendDocument(msg.telegramId, msg.fileId, {
+            caption: text,
+            parse_mode: "HTML",
+            reply_markup: msg.keyboard,
+            disable_notification: msg.isMuted,
+          });
+        } else if (msg.mediaType === "animation" && msg.fileId) {
+          return await this.bot.api.sendAnimation(msg.telegramId, msg.fileId, {
+            caption: text,
+            parse_mode: "HTML",
+            reply_markup: msg.keyboard,
+            disable_notification: msg.isMuted,
+          });
+        } else {
+          return await this.bot.api.sendMessage(msg.telegramId, text, {
+            parse_mode: "HTML",
+            reply_markup: msg.keyboard,
+            disable_notification: msg.isMuted,
+            link_preview_options: { is_disabled: true },
+          });
+        }
+      };
+
+      try {
+        await sendHelper(sanitizedText);
+      } catch (sendErr: any) {
+        const desc = sendErr?.description || sendErr?.message || "";
+        if (desc.includes("DOCUMENT_INVALID") || desc.includes("CUSTOM_EMOJI_INVALID")) {
+          const stripped = sanitizedText.replace(/<tg-emoji[^>]*>(.*?)<\/tg-emoji>/gi, "$1");
+          await sendHelper(stripped);
+        } else {
+          throw sendErr;
+        }
       }
 
       this.outboxManager.markDispatched(msg.id);
@@ -125,11 +140,11 @@ export class TelegramSender {
   }
 
   public async handleDispatchError(msg: OutgoingAlertMessage, err: any): Promise<void> {
-    const errorCode = err?.error_code;
-    const description = err?.description || "";
+    const errorCode = err?.error_code || err?.response?.error_code;
+    const description = err?.description || err?.message || "";
 
     // 1. User Blocked or Invalid Chat (403 / 400)
-    if (errorCode === 403 || (errorCode === 400 && description.includes("chat not found"))) {
+    if (errorCode === 403 || (errorCode === 400 && (description.includes("chat not found") || description.includes("bot was blocked by the user")))) {
       this.outboxManager.handleUserBlocked(msg.telegramId, msg.id);
       return;
     }
@@ -151,6 +166,7 @@ export class TelegramSender {
         await this.bot.api.sendMessage(msg.telegramId, plainText, {
           reply_markup: msg.keyboard,
           disable_notification: msg.isMuted,
+          link_preview_options: { is_disabled: true },
         });
         this.outboxManager.markDispatched(msg.id);
         return;

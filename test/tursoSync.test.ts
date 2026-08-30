@@ -205,4 +205,200 @@ describe("TursoCloudSync Universal Cloud Sync Suite", () => {
     expect(saved.language).toBe("uk");
     expect(saved.view_type).toBe("dashboard");
   });
+
+  it("5. should flawlessly hydrate all 8 tables simultaneously on cold boot without SQLite schema errors", async () => {
+    const sync = new TursoCloudSync("https://mock-turso.io", "mock-token");
+    const testDb = new Database(":memory:");
+    testDb.exec(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        telegram_id INTEGER NOT NULL UNIQUE,
+        username TEXT,
+        first_name TEXT NOT NULL,
+        language TEXT NOT NULL DEFAULT 'en',
+        is_muted INTEGER NOT NULL DEFAULT 0,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        notify_available_global INTEGER NOT NULL DEFAULT 1,
+        notify_sold_out_global INTEGER NOT NULL DEFAULT 0,
+        notify_models_global INTEGER NOT NULL DEFAULT 1,
+        notify_prices_global INTEGER NOT NULL DEFAULT 1,
+        notify_admin_new_users INTEGER NOT NULL DEFAULT 1,
+        is_admin INTEGER NOT NULL DEFAULT 0,
+        total_donated_stars INTEGER NOT NULL DEFAULT 0,
+        last_active_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE TABLE IF NOT EXISTS subscriptions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        pool_slug TEXT NOT NULL,
+        block_id TEXT NOT NULL,
+        notify_on_available INTEGER NOT NULL DEFAULT 1,
+        notify_on_sold_out INTEGER NOT NULL DEFAULT 0,
+        notify_on_models INTEGER NOT NULL DEFAULT 1,
+        notify_on_prices INTEGER NOT NULL DEFAULT 1,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, pool_slug, block_id)
+      );
+      CREATE TABLE IF NOT EXISTS donations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        telegram_id INTEGER NOT NULL,
+        amount_stars INTEGER NOT NULL,
+        currency TEXT NOT NULL DEFAULT 'XTR',
+        telegram_payment_charge_id TEXT NOT NULL UNIQUE,
+        provider_payment_charge_id TEXT,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE TABLE IF NOT EXISTS pool_state (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        pool_slug TEXT NOT NULL,
+        pool_name TEXT NOT NULL,
+        models_json TEXT NOT NULL,
+        block_id TEXT NOT NULL,
+        status TEXT NOT NULL,
+        hours_utc TEXT NOT NULL,
+        price_month TEXT NOT NULL,
+        min_price_day TEXT NOT NULL,
+        annual_discount REAL NOT NULL DEFAULT 0.15,
+        description TEXT,
+        infra_spec TEXT,
+        manual_provisioning INTEGER NOT NULL DEFAULT 0,
+        last_changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(pool_slug, block_id)
+      );
+      CREATE TABLE IF NOT EXISTS active_dashboards (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        chat_id INTEGER NOT NULL UNIQUE,
+        message_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        view_type TEXT NOT NULL DEFAULT 'dashboard',
+        pool_slug TEXT,
+        language TEXT NOT NULL DEFAULT 'en',
+        last_rendered_text_hash INTEGER NOT NULL DEFAULT 0,
+        last_rendered_keyboard_hash INTEGER NOT NULL DEFAULT 0,
+        last_telegram_edit_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        last_interaction_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        consecutive_errors INTEGER NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE TABLE IF NOT EXISTS slot_lifecycle_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        pool_slug TEXT NOT NULL,
+        block_id TEXT NOT NULL,
+        opened_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        closed_at DATETIME,
+        duration_seconds INTEGER,
+        initial_status TEXT NOT NULL,
+        price_month TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS slot_price_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        pool_slug TEXT NOT NULL,
+        block_id TEXT NOT NULL,
+        old_price TEXT NOT NULL,
+        new_price TEXT NOT NULL,
+        new_price_num REAL NOT NULL DEFAULT 0.0,
+        price_delta REAL NOT NULL,
+        percent_delta REAL NOT NULL,
+        changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE TABLE IF NOT EXISTS catalog_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        pool_slug TEXT NOT NULL,
+        pool_name TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        added_models_json TEXT NOT NULL DEFAULT '[]',
+        upgraded_models_json TEXT NOT NULL DEFAULT '[]',
+        removed_models_json TEXT NOT NULL DEFAULT '[]',
+        all_models_json TEXT NOT NULL,
+        previous_min_price TEXT,
+        new_min_price TEXT,
+        metadata_json TEXT DEFAULT '{}',
+        detected_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    vi.spyOn(sync as any, "initRemoteSchema").mockResolvedValue(undefined);
+    vi.spyOn(sync as any, "executePipeline").mockResolvedValue([
+      {
+        response: {
+          result: {
+            cols: [{ name: "id" }, { name: "telegram_id" }, { name: "first_name" }, { name: "language" }, { name: "is_admin" }, { name: "total_donated_stars" }],
+            rows: [
+              [{ value: 1 }, { value: 1234567 }, { value: "Roman" }, { value: "uk" }, { value: 1 }, { value: 50 }],
+            ],
+          },
+        },
+      },
+      {
+        response: {
+          result: {
+            cols: [{ name: "user_id" }, { name: "pool_slug" }, { name: "block_id" }, { name: "notify_on_available" }, { name: "notify_on_sold_out" }, { name: "notify_on_models" }, { name: "notify_on_prices" }],
+            rows: [
+              [{ value: 1 }, { value: "flagship" }, { value: "europe" }, { value: 1 }, { value: 1 }, { value: 1 }, { value: 1 }],
+            ],
+          },
+        },
+      },
+      {
+        response: {
+          result: {
+            cols: [{ name: "id" }, { name: "user_id" }, { name: "telegram_id" }, { name: "amount_stars" }, { name: "telegram_payment_charge_id" }],
+            rows: [
+              [{ value: 10 }, { value: 1 }, { value: 1234567 }, { value: 50 }, { value: "chg_123" }],
+            ],
+          },
+        },
+      },
+      {
+        response: {
+          result: {
+            cols: [{ name: "pool_slug" }, { name: "pool_name" }, { name: "models_json" }, { name: "block_id" }, { name: "status" }, { name: "hours_utc" }, { name: "price_month" }, { name: "min_price_day" }],
+            rows: [
+              [{ value: "flagship" }, { value: "Flagship Pool" }, { value: '["claude-3-7-sonnet"]' }, { value: "europe" }, { value: "available" }, { value: "08:00-16:00 UTC" }, { value: "149" }, { value: "4.90" }],
+            ],
+          },
+        },
+      },
+      {
+        response: {
+          result: {
+            cols: [{ name: "chat_id" }, { name: "message_id" }, { name: "user_id" }, { name: "view_type" }, { name: "language" }],
+            rows: [
+              [{ value: 1234567 }, { value: 999 }, { value: 1 }, { value: "dashboard" }, { value: "uk" }],
+            ],
+          },
+        },
+      },
+      { response: { result: { cols: [], rows: [] } } },
+      { response: { result: { cols: [], rows: [] } } },
+      { response: { result: { cols: [], rows: [] } } },
+    ]);
+
+    await sync.pullStateFromTurso(testDb);
+
+    const user = testDb.prepare("SELECT * FROM users WHERE telegram_id = 1234567").get() as any;
+    expect(user).toBeDefined();
+    expect(user.language).toBe("uk");
+    expect(user.is_admin).toBe(1);
+    expect(user.total_donated_stars).toBe(50);
+
+    const sub = testDb.prepare("SELECT * FROM subscriptions WHERE user_id = 1 AND pool_slug = 'flagship'").get() as any;
+    expect(sub).toBeDefined();
+    expect(sub.notify_on_sold_out).toBe(1);
+
+    const pool = testDb.prepare("SELECT * FROM pool_state WHERE pool_slug = 'flagship'").get() as any;
+    expect(pool).toBeDefined();
+    expect(pool.pool_name).toBe("Flagship Pool");
+    expect(pool.price_month).toBe("149");
+
+    const dash = testDb.prepare("SELECT * FROM active_dashboards WHERE chat_id = 1234567").get() as any;
+    expect(dash).toBeDefined();
+    expect(dash.language).toBe("uk");
+    expect(dash.message_id).toBe(999);
+  });
 });

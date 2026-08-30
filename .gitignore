@@ -40,3 +40,7 @@ scripts/update_*.ts
 scripts/test_vibrant_*.ts
 scripts/append_tech_spec.ts
 scripts/fetch_fluent_3d_emojis.ts
+
+# Backups
+*копія*
+*backup*

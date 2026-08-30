@@ -869,5 +869,51 @@ export function createTelegramBot(
     }
   });
 
+  // 15. Register Localized Bot Commands Menu in Telegram Client
+  bot.api
+    .setMyCommands(
+      [
+        { command: "start", description: "Головне меню та моніторинг слотів" },
+        { command: "menu", description: "Відкрити дашборд доступності" },
+        { command: "alerts", description: "Керування підписками та фільтрами" },
+        { command: "language", description: "Змінити мову інтерфейсу" },
+        { command: "help", description: "Інструкція та контакт автора" },
+        { command: "admin", description: "Панель адміністратора & керування" },
+        { command: "stats", description: "Телеметрія системи (Admin)" },
+        { command: "backup", description: "Завантажити бекап бази (Admin)" },
+      ],
+      { language_code: "uk" }
+    )
+    .catch(() => {});
+
+  bot.api
+    .setMyCommands(
+      [
+        { command: "start", description: "Главное меню и мониторинг слотов" },
+        { command: "menu", description: "Открыть дашборд доступности" },
+        { command: "alerts", description: "Управление подписками и фильтрами" },
+        { command: "language", description: "Сменить язык интерфейса" },
+        { command: "help", description: "Инструкция и контакт автора" },
+        { command: "admin", description: "Панель администратора & управление" },
+        { command: "stats", description: "Телеметрия системы (Admin)" },
+        { command: "backup", description: "Скачать бэкап базы (Admin)" },
+      ],
+      { language_code: "ru" }
+    )
+    .catch(() => {});
+
+  bot.api
+    .setMyCommands([
+      { command: "start", description: "Main dashboard & live slot monitor" },
+      { command: "menu", description: "Open slot availability dashboard" },
+      { command: "alerts", description: "Manage subscriptions & alert filters" },
+      { command: "language", description: "Change language / Змінити мову" },
+      { command: "help", description: "How the bot works & author contact" },
+      { command: "admin", description: "Administrator control panel" },
+      { command: "stats", description: "System telemetry (Admin)" },
+      { command: "backup", description: "Download SQLite database backup (Admin)" },
+    ])
+    .catch(() => {});
+
   return { bot, dispatcher, liveDashboardManager, donationDao: resolvedDonationDao, outboxDao: resolvedOutboxDao };
 }

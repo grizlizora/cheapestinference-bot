@@ -359,14 +359,19 @@ export class SubscriptionDAO {
   ): boolean {
     const isCurrentlySubscribed = this.isPoolSubscribed(userId, poolSlug, blockIds);
     const newState = !isCurrentlySubscribed;
+    const currentFlags = this.getPoolFlags(userId, poolSlug);
     this.txTogglePool(userId, poolSlug, newState, blockIds, allPools);
 
     if (newState) {
       tursoCloudSync.pushMutation(
         `INSERT INTO subscriptions (user_id, pool_slug, block_id, notify_on_available, notify_on_sold_out, notify_on_models, notify_on_prices)
-         VALUES (?, ?, 'ALL', 1, 0, 1, 1)
-         ON CONFLICT(user_id, pool_slug, block_id) DO UPDATE SET notify_on_available=1, notify_on_models=1, notify_on_prices=1`,
-        [userId, poolSlug],
+         VALUES (?, ?, 'ALL', ?, ?, ?, ?)
+         ON CONFLICT(user_id, pool_slug, block_id) DO UPDATE SET 
+           notify_on_available=excluded.notify_on_available,
+           notify_on_sold_out=excluded.notify_on_sold_out,
+           notify_on_models=excluded.notify_on_models,
+           notify_on_prices=excluded.notify_on_prices`,
+        [userId, poolSlug, currentFlags.available ? 1 : 0, currentFlags.soldOut ? 1 : 0, currentFlags.models ? 1 : 0, currentFlags.prices ? 1 : 0],
         true
       );
       for (const b of blockIds) {
@@ -386,6 +391,7 @@ export class SubscriptionDAO {
     allBlockIds: string[] = ["asia", "europe", "americas"],
     allPools?: Array<{ slug: string; blocks: string[] }>
   ): { isBlockSubscribed: boolean; isPoolSubscribed: boolean } {
+    const currentFlags = this.getPoolFlags(userId, poolSlug);
     const result = this.txToggleBlock(userId, poolSlug, blockId, allBlockIds, allPools) as any;
     const isBlockSubscribed = result?.isBlockSubscribed ?? this.isBlockSubscribed(userId, poolSlug, blockId);
     const isPoolSubscribed = result?.isPoolSubscribed ?? this.isPoolSubscribed(userId, poolSlug, allBlockIds);
@@ -393,9 +399,13 @@ export class SubscriptionDAO {
     if (isPoolSubscribed) {
       tursoCloudSync.pushMutation(
         `INSERT INTO subscriptions (user_id, pool_slug, block_id, notify_on_available, notify_on_sold_out, notify_on_models, notify_on_prices)
-         VALUES (?, ?, 'ALL', 1, 0, 1, 1)
-         ON CONFLICT(user_id, pool_slug, block_id) DO UPDATE SET notify_on_available=1, notify_on_models=1, notify_on_prices=1`,
-        [userId, poolSlug],
+         VALUES (?, ?, 'ALL', ?, ?, ?, ?)
+         ON CONFLICT(user_id, pool_slug, block_id) DO UPDATE SET 
+           notify_on_available=excluded.notify_on_available,
+           notify_on_sold_out=excluded.notify_on_sold_out,
+           notify_on_models=excluded.notify_on_models,
+           notify_on_prices=excluded.notify_on_prices`,
+        [userId, poolSlug, currentFlags.available ? 1 : 0, currentFlags.soldOut ? 1 : 0, currentFlags.models ? 1 : 0, currentFlags.prices ? 1 : 0],
         true
       );
       for (const b of allBlockIds) {
@@ -406,9 +416,13 @@ export class SubscriptionDAO {
       if (isBlockSubscribed) {
         tursoCloudSync.pushMutation(
           `INSERT INTO subscriptions (user_id, pool_slug, block_id, notify_on_available, notify_on_sold_out, notify_on_models, notify_on_prices)
-           VALUES (?, ?, ?, 1, 0, 1, 1)
-           ON CONFLICT(user_id, pool_slug, block_id) DO UPDATE SET notify_on_available=1, notify_on_models=1, notify_on_prices=1`,
-          [userId, poolSlug, blockId],
+           VALUES (?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(user_id, pool_slug, block_id) DO UPDATE SET 
+             notify_on_available=excluded.notify_on_available,
+             notify_on_sold_out=excluded.notify_on_sold_out,
+             notify_on_models=excluded.notify_on_models,
+             notify_on_prices=excluded.notify_on_prices`,
+          [userId, poolSlug, blockId, currentFlags.available ? 1 : 0, currentFlags.soldOut ? 1 : 0, currentFlags.models ? 1 : 0, currentFlags.prices ? 1 : 0],
           true
         );
       } else {
@@ -428,14 +442,19 @@ export class SubscriptionDAO {
   ): boolean {
     const hasGlobal = this.hasSubscription(userId, "ALL", "ALL");
     const newState = !hasGlobal;
+    const currentFlags = this.getPoolFlags(userId, "ALL");
     this.txToggleGlobal(userId, newState, pools);
 
     if (newState) {
       tursoCloudSync.pushMutation(
         `INSERT INTO subscriptions (user_id, pool_slug, block_id, notify_on_available, notify_on_sold_out, notify_on_models, notify_on_prices)
-         VALUES (?, 'ALL', 'ALL', 1, 0, 1, 1)
-         ON CONFLICT(user_id, pool_slug, block_id) DO UPDATE SET notify_on_available=1, notify_on_models=1, notify_on_prices=1`,
-        [userId],
+         VALUES (?, 'ALL', 'ALL', ?, ?, ?, ?)
+         ON CONFLICT(user_id, pool_slug, block_id) DO UPDATE SET 
+           notify_on_available=excluded.notify_on_available,
+           notify_on_sold_out=excluded.notify_on_sold_out,
+           notify_on_models=excluded.notify_on_models,
+           notify_on_prices=excluded.notify_on_prices`,
+        [userId, currentFlags.available ? 1 : 0, currentFlags.soldOut ? 1 : 0, currentFlags.models ? 1 : 0, currentFlags.prices ? 1 : 0],
         true
       );
       for (const p of pools) {

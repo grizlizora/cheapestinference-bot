@@ -6,7 +6,7 @@
 import { InlineKeyboard } from "grammy";
 import { DiffEvent } from "../../../types/domain.js";
 import { translate, SupportedLanguage } from "../../../i18n/index.js";
-import { cleanPriceString, resolveBlockName } from "../formatters/priceBadgeHelper.js";
+import { cleanPoolTitle, cleanPriceString, resolveBlockName } from "../formatters/priceBadgeHelper.js";
 
 export interface BundleButtonCandidate {
   priority: number; // 1 = Claim, 2 = SlotPrice, 3 = BasePrice, 4 = PoolOverview
@@ -38,12 +38,13 @@ export function buildSingleAlertKeyboard(
   }
 
   if (event.type === "SLOT_DISAPPEARED") {
+    const cleanName = cleanPoolTitle(event.poolName, event.poolSlug);
     const poolBtnLabel =
       lang === "uk"
-        ? `🌐 Відкрити ${event.poolName || "Pool"}`
+        ? `🌐 Відкрити ${cleanName}`
         : lang === "ru"
-        ? `🌐 Открыть ${event.poolName || "Pool"}`
-        : `🌐 Open ${event.poolName || "Pool"}`;
+        ? `🌐 Открыть ${cleanName}`
+        : `🌐 Open ${cleanName}`;
     return new InlineKeyboard().url(poolBtnLabel, poolUrl);
   }
 

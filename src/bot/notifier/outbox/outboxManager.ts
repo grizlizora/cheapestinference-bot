@@ -56,6 +56,34 @@ export class OutboxManager {
     }
   }
 
+  public recordOutboxInsertBatch(messages: OutgoingAlertMessage[]): void {
+    if (!this.outboxDao || messages.length === 0) return;
+    try {
+      this.outboxDao.enqueueBatch(
+        messages.map((msg) => ({
+          id: msg.id,
+          userId: msg.userId,
+          telegramId: msg.telegramId,
+          priority: msg.priority,
+          messageText: msg.text,
+          replyMarkupJson: msg.keyboard ? JSON.stringify(msg.keyboard.inline_keyboard) : undefined,
+          disableNotification: msg.isMuted,
+          eventType: msg.eventType,
+          poolSlug: msg.poolSlug,
+          blockId: msg.blockId,
+          mediaType: msg.mediaType,
+          fileId: msg.fileId,
+          isBroadcast: msg.eventType === "ADMIN_BROADCAST",
+          language: (msg as any).language,
+          status: "pending",
+          attempts: 0,
+        }))
+      );
+    } catch (e: any) {
+      console.warn("⚠️ [OutboxManager] Non-fatal outbox batch insert failure:", e.message);
+    }
+  }
+
   public markDispatched(msgId: string): void {
     try {
       this.outboxDao?.markDispatched(msgId);
@@ -119,7 +147,7 @@ export class OutboxManager {
         if (replyJson) {
           try {
             const parsed = JSON.parse(replyJson);
-            keyboard = new InlineKeyboard(parsed);
+            keyboard = new InlineKeyboard(parsed.inline_keyboard || parsed);
           } catch {}
         }
 

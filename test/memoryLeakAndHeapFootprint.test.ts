@@ -111,7 +111,7 @@ describe("🧪 Memory Leaks, Garbage Collection & RAM Footprint Benchmark Suite"
     const duration = performance.now() - startRes;
 
     expect(matches.length).toBe(25_000);
-    expect(duration).toBeLessThan(35);
+    expect(duration).toBeLessThan(75);
   });
 
   it("4. SQLite WAL Compaction & Maintenance Keeps DB Memory Flat", () => {

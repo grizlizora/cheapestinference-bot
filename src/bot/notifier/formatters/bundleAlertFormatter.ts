@@ -30,6 +30,7 @@ export function formatBundledAlertMessage(
   const count = matchedEvents.length;
   const timeFormatted = new Date().toISOString().replace("T", " ").substring(0, 19);
   const currencyMonth = translate(lang, "common.currency_month") || "mo";
+  const regionLabel = translate(lang, "common.region") || "Region";
 
   const rawTitle =
     translate(lang, "alerts.batch_title", { count }) ||
@@ -96,152 +97,152 @@ export function formatBundledAlertMessage(
         ? `${icon("event_price_drop")} <b>ЗМІНА ЦІН • ${pName} (${count})</b>`
         : lang === "ru"
         ? `${icon("event_price_drop")} <b>ИЗМЕНЕНИЕ ЦЕН • ${pName} (${count})</b>`
-        : `${icon("event_price_drop")} <b>PRICE CHANGES • ${pName} (${count})</b>`;
+        : `${icon("event_price_drop")} <b>PRICE UPDATES • ${pName} (${count})</b>`;
   }
 
   for (const { event } of matchedEvents) {
     const blockName = resolveBlockName(event.block, lang);
-    const poolName = cleanPoolTitle(event.poolName, event.poolSlug);
+    const cleanName = cleanPoolTitle(event.poolName, event.poolSlug);
     const poolUrl = `https://cheapestinference.com/pools/${event.poolSlug}`;
     const blockHash = event.block && event.block !== "ALL" ? `#${event.block}` : "";
     const checkoutUrl = `${poolUrl}${blockHash}`;
+    const hoursLocal = event.hoursUtc ? formatBlockHoursWithLocal(event.block, event.hoursUtc, lang) : "";
+    const hoursText = hoursLocal ? ` <code>(${escapeHtml(hoursLocal)})</code>` : "";
 
     if (event.type === "SLOT_APPEARED") {
-      const isLimited = event.newStatus === "limited";
-      const statusIcon = isLimited ? icon("status_limited") : icon("status_available");
-      const hoursLocal = event.hoursUtc ? formatBlockHoursWithLocal(event.block, event.hoursUtc, lang) : "";
-      const hoursText = hoursLocal ? ` <code>(${escapeHtml(hoursLocal)})</code>` : "";
+      const cleanPrice = cleanPriceString(event.newPrice);
+      const lifespanBadge = event.analytics?.avgLifespanFormatted
+        ? ` ${event.analytics.demandCategory === "hot" ? icon("event_hot_slot") : icon("event_slot_drop")} <code>${escapeHtml(event.analytics.avgLifespanFormatted)}</code>`
+        : "";
 
-      const poolBlockHeader = allSamePool
-        ? `${getRegionIcon(event.block)} <b>${escapeHtml(blockName)}</b>`
-        : `<b>${escapeHtml(poolName)} • ${escapeHtml(blockName)}</b> ${getRegionIcon(event.block)}`;
-
-      const line =
-        `${statusIcon} ${poolBlockHeader}${hoursText}: ` +
-        `<b>$${cleanPriceString(event.newPrice)}/${currencyMonth}</b>`;
-      sectionLines.push(line);
-
-      const btnLabel = translate(lang, "alerts.btn_claim_slot_block", {
-        block_name: `${poolName} (${blockName})`,
-        price: cleanPriceString(event.newPrice),
-        currency_month: currencyMonth,
-      });
+      if (allSamePool) {
+        sectionLines.push(
+          `${getRegionIcon(event.block)} <b>${escapeHtml(blockName)}</b>${lifespanBadge}\n` +
+          `  • ${icon("price_money")} <b>$${escapeHtml(cleanPrice)}/${currencyMonth}</b> | ${icon("nav_clock")} <code>${escapeHtml(hoursLocal || event.hoursUtc)}</code>`
+        );
+      } else {
+        sectionLines.push(
+          `${getRegionIcon(event.block)} <b>${escapeHtml(cleanName)} • ${escapeHtml(blockName)}</b>${lifespanBadge}\n` +
+          `  • ${icon("price_money")} <b>$${escapeHtml(cleanPrice)}/${currencyMonth}</b> | ${icon("nav_clock")} <code>${escapeHtml(hoursLocal || event.hoursUtc)}</code>`
+        );
+      }
 
       candidates.push({
         priority: 1,
-        label: btnLabel,
+        label: `⚡ ${cleanName} (${blockName}) • $${cleanPrice}`,
         url: checkoutUrl,
         poolSlug: event.poolSlug,
         isSpecificAction: true,
       });
     } else if (event.type === "SLOT_DISAPPEARED") {
-      const poolBlockHeader = allSamePool
-        ? `${getRegionIcon(event.block)} <b>${escapeHtml(blockName)}</b>`
-        : `<b>${escapeHtml(poolName)} • ${escapeHtml(blockName)}</b> ${getRegionIcon(event.block)}`;
-
-      const line =
-        `${icon("event_slot_sold")} ${poolBlockHeader}: ` +
-        `<i>${statusSoldOut}</i>`;
-      sectionLines.push(line);
-
+      if (allSamePool) {
+        sectionLines.push(
+          `${getRegionIcon(event.block)} <b>${regionLabel}:</b> ${escapeHtml(blockName)}${hoursText} — ${icon("status_sold_out")} <i>${statusSoldOut}</i>`
+        );
+      } else {
+        sectionLines.push(
+          `${icon("event_slot_sold")} <b>${escapeHtml(cleanName)}</b>\n` +
+          `  • ${getRegionIcon(event.block)} <b>${escapeHtml(blockName)}:</b> ${icon("status_sold_out")} <i>${statusSoldOut}</i>`
+        );
+      }
       const poolBtnLabel =
         lang === "uk"
-          ? `🌐 Відкрити ${poolName}`
+          ? `🌐 Відкрити ${cleanName}`
           : lang === "ru"
-          ? `🌐 Открыть ${poolName}`
-          : `🌐 Open ${poolName}`;
+          ? `🌐 Открыть ${cleanName}`
+          : `🌐 Open ${cleanName}`;
 
       candidates.push({
         priority: 4,
-        label: poolBtnLabel,
-        url: poolUrl,
-        poolSlug: event.poolSlug,
-        isSpecificAction: false,
-      });
-    } else if (event.type === "SLOT_PRICE_CHANGED") {
-      const isDiscount = (event.slotPrice?.priceDelta || 0) < 0;
-      const trendIcon = isDiscount ? icon("event_price_drop") : icon("event_price_hike");
-      const deltaBadge = event.slotPrice
-        ? formatPriceDeltaBadge(event.slotPrice.priceDelta, event.slotPrice.percentageDelta, lang)
-        : "";
-      const hoursLocal = event.hoursUtc ? formatBlockHoursWithLocal(event.block, event.hoursUtc, lang) : "";
-      const hoursText = hoursLocal ? ` <code>(${escapeHtml(hoursLocal)})</code>` : "";
-
-      const poolBlockHeader = allSamePool
-        ? `${getRegionIcon(event.block)} <b>${escapeHtml(blockName)}</b>`
-        : `<b>${escapeHtml(poolName)} • ${escapeHtml(blockName)}</b> ${getRegionIcon(event.block)}`;
-
-      const line =
-        `${trendIcon} ${poolBlockHeader}${hoursText}: ` +
-        `<s>$${cleanPriceString(event.previousPrice)}</s> ➔ <b>$${cleanPriceString(event.newPrice)}/${currencyMonth}</b> ` +
-        `${deltaBadge}`;
-      sectionLines.push(line);
-
-      const btnLabel = translate(lang, "alerts.btn_claim_slot_block", {
-        block_name: `${poolName} (${blockName})`,
-        price: cleanPriceString(event.newPrice),
-        currency_month: currencyMonth,
-      });
-
-      candidates.push({
-        priority: 2,
-        label: btnLabel,
-        url: checkoutUrl,
-        poolSlug: event.poolSlug,
-        isSpecificAction: true,
-      });
-    } else if (event.type === "POOL_BASE_PRICE_CHANGED" || event.type === "PRICE_CHANGED") {
-      const isDiscount = (event.basePrice?.priceDelta || 0) < 0;
-      const trendIcon = isDiscount ? icon("event_price_drop") : icon("event_price_hike");
-      const deltaBadge = event.basePrice
-        ? formatPriceDeltaBadge(event.basePrice.priceDelta, event.basePrice.percentageDelta, lang)
-        : "";
-
-      const poolPrefix = allSamePool ? "" : `<b>${escapeHtml(poolName)}</b>: `;
-      const baseRateLabel =
-        lang === "uk"
-          ? "Базовий тариф"
-          : lang === "ru"
-          ? "Базовый тариф"
-          : "Base Rate";
-      const line =
-        `${trendIcon} ${poolPrefix}<b>${baseRateLabel}</b>: ` +
-        `<s>$${cleanPriceString(event.previousPrice)}</s> ➔ <b>$${cleanPriceString(event.newPrice)}/${currencyMonth}</b> ` +
-        `${deltaBadge}`;
-      sectionLines.push(line);
-
-      const poolBtnLabel =
-        lang === "uk"
-          ? `🌐 Тариф ${poolName}`
-          : lang === "ru"
-          ? `🌐 Тариф ${poolName}`
-          : `🌐 ${poolName} Rate`;
-
-      candidates.push({
-        priority: 3,
         label: poolBtnLabel,
         url: poolUrl,
         poolSlug: event.poolSlug,
         isSpecificAction: false,
       });
     } else if (event.type === "MODEL_UPGRADE_EVENT") {
-      const poolPrefix = allSamePool ? "" : `<b>${escapeHtml(poolName)}</b>: `;
-      const modelsList = (event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ");
-      const line = `${icon("event_model_upgrade")} ${poolPrefix}${modelsList}`;
-      sectionLines.push(line);
-
+      const upgradeTitle = translate(lang, "alerts.bundle_title_models") || "Model Upgrade";
+      sectionLines.push(
+        `${icon("event_model_upgrade")} <b>${escapeHtml(cleanName)} • ${upgradeTitle}</b>\n` +
+        `${icon("ai_robot")} ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
+      );
       candidates.push({
         priority: 4,
-        label: translate(lang, "common.open_site"),
+        label: `🔍 ${cleanName}`,
+        url: poolUrl,
+        poolSlug: event.poolSlug,
+        isSpecificAction: false,
+      });
+    } else if (event.type === "SLOT_PRICE_CHANGED") {
+      const deltaStr = event.slotPrice
+        ? ` (${formatPriceDeltaBadge(event.slotPrice.priceDelta, event.slotPrice.percentageDelta, lang)})`
+        : "";
+      const cleanOld = cleanPriceString(event.previousPrice);
+      const cleanNew = cleanPriceString(event.newPrice);
+      const hoursStr = event.hoursUtc ? `\n  • ${icon("nav_clock")} <code>${escapeHtml(hoursLocal || event.hoursUtc)}</code>` : "";
+
+      if (allSamePool) {
+        sectionLines.push(
+          `${getRegionIcon(event.block)} <b>${escapeHtml(blockName)}</b>\n` +
+          `  • <s>$${escapeHtml(cleanOld)}</s> ➔ <b>$${escapeHtml(cleanNew)}/${currencyMonth}</b>${deltaStr}${hoursStr}`
+        );
+      } else {
+        sectionLines.push(
+          `${getRegionIcon(event.block)} <b>${escapeHtml(cleanName)} • ${escapeHtml(blockName)}</b>\n` +
+          `  • <s>$${escapeHtml(cleanOld)}</s> ➔ <b>$${escapeHtml(cleanNew)}/${currencyMonth}</b>${deltaStr}${hoursStr}`
+        );
+      }
+
+      candidates.push({
+        priority: 2,
+        label: `🏷 ${cleanName} (${blockName}) • $${cleanNew}`,
+        url: checkoutUrl,
+        poolSlug: event.poolSlug,
+        isSpecificAction: true,
+      });
+    } else if (event.type === "POOL_BASE_PRICE_CHANGED" || event.type === "PRICE_CHANGED") {
+      const deltaStr = event.basePrice
+        ? ` (${formatPriceDeltaBadge(event.basePrice.priceDelta, event.basePrice.percentageDelta, lang)})`
+        : "";
+      const cleanOld = cleanPriceString(event.previousPrice);
+      const cleanNew = cleanPriceString(event.newPrice);
+      const tariffBadge = translate(lang, "alerts.bundle_title_base_price") || "Base Tariff";
+      sectionLines.push(
+        `${icon("price_money")} <b>${escapeHtml(event.poolName)} • ${tariffBadge}</b>\n` +
+        `${icon("price_dollar")} <s>$${escapeHtml(cleanOld)}</s> ➔ <b>$${escapeHtml(cleanNew)}/${currencyMonth}</b>${deltaStr}\n` +
+        `${icon("ai_robot")} ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
+      );
+      candidates.push({
+        priority: 3,
+        label: `💰 ${event.poolSlug.toUpperCase()} • $${cleanNew}`,
+        url: poolUrl,
+        poolSlug: event.poolSlug,
+        isSpecificAction: false,
+      });
+    } else if (event.type === "TIER_UPDATED_EVENT") {
+      const tierTitle = translate(lang, "alerts.bundle_title_tier") || "Tier Specification Updated";
+      sectionLines.push(`${icon("event_tier_update")} <b>${escapeHtml(event.poolName)} • ${tierTitle}</b>`);
+      candidates.push({
+        priority: 4,
+        label: `🔍 ${event.poolSlug.toUpperCase()}`,
+        url: poolUrl,
+        poolSlug: event.poolSlug,
+        isSpecificAction: false,
+      });
+    } else if (event.type === "NEW_POOL_EVENT") {
+      const newPoolTitle = translate(lang, "alerts.bundle_title_new_pool") || "New Pool Launched";
+      sectionLines.push(
+        `${icon("event_new_pool")} <b>${escapeHtml(event.poolName)} • ${newPoolTitle}</b>\n` +
+        `🤖 ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
+      );
+      candidates.push({
+        priority: 4,
+        label: `🔍 ${event.poolSlug.toUpperCase()}`,
         url: poolUrl,
         poolSlug: event.poolSlug,
         isSpecificAction: false,
       });
     } else {
-      const poolPrefix = allSamePool ? "" : `<b>${escapeHtml(poolName)}</b> • `;
-      const line = `${icon("event_new_pool")} ${poolPrefix}<b>${escapeHtml(blockName)}</b>: ${escapeHtml(event.newStatus || "updated")}`;
-      sectionLines.push(line);
-
+      sectionLines.push(`• <b>${escapeHtml(event.poolName)}</b> (${escapeHtml(blockName)}): ${escapeHtml(event.newStatus || "updated")}`);
       candidates.push({
         priority: 4,
         label: translate(lang, "common.open_site"),
@@ -281,59 +282,70 @@ export function formatBundledAlertMessage(
  */
 export function createTestAlertMessage(
   user: PackedUserProfile,
-  type: "slot" | "bundle" = "slot"
+  type: "slot" | "model" | "bundle" = "slot"
 ): OutgoingAlertMessage {
-  if (type === "bundle") {
-    const mockEvents: Array<{ event: DiffEvent; priority: BroadcastPriority }> = [
+  if (type === "slot") {
+    const event: DiffEvent = {
+      id: crypto.randomUUID(),
+      type: "SLOT_APPEARED",
+      poolSlug: "frontier",
+      poolName: "Frontier Pool",
+      block: "europe",
+      models: ["deepseek-r1", "qwen-2.5-coder-32b", "glm-5.3"],
+      hoursUtc: "08:00 – 16:00 UTC",
+      newPrice: "149",
+      newStatus: "available",
+      timestamp: Date.now(),
+    };
+    return formatSingleAlertMessage(user, event, "P0");
+  } else if (type === "bundle") {
+    const events: DiffEvent[] = [
       {
-        event: {
-          id: "test-slot-1",
-          poolSlug: "flagship",
-          poolName: "Flagship Pool",
-          block: "asia",
-          type: "SLOT_APPEARED",
-          newStatus: "available",
-          previousStatus: "sold-out",
-          newPrice: "149",
-          hoursUtc: "00:00-08:00 UTC",
-          models: ["DeepSeek-V3", "Kimi-K1.5"],
-          timestamp: Date.now(),
-        },
-        priority: "P1",
+        id: crypto.randomUUID(),
+        type: "SLOT_APPEARED",
+        poolSlug: "frontier",
+        poolName: "Frontier Pool",
+        block: "europe",
+        models: ["deepseek-r1", "glm-5.3"],
+        hoursUtc: "08:00 – 16:00 UTC",
+        newPrice: "149",
+        newStatus: "available",
+        timestamp: Date.now(),
       },
       {
-        event: {
-          id: "test-slot-2",
-          poolSlug: "flagship",
-          poolName: "Flagship Pool",
-          block: "europe",
-          type: "SLOT_APPEARED",
-          newStatus: "available",
-          previousStatus: "sold-out",
-          newPrice: "149",
-          hoursUtc: "08:00-16:00 UTC",
-          models: ["DeepSeek-V3", "Kimi-K1.5"],
-          timestamp: Date.now(),
-        },
-        priority: "P1",
+        id: crypto.randomUUID(),
+        type: "SLOT_APPEARED",
+        poolSlug: "core",
+        poolName: "Core Pool",
+        block: "asia",
+        models: ["deepseek-v3", "kimi-k2.5"],
+        hoursUtc: "00:00 – 08:00 UTC",
+        newPrice: "49",
+        newStatus: "available",
+        timestamp: Date.now(),
       },
     ];
-    return formatBundledAlertMessage(user, mockEvents);
+    return formatBundledAlertMessage(user, [
+      { event: events[0], priority: "P0" },
+      { event: events[1], priority: "P0" },
+    ]);
+  } else {
+    const event: DiffEvent = {
+      id: crypto.randomUUID(),
+      type: "MODEL_UPGRADE_EVENT",
+      poolSlug: "flagship",
+      poolName: "Flagship Pool",
+      block: "ALL",
+      models: ["claude-3-7-sonnet", "deepseek-r1"],
+      hoursUtc: "",
+      timestamp: Date.now(),
+      modelUpgrade: {
+        added: [{ type: "added", modelName: "deepseek-r1", family: "deepseek" }],
+        upgraded: [{ type: "upgraded", modelName: "claude-3-7-sonnet", previousModelName: "claude-3-5-sonnet", family: "claude" }],
+        removed: [],
+        allActiveModels: ["claude-3-7-sonnet", "deepseek-r1"],
+      },
+    };
+    return formatSingleAlertMessage(user, event, "P0");
   }
-
-  const mockEvent: DiffEvent = {
-    id: "test-alert-single",
-    poolSlug: "flagship",
-    poolName: "Flagship Pool",
-    block: "europe",
-    type: "SLOT_APPEARED",
-    newStatus: "available",
-    previousStatus: "sold-out",
-    newPrice: "149",
-    hoursUtc: "08:00-16:00 UTC",
-    models: ["DeepSeek-V3", "Kimi-K1.5"],
-    timestamp: Date.now(),
-  };
-
-  return formatSingleAlertMessage(user, mockEvent, "P1");
 }

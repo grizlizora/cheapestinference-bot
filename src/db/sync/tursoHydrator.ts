@@ -31,10 +31,10 @@ export class TursoHydrator {
           { type: "execute", stmt: { sql: "SELECT * FROM subscriptions" } },
           { type: "execute", stmt: { sql: "SELECT * FROM donations" } },
           { type: "execute", stmt: { sql: "SELECT * FROM pool_state" } },
-          { type: "execute", stmt: { sql: "SELECT * FROM active_dashboards" } },
-          { type: "execute", stmt: { sql: "SELECT * FROM slot_lifecycle_history" } },
-          { type: "execute", stmt: { sql: "SELECT * FROM slot_price_history" } },
-          { type: "execute", stmt: { sql: "SELECT * FROM catalog_history" } },
+          { type: "execute", stmt: { sql: "SELECT * FROM active_dashboards WHERE last_interaction_at >= datetime('now', '-48 hours') AND consecutive_errors < 3" } },
+          { type: "execute", stmt: { sql: "SELECT * FROM slot_lifecycle_history ORDER BY id DESC LIMIT 500" } },
+          { type: "execute", stmt: { sql: "SELECT * FROM slot_price_history ORDER BY id DESC LIMIT 500" } },
+          { type: "execute", stmt: { sql: "SELECT * FROM catalog_history ORDER BY id DESC LIMIT 500" } },
         ],
         15_000
       );
@@ -47,6 +47,11 @@ export class TursoHydrator {
       const lifeResult = results[5]?.response?.result;
       const priceResult = results[6]?.response?.result;
       const catResult = results[7]?.response?.result;
+
+      if (!usersResult && !subsResult && !poolResult && !donResult && !dashResult && !lifeResult && !priceResult && !catResult) {
+        console.log("☁️ [TursoSync] No remote state found in Turso.");
+        return;
+      }
 
       let userCount = 0;
       let subCount = 0;
@@ -85,8 +90,8 @@ export class TursoHydrator {
       db.transaction(() => {
         // 1. Users
         if (usersResult && usersResult.rows?.length > 0) {
-          const insertUser = db.prepare(`
-            INSERT OR REPLACE INTO users (
+          const upsertUserStmt = db.prepare(`
+            INSERT INTO users (
               id, telegram_id, username, first_name, language, is_muted, is_active,
               notify_available_global, notify_sold_out_global, notify_models_global, notify_prices_global,
               notify_admin_new_users, is_admin, total_donated_stars, last_active_at, created_at, updated_at
@@ -95,15 +100,31 @@ export class TursoHydrator {
               @notify_available_global, @notify_sold_out_global, @notify_models_global, @notify_prices_global,
               @notify_admin_new_users, @is_admin, @total_donated_stars, @last_active_at, @created_at, @updated_at
             )
+            ON CONFLICT(telegram_id) DO UPDATE SET
+              id = excluded.id,
+              username = excluded.username,
+              first_name = excluded.first_name,
+              language = excluded.language,
+              is_muted = excluded.is_muted,
+              is_active = excluded.is_active,
+              notify_available_global = excluded.notify_available_global,
+              notify_sold_out_global = excluded.notify_sold_out_global,
+              notify_models_global = excluded.notify_models_global,
+              notify_prices_global = excluded.notify_prices_global,
+              notify_admin_new_users = excluded.notify_admin_new_users,
+              is_admin = excluded.is_admin,
+              total_donated_stars = excluded.total_donated_stars,
+              last_active_at = excluded.last_active_at,
+              updated_at = excluded.updated_at
           `);
 
           const userObjects = extractRows(usersResult);
           for (const u of userObjects) {
-            insertUser.run({
+            upsertUserStmt.run({
               id: toNum(u.id),
               telegram_id: toNum(u.telegram_id),
               username: u.username ?? null,
-              first_name: u.first_name ?? null,
+              first_name: u.first_name ?? "",
               language: u.language ?? "en",
               is_muted: toNum(u.is_muted, 0),
               is_active: toNum(u.is_active, 1),
@@ -122,22 +143,24 @@ export class TursoHydrator {
           }
         }
 
-        // 2. Subscriptions
+        // 2. Subscriptions (No updated_at column in SQLite schema)
         if (subsResult && subsResult.rows?.length > 0) {
-          const insertSub = db.prepare(`
-            INSERT OR REPLACE INTO subscriptions (
-              id, user_id, pool_slug, block_id, notify_on_available, notify_on_sold_out,
-              notify_on_models, notify_on_prices, created_at, updated_at
+          const upsertSubStmt = db.prepare(`
+            INSERT INTO subscriptions (
+              user_id, pool_slug, block_id, notify_on_available, notify_on_sold_out, notify_on_models, notify_on_prices, created_at
             ) VALUES (
-              @id, @user_id, @pool_slug, @block_id, @notify_on_available, @notify_on_sold_out,
-              @notify_on_models, @notify_on_prices, @created_at, @updated_at
+              @user_id, @pool_slug, @block_id, @notify_on_available, @notify_on_sold_out, @notify_on_models, @notify_on_prices, @created_at
             )
+            ON CONFLICT(user_id, pool_slug, block_id) DO UPDATE SET
+              notify_on_available = excluded.notify_on_available,
+              notify_on_sold_out = excluded.notify_on_sold_out,
+              notify_on_models = excluded.notify_on_models,
+              notify_on_prices = excluded.notify_on_prices
           `);
 
           const subObjects = extractRows(subsResult);
           for (const s of subObjects) {
-            insertSub.run({
-              id: toNum(s.id),
+            upsertSubStmt.run({
               user_id: toNum(s.user_id),
               pool_slug: s.pool_slug,
               block_id: s.block_id,
@@ -146,7 +169,6 @@ export class TursoHydrator {
               notify_on_models: toNum(s.notify_on_models, 1),
               notify_on_prices: toNum(s.notify_on_prices, 1),
               created_at: s.created_at ?? new Date().toISOString(),
-              updated_at: s.updated_at ?? new Date().toISOString(),
             });
             subCount++;
           }
@@ -154,19 +176,20 @@ export class TursoHydrator {
 
         // 3. Donations
         if (donResult && donResult.rows?.length > 0) {
-          const insertDon = db.prepare(`
-            INSERT OR REPLACE INTO donations (
+          const upsertDonationStmt = db.prepare(`
+            INSERT INTO donations (
               id, user_id, telegram_id, amount_stars, currency,
               telegram_payment_charge_id, provider_payment_charge_id, created_at
             ) VALUES (
               @id, @user_id, @telegram_id, @amount_stars, @currency,
               @telegram_payment_charge_id, @provider_payment_charge_id, @created_at
             )
+            ON CONFLICT(telegram_payment_charge_id) DO NOTHING
           `);
 
           const donObjects = extractRows(donResult);
           for (const d of donObjects) {
-            insertDon.run({
+            upsertDonationStmt.run({
               id: toNum(d.id),
               user_id: toNum(d.user_id),
               telegram_id: toNum(d.telegram_id),
@@ -182,28 +205,47 @@ export class TursoHydrator {
 
         // 4. Pool State
         if (poolResult && poolResult.rows?.length > 0) {
-          const insertPool = db.prepare(`
-            INSERT OR REPLACE INTO pool_state (
-              id, pool_slug, block_id, status, price_per_month, hours_utc,
-              models_json, infra_spec, manual_provisioning, updated_at
+          const upsertPoolStateStmt = db.prepare(`
+            INSERT INTO pool_state (
+              pool_slug, pool_name, models_json, block_id, status, 
+              hours_utc, price_month, min_price_day, annual_discount, description,
+              infra_spec, manual_provisioning, last_changed_at, updated_at
             ) VALUES (
-              @id, @pool_slug, @block_id, @status, @price_per_month, @hours_utc,
-              @models_json, @infra_spec, @manual_provisioning, @updated_at
+              @pool_slug, @pool_name, @models_json, @block_id, @status,
+              @hours_utc, @price_month, @min_price_day, @annual_discount, @description,
+              @infra_spec, @manual_provisioning, @last_changed_at, @updated_at
             )
+            ON CONFLICT(pool_slug, block_id) DO UPDATE SET
+              pool_name = excluded.pool_name,
+              models_json = excluded.models_json,
+              status = excluded.status,
+              hours_utc = excluded.hours_utc,
+              price_month = excluded.price_month,
+              min_price_day = excluded.min_price_day,
+              annual_discount = excluded.annual_discount,
+              description = excluded.description,
+              infra_spec = excluded.infra_spec,
+              manual_provisioning = excluded.manual_provisioning,
+              last_changed_at = excluded.last_changed_at,
+              updated_at = excluded.updated_at
           `);
 
           const poolObjects = extractRows(poolResult);
           for (const p of poolObjects) {
-            insertPool.run({
-              id: toNum(p.id),
+            upsertPoolStateStmt.run({
               pool_slug: p.pool_slug,
+              pool_name: p.pool_name ?? p.pool_slug,
+              models_json: p.models_json ?? "[]",
               block_id: p.block_id,
               status: p.status,
-              price_per_month: p.price_per_month ?? null,
-              hours_utc: p.hours_utc ?? null,
-              models_json: p.models_json ?? null,
-              infra_spec: p.infra_spec ?? null,
+              hours_utc: p.hours_utc ?? "",
+              price_month: p.price_month ?? p.price_per_month ?? "",
+              min_price_day: p.min_price_day ?? "",
+              annual_discount: Number(p.annual_discount) || 0.15,
+              description: p.description ?? "",
+              infra_spec: p.infra_spec ?? "",
               manual_provisioning: toNum(p.manual_provisioning, 0),
+              last_changed_at: p.last_changed_at ?? new Date().toISOString(),
               updated_at: p.updated_at ?? new Date().toISOString(),
             });
             poolCount++;
@@ -212,26 +254,42 @@ export class TursoHydrator {
 
         // 5. Active Dashboards
         if (dashResult && dashResult.rows?.length > 0) {
-          const insertDash = db.prepare(`
-            INSERT OR REPLACE INTO active_dashboards (
-              chat_id, message_id, user_id, language, last_rendered_text_hash,
-              view_type, pool_slug, updated_at
+          const upsertDashboardStmt = db.prepare(`
+            INSERT INTO active_dashboards (
+              chat_id, message_id, user_id, view_type, pool_slug, language,
+              last_rendered_text_hash, last_rendered_keyboard_hash,
+              last_telegram_edit_at, last_interaction_at, consecutive_errors, created_at, updated_at
             ) VALUES (
-              @chat_id, @message_id, @user_id, @language, @last_rendered_text_hash,
-              @view_type, @pool_slug, @updated_at
+              @chat_id, @message_id, @user_id, @view_type, @pool_slug, @language,
+              @last_rendered_text_hash, @last_rendered_keyboard_hash,
+              @last_telegram_edit_at, @last_interaction_at, @consecutive_errors, @created_at, @updated_at
             )
+            ON CONFLICT(chat_id) DO UPDATE SET
+              message_id = excluded.message_id,
+              user_id = excluded.user_id,
+              view_type = excluded.view_type,
+              pool_slug = excluded.pool_slug,
+              language = excluded.language,
+              last_interaction_at = excluded.last_interaction_at,
+              consecutive_errors = 0,
+              updated_at = excluded.updated_at
           `);
 
           const dashObjects = extractRows(dashResult);
           for (const dash of dashObjects) {
-            insertDash.run({
+            upsertDashboardStmt.run({
               chat_id: toNum(dash.chat_id),
               message_id: toNum(dash.message_id),
               user_id: toNum(dash.user_id),
-              language: dash.language ?? dash.lang ?? "en",
-              last_rendered_text_hash: toNum(dash.last_rendered_text_hash, 0),
               view_type: dash.view_type ?? dash.active_view ?? "dashboard",
               pool_slug: dash.pool_slug ?? dash.active_pool_slug ?? null,
+              language: dash.language ?? dash.lang ?? "en",
+              last_rendered_text_hash: toNum(dash.last_rendered_text_hash, 0),
+              last_rendered_keyboard_hash: toNum(dash.last_rendered_keyboard_hash, 0),
+              last_telegram_edit_at: dash.last_telegram_edit_at ?? new Date().toISOString(),
+              last_interaction_at: dash.last_interaction_at ?? new Date().toISOString(),
+              consecutive_errors: toNum(dash.consecutive_errors, 0),
+              created_at: dash.created_at ?? new Date().toISOString(),
               updated_at: dash.updated_at ?? dash.last_updated_at ?? new Date().toISOString(),
             });
             dashCount++;
@@ -240,25 +298,28 @@ export class TursoHydrator {
 
         // 6. Slot Lifecycle History
         if (lifeResult && lifeResult.rows?.length > 0) {
-          const insertLife = db.prepare(`
-            INSERT OR REPLACE INTO slot_lifecycle_history (
-              id, pool_slug, block_id, initial_status, price_month, opened_at, closed_at, duration_seconds
+          const upsertSlotLifecycleStmt = db.prepare(`
+            INSERT INTO slot_lifecycle_history (
+              id, pool_slug, block_id, opened_at, closed_at, duration_seconds, initial_status, price_month
             ) VALUES (
-              @id, @pool_slug, @block_id, @initial_status, @price_month, @opened_at, @closed_at, @duration_seconds
+              @id, @pool_slug, @block_id, @opened_at, @closed_at, @duration_seconds, @initial_status, @price_month
             )
+            ON CONFLICT(id) DO UPDATE SET
+              closed_at = excluded.closed_at,
+              duration_seconds = excluded.duration_seconds
           `);
 
           const lifeObjects = extractRows(lifeResult);
           for (const l of lifeObjects) {
-            insertLife.run({
+            upsertSlotLifecycleStmt.run({
               id: toNum(l.id),
               pool_slug: l.pool_slug,
               block_id: l.block_id,
-              initial_status: l.initial_status,
-              price_month: l.price_month ?? null,
               opened_at: l.opened_at,
               closed_at: l.closed_at ?? null,
               duration_seconds: toNullableNum(l.duration_seconds),
+              initial_status: l.initial_status,
+              price_month: l.price_month ?? null,
             });
             lifeCount++;
           }
@@ -266,17 +327,18 @@ export class TursoHydrator {
 
         // 7. Slot Price History
         if (priceResult && priceResult.rows?.length > 0) {
-          const insertPrice = db.prepare(`
-            INSERT OR REPLACE INTO slot_price_history (
+          const upsertSlotPriceStmt = db.prepare(`
+            INSERT INTO slot_price_history (
               id, pool_slug, block_id, old_price, new_price, new_price_num, price_delta, percent_delta, changed_at
             ) VALUES (
               @id, @pool_slug, @block_id, @old_price, @new_price, @new_price_num, @price_delta, @percent_delta, @changed_at
             )
+            ON CONFLICT(id) DO NOTHING
           `);
 
           const priceObjects = extractRows(priceResult);
           for (const pr of priceObjects) {
-            insertPrice.run({
+            upsertSlotPriceStmt.run({
               id: toNum(pr.id),
               pool_slug: pr.pool_slug,
               block_id: pr.block_id,
@@ -293,19 +355,20 @@ export class TursoHydrator {
 
         // 8. Catalog History
         if (catResult && catResult.rows?.length > 0) {
-          const insertCat = db.prepare(`
-            INSERT OR REPLACE INTO catalog_history (
+          const upsertCatalogHistoryStmt = db.prepare(`
+            INSERT INTO catalog_history (
               id, pool_slug, pool_name, event_type, added_models_json, upgraded_models_json,
               removed_models_json, all_models_json, previous_min_price, new_min_price, metadata_json, detected_at
             ) VALUES (
               @id, @pool_slug, @pool_name, @event_type, @added_models_json, @upgraded_models_json,
               @removed_models_json, @all_models_json, @previous_min_price, @new_min_price, @metadata_json, @detected_at
             )
+            ON CONFLICT(id) DO NOTHING
           `);
 
           const catObjects = extractRows(catResult);
           for (const c of catObjects) {
-            insertCat.run({
+            upsertCatalogHistoryStmt.run({
               id: toNum(c.id),
               pool_slug: c.pool_slug,
               pool_name: c.pool_name,
