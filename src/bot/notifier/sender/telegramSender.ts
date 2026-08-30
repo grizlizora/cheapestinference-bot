@@ -25,7 +25,9 @@ export class TelegramSender {
   public startWorker(): void {
     if (this.isWorkerRunning) return;
     this.isWorkerRunning = true;
-    this.processQueueLoop();
+    setImmediate(() => {
+      this.processQueueLoop();
+    });
   }
 
   public stop(): void {
