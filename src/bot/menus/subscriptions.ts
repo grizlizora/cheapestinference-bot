@@ -332,8 +332,8 @@ export function createSubscriptionsMenu(
 export function renderSubscriptionsText(ctx: BotContext, subDao: SubscriptionDAO): string {
   const isGlobal = subDao.hasSubscription(ctx.user.id, "ALL", "ALL");
 
-  const onText = ctx.lang === "uk" ? `Увімкнено ${icon("toggle_on")}` : ctx.lang === "ru" ? `Включено ${icon("toggle_on")}` : `Enabled ${icon("toggle_on")}`;
-  const offText = ctx.lang === "uk" ? `Вимкнено ${icon("toggle_off")}` : ctx.lang === "ru" ? `Выключено ${icon("toggle_off")}` : `Disabled ${icon("toggle_off")}`;
+  const onIcon = icon("toggle_on");
+  const offIcon = icon("toggle_off");
 
   const titleText = ctx.lang === "uk"
     ? `<b>Керування сповіщеннями</b>\n\nНалаштуйте категорії подій, тарифи та регіональні блоки:`
@@ -343,7 +343,7 @@ export function renderSubscriptionsText(ctx: BotContext, subDao: SubscriptionDAO
 
   const globalFiltersHeader = ctx.lang === "uk" ? "Глобальні фільтри:" : ctx.lang === "ru" ? "Глобальные фильтры:" : "Global Filters:";
   const dropsLabel = ctx.lang === "uk" ? "Вільні слоти" : ctx.lang === "ru" ? "Свободные слоты" : "Available Slots";
-  const soldLabel = ctx.lang === "uk" ? "Розпродано (Sold Out)" : ctx.lang === "ru" ? "Распродано (Sold Out)" : "Sold Out";
+  const soldLabel = ctx.lang === "uk" ? "Розпродано" : ctx.lang === "ru" ? "Распродано" : "Sold Out";
   const modelsLabel = ctx.lang === "uk" ? "Оновлення моделей" : ctx.lang === "ru" ? "Обновления моделей" : "Model Updates";
   const pricesLabel = ctx.lang === "uk" ? "Зміни цін та тарифів" : ctx.lang === "ru" ? "Изменения цен и тарифов" : "Price & Tariff Changes";
   const globalAlertsLabel = ctx.lang === "uk" ? "Глобальні сповіщення" : ctx.lang === "ru" ? "Глобальные уведомления" : "Global Notifications";
@@ -353,18 +353,18 @@ export function renderSubscriptionsText(ctx: BotContext, subDao: SubscriptionDAO
     ? (ctx.lang === "uk" ? `Без звуку ${icon("notify_mute")}` : ctx.lang === "ru" ? `Без звука ${icon("notify_mute")}` : `Muted ${icon("notify_mute")}`)
     : (ctx.lang === "uk" ? `Звук увімкнено ${icon("notify_loud")}` : ctx.lang === "ru" ? `Звук включен ${icon("notify_loud")}` : `Sound on ${icon("notify_loud")}`);
 
-  const availStatus = (ctx.user.notify_available_global ?? 1) === 1 ? onText : offText;
-  const soldStatus = (ctx.user.notify_sold_out_global ?? 0) === 1 ? onText : offText;
-  const modelStatus = (ctx.user.notify_models_global ?? 1) === 1 ? onText : offText;
-  const priceStatus = (ctx.user.notify_prices_global ?? 1) === 1 ? onText : offText;
-  const globalStatus = isGlobal ? onText : offText;
+  const availStatus = (ctx.user.notify_available_global ?? 1) === 1 ? onIcon : offIcon;
+  const soldStatus = (ctx.user.notify_sold_out_global ?? 0) === 1 ? onIcon : offIcon;
+  const modelStatus = (ctx.user.notify_models_global ?? 1) === 1 ? onIcon : offIcon;
+  const priceStatus = (ctx.user.notify_prices_global ?? 1) === 1 ? onIcon : offIcon;
+  const globalStatus = isGlobal ? onIcon : offIcon;
 
   return `${icon("notify_bell_on")} ${titleText}\n\n` +
     `<b>${globalFiltersHeader}</b>\n` +
-    `• ${icon("event_slot_drop")} ${dropsLabel}: ${availStatus}\n` +
-    `• ${icon("event_slot_sold")} ${soldLabel}: ${soldStatus}\n` +
-    `• ${icon("ai_robot")} ${modelsLabel}: ${modelStatus}\n` +
-    `• ${icon("price_tag")} ${pricesLabel}: ${priceStatus}\n\n` +
+    `• ${icon("event_slot_drop")} <b>${dropsLabel}:</b> ${availStatus}\n` +
+    `• ${icon("event_slot_sold")} <b>${soldLabel}:</b> ${soldStatus}\n` +
+    `• ${icon("ai_robot")} <b>${modelsLabel}:</b> ${modelStatus}\n` +
+    `• ${icon("price_tag")} <b>${pricesLabel}:</b> ${priceStatus}\n\n` +
     `${icon("nav_language")} <b>${globalAlertsLabel}:</b> ${globalStatus}\n` +
     `🔊 <b>${soundLabel}:</b> ${soundStatus}`;
 }

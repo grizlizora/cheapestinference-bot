@@ -65,8 +65,8 @@ export function renderPoolSettingsText(
   const rank = POOL_RANKS[slug];
   const poolTitle = rank?.tierName[ctx.lang] || blocks[0]?.pool_name || slug.toUpperCase();
 
-  const onText = ctx.lang === "uk" ? `Увімкнено ${icon("toggle_on")}` : ctx.lang === "ru" ? `Включено ${icon("toggle_on")}` : `Enabled ${icon("toggle_on")}`;
-  const offText = ctx.lang === "uk" ? `Вимкнено ${icon("toggle_off")}` : ctx.lang === "ru" ? `Выключено ${icon("toggle_off")}` : `Disabled ${icon("toggle_off")}`;
+  const onIcon = icon("toggle_on");
+  const offIcon = icon("toggle_off");
 
   const headerTitle = ctx.lang === "uk"
     ? `<b>Фільтри сповіщень • ${escapeHtml(poolTitle)}</b>`
@@ -77,18 +77,18 @@ export function renderPoolSettingsText(
   const subStatusLabel = ctx.lang === "uk" ? "Підписка на кластер" : ctx.lang === "ru" ? "Подписка на кластер" : "Cluster Subscription";
 
   const categoriesHeader = ctx.lang === "uk" ? "Категорії сповіщень:" : ctx.lang === "ru" ? "Категории уведомлений:" : "Event Categories:";
-  const dropsLabel = ctx.lang === "uk" ? "Вільні слоти (Drops)" : ctx.lang === "ru" ? "Свободные слоты (Drops)" : "Available Slots (Drops)";
-  const soldLabel = ctx.lang === "uk" ? "Розпродано (Sold Out)" : ctx.lang === "ru" ? "Распродано (Sold Out)" : "Sold Out";
+  const dropsLabel = ctx.lang === "uk" ? "Вільні слоти" : ctx.lang === "ru" ? "Свободные слоты" : "Available Drops";
+  const soldLabel = ctx.lang === "uk" ? "Розпродано" : ctx.lang === "ru" ? "Распродано" : "Sold Out";
   const modelsLabel = ctx.lang === "uk" ? "Оновлення моделей" : ctx.lang === "ru" ? "Обновления моделей" : "Model Updates";
   const pricesLabel = ctx.lang === "uk" ? "Зміна цін та знижок" : ctx.lang === "ru" ? "Изменение цен и скидок" : "Price & Discount Changes";
 
   return `${icon("nav_settings")} ${headerTitle}\n\n` +
-    `${icon("notify_bell_on")} <b>${subStatusLabel}:</b> [ ${capacityBar} ] <b>${statusWord}</b> <i>(${subscribedCount}/${totalBlocks} ${blocksUnit})</i>\n\n` +
+    `${icon("notify_bell_on")} <b>${subStatusLabel}:</b> [${capacityBar}] <b>${statusWord}</b> <i>(${subscribedCount}/${totalBlocks} ${blocksUnit})</i>\n\n` +
     `<b>${categoriesHeader}</b>\n` +
-    `• ${icon("event_slot_drop")} ${dropsLabel}: ${flags.available ? onText : offText}\n` +
-    `• ${icon("event_slot_sold")} ${soldLabel}: ${flags.soldOut ? onText : offText}\n` +
-    `• ${icon("ai_robot")} ${modelsLabel}: ${flags.models ? onText : offText}\n` +
-    `• ${icon("price_tag")} ${pricesLabel}: ${flags.prices ? onText : offText}`;
+    `• ${icon("event_slot_drop")} <b>${dropsLabel}:</b> ${flags.available ? onIcon : offIcon}\n` +
+    `• ${icon("event_slot_sold")} <b>${soldLabel}:</b> ${flags.soldOut ? onIcon : offIcon}\n` +
+    `• ${icon("ai_robot")} <b>${modelsLabel}:</b> ${flags.models ? onIcon : offIcon}\n` +
+    `• ${icon("price_tag")} <b>${pricesLabel}:</b> ${flags.prices ? onIcon : offIcon}`;
 }
 
 export function renderPoolDetailText(

@@ -22,17 +22,17 @@ export function renderDonateText(ctx: BotContext, userTotalStars = 0): string {
   if (meta.isAdmin) {
     statusCard =
       ctx.lang === "uk"
-        ? `\n\n${meta.iconHtml} <b>Ваш статус:</b> ${meta.rankTitle}\n• <b>Пріоритет:</b> ${meta.priorityTitle}\n• <b>Утримання:</b> ${meta.retentionText}`
+        ? `\n\n<b>Ваш статус:</b> ${meta.rankTitle}\n• <b>Пріоритет:</b> ${meta.priorityTitle}\n• <b>Утримання:</b> ${meta.retentionText}`
         : ctx.lang === "ru"
-        ? `\n\n${meta.iconHtml} <b>Ваш статус:</b> ${meta.rankTitle}\n• <b>Приоритет:</b> ${meta.priorityTitle}\n• <b>Удержание:</b> ${meta.retentionText}`
-        : `\n\n${meta.iconHtml} <b>Your Status:</b> ${meta.rankTitle}\n• <b>Priority:</b> ${meta.priorityTitle}\n• <b>Retention:</b> ${meta.retentionText}`;
+        ? `\n\n<b>Ваш статус:</b> ${meta.rankTitle}\n• <b>Приоритет:</b> ${meta.priorityTitle}\n• <b>Удержание:</b> ${meta.retentionText}`
+        : `\n\n<b>Your Status:</b> ${meta.rankTitle}\n• <b>Priority:</b> ${meta.priorityTitle}\n• <b>Retention:</b> ${meta.retentionText}`;
   } else if (userTotalStars > 0) {
     statusCard =
       ctx.lang === "uk"
-        ? `\n\n${meta.iconHtml} <b>Ваш статус:</b> ${meta.rankTitle} (<b>${userTotalStars} ${starIcon}</b>)\n• <b>Пріоритет:</b> ${meta.priorityTitle}\n• <b>Утримання:</b> ${meta.retentionText}`
+        ? `\n\n<b>Ваш статус:</b> ${meta.rankTitle} (<b>${userTotalStars} ${starIcon}</b>)\n• <b>Пріоритет:</b> ${meta.priorityTitle}\n• <b>Утримання:</b> ${meta.retentionText}`
         : ctx.lang === "ru"
-        ? `\n\n${meta.iconHtml} <b>Ваш статус:</b> ${meta.rankTitle} (<b>${userTotalStars} ${starIcon}</b>)\n• <b>Приоритет:</b> ${meta.priorityTitle}\n• <b>Удержание:</b> ${meta.retentionText}`
-        : `\n\n${meta.iconHtml} <b>Your Status:</b> ${meta.rankTitle} (<b>${userTotalStars} ${starIcon}</b>)\n• <b>Priority:</b> ${meta.priorityTitle}\n• <b>Retention:</b> ${meta.retentionText}`;
+        ? `\n\n<b>Ваш статус:</b> ${meta.rankTitle} (<b>${userTotalStars} ${starIcon}</b>)\n• <b>Приоритет:</b> ${meta.priorityTitle}\n• <b>Удержание:</b> ${meta.retentionText}`
+        : `\n\n<b>Your Status:</b> ${meta.rankTitle} (<b>${userTotalStars} ${starIcon}</b>)\n• <b>Priority:</b> ${meta.priorityTitle}\n• <b>Retention:</b> ${meta.retentionText}`;
   }
 
   if (ctx.lang === "uk") {
