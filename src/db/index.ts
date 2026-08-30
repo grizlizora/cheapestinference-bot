@@ -269,6 +269,12 @@ export function initSchema(db: Database.Database): void {
     db.exec(`ALTER TABLE notification_outbox ADD COLUMN language TEXT NOT NULL DEFAULT 'en';`);
   } catch {}
   try {
+    db.exec(`ALTER TABLE notification_outbox ADD COLUMN media_type TEXT NOT NULL DEFAULT 'text';`);
+  } catch {}
+  try {
+    db.exec(`ALTER TABLE notification_outbox ADD COLUMN file_id TEXT;`);
+  } catch {}
+  try {
     db.exec(`CREATE INDEX IF NOT EXISTS idx_users_admins ON users(telegram_id) WHERE is_admin = 1 AND is_active = 1;`);
   } catch {}
   try {

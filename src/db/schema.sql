@@ -188,6 +188,8 @@ CREATE TABLE IF NOT EXISTS notification_outbox (
   block_id TEXT,
   is_broadcast INTEGER NOT NULL DEFAULT 0,
   language TEXT NOT NULL DEFAULT 'en',
+  media_type TEXT NOT NULL DEFAULT 'text',
+  file_id TEXT,
   status TEXT NOT NULL DEFAULT 'pending',
   attempts INTEGER NOT NULL DEFAULT 0,
   last_error TEXT,

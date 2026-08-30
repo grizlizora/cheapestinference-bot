@@ -85,6 +85,8 @@ describe("Admin Multi-Language Broadcast System", () => {
         block_id TEXT,
         is_broadcast INTEGER NOT NULL DEFAULT 0,
         language TEXT NOT NULL DEFAULT 'en',
+        media_type TEXT NOT NULL DEFAULT 'text',
+        file_id TEXT,
         status TEXT NOT NULL DEFAULT 'pending',
         attempts INTEGER NOT NULL DEFAULT 0,
         last_error TEXT,
@@ -606,5 +608,76 @@ describe("Admin Multi-Language Broadcast System", () => {
     // Must have successfully serviced both P0 broadcasts and the P1 slot drop without lock or delay
     expect(dispatchedPriorities).toContain("P0");
     expect(dispatchedPriorities).toContain("P1");
+  });
+
+  it("8. Media Broadcast & Crash Recovery: lossless media dispatch and seamless SQLite outbox resumption after crash", async () => {
+    const testDispatcher = new NotificationDispatcher(
+      mockBot,
+      userDao,
+      logDao,
+      undefined,
+      invertedIndex,
+      undefined,
+      outboxDao
+    );
+
+    // A. Dispatch media broadcast (Photo with Caption)
+    const mediaDrafts = {
+      uk: {
+        text: "⚡ <b>Нове покоління серверів!</b> Дивіться фотографію нижче:",
+        mediaType: "photo" as const,
+        fileId: "AgACAgIAAxkBAAIB...", // Original highest-res Telegram file_id
+      },
+      en: {
+        text: "⚡ <b>New Server Generation!</b> See photo below:",
+        mediaType: "photo" as const,
+        fileId: "AgACAgIAAxkBAAIB...",
+      },
+      ru: {
+        text: "⚡ <b>Новое поколение серверов!</b> Смотрите фото ниже:",
+        mediaType: "photo" as const,
+        fileId: "AgACAgIAAxkBAAIB...",
+      },
+    };
+
+    const res = await testDispatcher.dispatchBroadcastBatch(mediaDrafts, { filter: "active_only" });
+    expect(res.totalEnqueued).toBe(4);
+
+    // Verify items in SQLite outbox have media_type = 'photo' and correct file_id
+    const pending = outboxDao.getPending(10);
+    expect(pending.length).toBe(4);
+    expect(pending[0].mediaType).toBe("photo");
+    expect(pending[0].fileId).toBe("AgACAgIAAxkBAAIB...");
+
+    // B. Simulate sending first 2 messages during active broadcast
+    const msg1 = (testDispatcher as any).p0Queue.pop();
+    const msg2 = (testDispatcher as any).p0Queue.pop();
+    outboxDao.markDispatched(msg1.id);
+    outboxDao.markDispatched(msg2.id);
+
+    // Remaining in SQLite outbox is 2 pending messages
+    const remainingPending = outboxDao.getPending(10);
+    expect(remainingPending.length).toBe(2);
+
+    // C. Simulate Server Crash & Reboot:
+    // Create fresh dispatcher instance connected to same SQLite DB
+    const restartedDispatcher = new NotificationDispatcher(
+      mockBot,
+      userDao,
+      logDao,
+      undefined,
+      invertedIndex,
+      undefined,
+      outboxDao
+    );
+
+    // The restarted dispatcher must have automatically hydrated exactly the 2 remaining messages into P0 on boot
+    expect((restartedDispatcher as any).p0Queue.size()).toBe(2);
+
+    // Drain and verify that mediaType and fileId survived the reboot intact
+    const nextMsg = (restartedDispatcher as any).p0Queue.pop();
+    expect(nextMsg.mediaType).toBe("photo");
+    expect(nextMsg.fileId).toBe("AgACAgIAAxkBAAIB...");
+    expect(nextMsg.text).toMatch(/покоління|поколение|Server Generation/);
   });
 });

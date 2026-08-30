@@ -25,6 +25,8 @@ export interface OutgoingAlertMessage {
   priority: BroadcastPriority;
   retries: number;
   enqueuedAt: number;
+  mediaType?: "text" | "photo" | "video" | "document" | "animation";
+  fileId?: string;
 }
 
 export function cleanPriceString(val: string | number | undefined | null): string {

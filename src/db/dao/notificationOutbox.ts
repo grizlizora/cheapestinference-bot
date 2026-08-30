@@ -14,6 +14,8 @@ export interface OutboxItem {
   blockId?: string;
   isBroadcast?: boolean;
   language?: string;
+  mediaType?: "text" | "photo" | "video" | "document" | "animation";
+  fileId?: string;
   status: "pending" | "dispatched" | "failed";
   attempts: number;
   lastError?: string;
@@ -34,8 +36,9 @@ export class NotificationOutboxDAO {
     this.stmtEnqueue = db.prepare(`
       INSERT OR IGNORE INTO notification_outbox (
         id, user_id, telegram_id, priority, message_text, reply_markup_json,
-        disable_notification, event_type, pool_slug, block_id, is_broadcast, language, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+        disable_notification, event_type, pool_slug, block_id, is_broadcast, language,
+        media_type, file_id, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
     `);
 
     this.stmtGetPending = db.prepare(`
@@ -43,8 +46,8 @@ export class NotificationOutboxDAO {
         id, user_id as userId, telegram_id as telegramId, priority, message_text as messageText,
         reply_markup_json as replyMarkupJson, disable_notification as disableNotification,
         event_type as eventType, pool_slug as poolSlug, block_id as blockId,
-        is_broadcast as isBroadcast, language, status, attempts,
-        created_at as createdAt
+        is_broadcast as isBroadcast, language, media_type as mediaType, file_id as fileId,
+        status, attempts, created_at as createdAt
       FROM notification_outbox
       WHERE status = 'pending'
       ORDER BY priority ASC, created_at ASC
@@ -90,7 +93,9 @@ export class NotificationOutboxDAO {
           item.poolSlug || null,
           item.blockId || null,
           item.isBroadcast ? 1 : 0,
-          item.language || "en"
+          item.language || "en",
+          item.mediaType || "text",
+          item.fileId || null
         );
       }
     });
@@ -114,7 +119,9 @@ export class NotificationOutboxDAO {
       item.poolSlug || null,
       item.blockId || null,
       item.isBroadcast ? 1 : 0,
-      item.language || "en"
+      item.language || "en",
+      item.mediaType || "text",
+      item.fileId || null
     );
   }
 

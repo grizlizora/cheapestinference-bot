@@ -522,11 +522,21 @@ export function createTelegramBot(
     const lang = ctx.match[1] as SupportedLanguage;
     const session = getOrCreateBroadcastSession(ctx);
     const draft = session.drafts[lang];
-    if (draft && draft.htmlText) {
-      await ctx.reply(draft.htmlText, {
-        parse_mode: "HTML",
-        link_preview_options: { is_disabled: true },
-      }).catch(() => {});
+    if (draft && (draft.htmlText || draft.fileId)) {
+      if (draft.mediaType === "photo" && draft.fileId) {
+        await ctx.replyWithPhoto(draft.fileId, { caption: draft.htmlText, parse_mode: "HTML" }).catch(() => {});
+      } else if (draft.mediaType === "video" && draft.fileId) {
+        await ctx.replyWithVideo(draft.fileId, { caption: draft.htmlText, parse_mode: "HTML" }).catch(() => {});
+      } else if (draft.mediaType === "document" && draft.fileId) {
+        await ctx.replyWithDocument(draft.fileId, { caption: draft.htmlText, parse_mode: "HTML" }).catch(() => {});
+      } else if (draft.mediaType === "animation" && draft.fileId) {
+        await ctx.replyWithAnimation(draft.fileId, { caption: draft.htmlText, parse_mode: "HTML" }).catch(() => {});
+      } else {
+        await ctx.reply(draft.htmlText, {
+          parse_mode: "HTML",
+          link_preview_options: { is_disabled: true },
+        }).catch(() => {});
+      }
       await ctx.answerCallbackQuery({ text: ctx.t("admin.broadcast.toast_test_sent", { lang: lang.toUpperCase() }) }).catch(() => {});
     } else {
       await ctx.answerCallbackQuery({ text: ctx.t("admin.broadcast.toast_draft_empty"), show_alert: true }).catch(() => {});
@@ -540,11 +550,22 @@ export function createTelegramBot(
     let sentCount = 0;
     for (const l of langs) {
       const draft = session.drafts[l];
-      if (draft && draft.htmlText) {
-        await ctx.reply(`[${l.toUpperCase()}]\n\n${draft.htmlText}`, {
-          parse_mode: "HTML",
-          link_preview_options: { is_disabled: true },
-        }).catch(() => {});
+      if (draft && (draft.htmlText || draft.fileId)) {
+        const prefix = `[${l.toUpperCase()}]\n\n`;
+        if (draft.mediaType === "photo" && draft.fileId) {
+          await ctx.replyWithPhoto(draft.fileId, { caption: `${prefix}${draft.htmlText}`, parse_mode: "HTML" }).catch(() => {});
+        } else if (draft.mediaType === "video" && draft.fileId) {
+          await ctx.replyWithVideo(draft.fileId, { caption: `${prefix}${draft.htmlText}`, parse_mode: "HTML" }).catch(() => {});
+        } else if (draft.mediaType === "document" && draft.fileId) {
+          await ctx.replyWithDocument(draft.fileId, { caption: `${prefix}${draft.htmlText}`, parse_mode: "HTML" }).catch(() => {});
+        } else if (draft.mediaType === "animation" && draft.fileId) {
+          await ctx.replyWithAnimation(draft.fileId, { caption: `${prefix}${draft.htmlText}`, parse_mode: "HTML" }).catch(() => {});
+        } else {
+          await ctx.reply(`${prefix}${draft.htmlText}`, {
+            parse_mode: "HTML",
+            link_preview_options: { is_disabled: true },
+          }).catch(() => {});
+        }
         sentCount++;
       }
     }
@@ -597,9 +618,21 @@ export function createTelegramBot(
     if (!(await requireAdmin(ctx))) return;
     const session = getOrCreateBroadcastSession(ctx);
     const drafts = {
-      uk: session.drafts.uk?.htmlText,
-      en: session.drafts.en?.htmlText,
-      ru: session.drafts.ru?.htmlText,
+      uk: session.drafts.uk ? {
+        text: session.drafts.uk.htmlText,
+        mediaType: session.drafts.uk.mediaType,
+        fileId: session.drafts.uk.fileId,
+      } : undefined,
+      en: session.drafts.en ? {
+        text: session.drafts.en.htmlText,
+        mediaType: session.drafts.en.mediaType,
+        fileId: session.drafts.en.fileId,
+      } : undefined,
+      ru: session.drafts.ru ? {
+        text: session.drafts.ru.htmlText,
+        mediaType: session.drafts.ru.mediaType,
+        fileId: session.drafts.ru.fileId,
+      } : undefined,
     };
 
     await ctx.answerCallbackQuery({ text: ctx.t("admin.broadcast.toast_dispatched") }).catch(() => {});

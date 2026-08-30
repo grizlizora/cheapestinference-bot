@@ -117,6 +117,8 @@ export class NotificationDispatcher {
           priority: item.priority,
           retries: item.attempts,
           enqueuedAt: itemCreatedMs,
+          mediaType: item.mediaType,
+          fileId: item.fileId,
         };
 
         const q = this.getQueueByPriority(msg.priority);
@@ -582,7 +584,11 @@ export class NotificationDispatcher {
    * SQLite Outbox persistence, and DWRR P0 rate-limited streaming.
    */
   public async dispatchBroadcastBatch(
-    drafts: { uk?: string; en?: string; ru?: string },
+    drafts: {
+      uk?: string | { text: string; mediaType?: "text" | "photo" | "video" | "document" | "animation"; fileId?: string };
+      en?: string | { text: string; mediaType?: "text" | "photo" | "video" | "document" | "animation"; fileId?: string };
+      ru?: string | { text: string; mediaType?: "text" | "photo" | "video" | "document" | "animation"; fileId?: string };
+    },
     options: {
       sendSilent?: boolean;
       filter?: "all" | "active_only" | "donors_only";
@@ -595,25 +601,33 @@ export class NotificationDispatcher {
     const outboxBatch: OutboxItem[] = [];
     const statsByLang: Record<string, number> = { uk: 0, en: 0, ru: 0 };
 
+    const getDraftInfo = (d?: string | { text: string; mediaType?: "text" | "photo" | "video" | "document" | "animation"; fileId?: string }) => {
+      if (!d) return undefined;
+      if (typeof d === "string") {
+        return { text: d, mediaType: "text" as const, fileId: undefined };
+      }
+      return { text: d.text, mediaType: d.mediaType || ("text" as const), fileId: d.fileId };
+    };
+
     for (const p of profiles) {
-      let chosenText = drafts[p.language];
+      let chosen = getDraftInfo(drafts[p.language]);
       let resolvedLang: SupportedLanguage = p.language;
 
       // 4-tier fallback resolution
-      if (!chosenText || chosenText.trim().length === 0) {
-        if (drafts.en && drafts.en.trim().length > 0) {
-          chosenText = drafts.en;
+      if (!chosen || chosen.text.trim().length === 0) {
+        if (drafts.en && getDraftInfo(drafts.en)?.text.trim().length) {
+          chosen = getDraftInfo(drafts.en);
           resolvedLang = "en";
-        } else if (drafts.uk && drafts.uk.trim().length > 0) {
-          chosenText = drafts.uk;
+        } else if (drafts.uk && getDraftInfo(drafts.uk)?.text.trim().length) {
+          chosen = getDraftInfo(drafts.uk);
           resolvedLang = "uk";
-        } else if (drafts.ru && drafts.ru.trim().length > 0) {
-          chosenText = drafts.ru;
+        } else if (drafts.ru && getDraftInfo(drafts.ru)?.text.trim().length) {
+          chosen = getDraftInfo(drafts.ru);
           resolvedLang = "ru";
         }
       }
 
-      if (!chosenText || chosenText.trim().length === 0) continue;
+      if (!chosen || chosen.text.trim().length === 0) continue;
 
       statsByLang[resolvedLang] = (statsByLang[resolvedLang] || 0) + 1;
       const isMuted = options.sendSilent ?? Boolean(p.isMuted);
@@ -624,11 +638,13 @@ export class NotificationDispatcher {
         userId: p.userId,
         telegramId: p.telegramId,
         priority: "P0",
-        messageText: chosenText,
+        messageText: chosen.text,
         disableNotification: isMuted,
         eventType: "admin_broadcast",
         isBroadcast: true,
         language: resolvedLang,
+        mediaType: chosen.mediaType,
+        fileId: chosen.fileId,
         status: "pending",
         attempts: 0,
       };
@@ -642,7 +658,9 @@ export class NotificationDispatcher {
         poolSlug: "broadcast",
         blockId: "all",
         eventType: "admin_broadcast",
-        text: chosenText,
+        text: chosen.text,
+        mediaType: chosen.mediaType,
+        fileId: chosen.fileId,
         isMuted,
         priority: "P0",
         retries: 0,
@@ -667,23 +685,54 @@ export class NotificationDispatcher {
 
       const sanitizedText = toValidUtf8(msg.text);
 
-      try {
-        await this.bot.api.sendMessage(msg.telegramId, sanitizedText, {
+      const sendHelper = async (text: string) => {
+        if (msg.mediaType === "photo" && msg.fileId) {
+          return await this.bot.api.sendPhoto(msg.telegramId, msg.fileId, {
+            caption: text,
+            parse_mode: "HTML",
+            reply_markup: msg.keyboard,
+            disable_notification: msg.isMuted,
+          });
+        }
+        if (msg.mediaType === "video" && msg.fileId) {
+          return await this.bot.api.sendVideo(msg.telegramId, msg.fileId, {
+            caption: text,
+            parse_mode: "HTML",
+            reply_markup: msg.keyboard,
+            disable_notification: msg.isMuted,
+          });
+        }
+        if (msg.mediaType === "document" && msg.fileId) {
+          return await this.bot.api.sendDocument(msg.telegramId, msg.fileId, {
+            caption: text,
+            parse_mode: "HTML",
+            reply_markup: msg.keyboard,
+            disable_notification: msg.isMuted,
+          });
+        }
+        if (msg.mediaType === "animation" && msg.fileId) {
+          return await this.bot.api.sendAnimation(msg.telegramId, msg.fileId, {
+            caption: text,
+            parse_mode: "HTML",
+            reply_markup: msg.keyboard,
+            disable_notification: msg.isMuted,
+          });
+        }
+        return await this.bot.api.sendMessage(msg.telegramId, text, {
           parse_mode: "HTML",
           reply_markup: msg.keyboard,
           disable_notification: msg.isMuted,
           link_preview_options: { is_disabled: true },
         });
+      };
+
+      try {
+        await sendHelper(sanitizedText);
       } catch (sendErr: any) {
         const desc = sendErr?.description || sendErr?.message || "";
         if (desc.includes("DOCUMENT_INVALID") || desc.includes("CUSTOM_EMOJI_INVALID")) {
           const stripped = sanitizedText.replace(/<tg-emoji[^>]*>(.*?)<\/tg-emoji>/gi, "$1");
-          await this.bot.api.sendMessage(msg.telegramId, stripped, {
-            parse_mode: "HTML",
-            reply_markup: msg.keyboard,
-            disable_notification: msg.isMuted,
-            link_preview_options: { is_disabled: true },
-          });
+          await sendHelper(stripped);
         } else {
           throw sendErr;
         }
