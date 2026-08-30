@@ -92,6 +92,7 @@ export class CatalogHistoryDAO {
       ],
       true
     );
+    console.log(`📦 [CatalogHistory] Recorded MODEL_UPGRADE for ${diff.poolSlug}: +${diff.added.length} added, ${diff.upgraded.length} upgraded.`);
   }
 
   public recordTierUpdate(poolSlug: string, poolName: string, allModels: string[], payload: TierUpdatedPayload): void {
@@ -131,6 +132,7 @@ export class CatalogHistoryDAO {
       ],
       true
     );
+    console.log(`🛠️ [CatalogHistory] Recorded TIER_UPDATE for ${poolSlug}.`);
   }
 
   public recordBasePriceUpdate(poolSlug: string, poolName: string, allModels: string[], payload: PoolBasePricePayload): void {
@@ -165,6 +167,7 @@ export class CatalogHistoryDAO {
       ],
       true
     );
+    console.log(`🏷️ [CatalogHistory] Recorded BASE_PRICE for ${poolSlug}: ${payload.previousMinPrice} ➔ ${payload.newMinPrice} (${payload.priceDelta > 0 ? "+" : ""}${payload.priceDelta})`);
   }
 
   public recordSlotPriceChange(
@@ -194,6 +197,7 @@ export class CatalogHistoryDAO {
       [poolSlug, blockId, oldPrice, newPrice, newPriceNum, priceDelta, percentDelta],
       true
     );
+    console.log(`💰 [SlotPriceHistory] Recorded slot price change for ${poolSlug}:${blockId}: ${oldPrice} ➔ ${newPrice} (${percentDelta > 0 ? "+" : ""}${percentDelta}%)`);
   }
 
   /**

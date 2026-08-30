@@ -139,6 +139,7 @@ export class SlotHistoryDAO {
       [poolSlug, blockId, initialStatus, priceMonth],
       true
     );
+    console.log(`🟢 [SlotHistory] Recorded slot OPENED for ${poolSlug}:${blockId} (${priceMonth}, status: ${initialStatus})`);
   }
 
   public recordSlotClosed(poolSlug: string, blockId: string): void {
@@ -151,6 +152,7 @@ export class SlotHistoryDAO {
       [poolSlug, blockId],
       true
     );
+    console.log(`🔴 [SlotHistory] Recorded slot CLOSED for ${poolSlug}:${blockId}`);
   }
 
   public getActiveSlot(poolSlug: string, blockId: string): SlotLifecycleRecord | undefined {
