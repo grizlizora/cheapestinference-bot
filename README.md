@@ -7,7 +7,7 @@
 [![grammY](https://img.shields.io/badge/grammY-Telegram%20Framework-2481CC?style=for-the-badge&logo=telegram&logoColor=white)](https://grammy.dev/)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL%20Mode-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
 [![Turso](https://img.shields.io/badge/Turso-Cloud%20Sync-00D2BA?style=for-the-badge&logo=sqlite&logoColor=white)](https://turso.tech/)
-[![Vitest](https://img.shields.io/badge/Vitest-183%20Tests%20Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)](https://vitest.dev/)
+[![Vitest](https://img.shields.io/badge/Vitest-442%20Tests%20Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)](https://vitest.dev/)
 [![Latency](https://img.shields.io/badge/Live%20Origin%20API-240ms--280ms-success?style=for-the-badge&logo=lightning&logoColor=white)]()
 [![LiveSync](https://img.shields.io/badge/Telegram%20LiveSync-51ms--65ms-blue?style=for-the-badge&logo=telegram&logoColor=white)]()
 [![Tor](https://img.shields.io/badge/Tor%20Network-SOCKS5h-7D4698?style=for-the-badge&logo=torproject&logoColor=white)](https://www.torproject.org/)
@@ -348,12 +348,12 @@ npm test
 ```
 
 ```
- Test Files  36 passed (36)
-      Tests  183 passed (183)
-   Duration  2.38s
+ Test Files  91 passed (91)
+      Tests  442 passed (442)
+   Duration  6.60s
 ```
 
-* **36 Test Suites**: Complete End-to-End Simulation (7 Stages), Strict 3-Tier Priority Ordering (P0 Admin ➔ P1 VIP Donors DESC ➔ P2 Free Active), 14-Day Inactivity Engine & Dormant Filtering, Progressive Star Retention Calculus & Decay Invariants, Zero-Loss Instant Revival on User Touch, Telegram 403 Block Safety & Subscriber Index Preservation, Granular Multi-Tariff Event Isolation, Slot Availability Oscillation Immunity ($K=2$ Noise Gate), Slot Diffing ($K=1$/$K=2$), Predictive Analytics & Outlier-Free IQR, Price Rating (ATL / Fair Value), Bipartite Model Matching, Tor Stream Isolation, In-Memory Inverted Index, Singleflight Polling, DWRR Scheduler, Live Dashboard Sync, Rate Limiting, Multi-Language i18n, Turso Cloud Sync Hydration, Telegram Stars (XTR) Custom Flow, and SQLite Migrations.
+* **91 Test Suites (442 Automated Tests)**: Complete End-to-End Simulation (7 Stages), Strict 3-Tier Priority Ordering (P0 Admin ➔ P1 VIP Donors DESC ➔ P2 Free Active), 14-Day Inactivity Engine & Dormant Filtering, Progressive Star Retention Calculus & Decay Invariants, Zero-Loss Instant Revival on User Touch, Telegram 403 Block Safety & Subscriber Index Preservation, Granular Multi-Tariff Event Isolation, Slot Availability Oscillation Immunity ($K=2$ Noise Gate), Slot Diffing ($K=1$/$K=2$), Predictive Analytics & Outlier-Free IQR, Price Rating (ATL / Fair Value), Bipartite Model Matching, Tor Stream Isolation, In-Memory Inverted Index, Singleflight Polling, DWRR Scheduler, Live Dashboard Sync, Rate Limiting, Multi-Language i18n, Turso Cloud Sync Hydration, Telegram Stars (XTR) Custom Flow, and SQLite Migrations.
 
 ---
 
