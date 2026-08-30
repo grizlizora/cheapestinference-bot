@@ -11,6 +11,7 @@ import { ProxyPool } from "../proxy/proxyPool.js";
 import {
   createMainMenuHierarchy,
   renderDashboardText,
+  renderSettingsText,
   renderHelpText,
 } from "./menus/mainDashboard.js";
 import { renderSubscriptionsText } from "./menus/subscriptions.js";
@@ -411,6 +412,17 @@ export function createTelegramBot(
     }
     const rendered = renderDashboardText(ctx, poolStateDao, historyDao, scraper);
     await safeEditMessageText(ctx, rendered, { reply_markup: mainDashboardMenu });
+  });
+
+  bot.callbackQuery("admin_open_settings", async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    await ctx.answerCallbackQuery().catch(() => {});
+    const msgId = ctx.callbackQuery?.message?.message_id;
+    if (ctx.chat && msgId) {
+      activeDashboardRegistry.updateView(ctx.chat.id, "settings", undefined, ctx.lang, msgId, ctx.user?.id);
+    }
+    const rendered = renderSettingsText(ctx);
+    await safeEditMessageText(ctx, rendered, { reply_markup: settingsMenu });
   });
 
   bot.callbackQuery("admin_toggle_new_users", async (ctx) => {

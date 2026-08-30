@@ -136,6 +136,7 @@ export function createAdminKeyboard(ctx: BotContext, userDao: UserDAO): InlineKe
   const adminUser = ctx.from ? userDao.getByTelegramId(ctx.from.id) : undefined;
   const newUsersEnabled = (adminUser?.notify_admin_new_users ?? 1) === 1;
 
+  const settingsLabel = ctx.lang === "uk" ? "⚙️ Налаштування" : ctx.lang === "ru" ? "⚙️ Настройки" : "⚙️ Settings";
   const dashboardLabel = ctx.lang === "uk" ? "📊 Головний дашборд" : ctx.lang === "ru" ? "📊 Главный дашборд" : "📊 Main Dashboard";
   const broadcastLabel = ctx.lang === "uk" ? "📢 Розсилка користувачам" : ctx.lang === "ru" ? "📢 Рассылка пользователям" : "📢 Broadcast to Users";
 
@@ -158,6 +159,8 @@ export function createAdminKeyboard(ctx: BotContext, userDao: UserDAO): InlineKe
     .text(ctx.t("admin.btn_test_alert"), "admin_test_alert")
     .row()
     .text(ctx.t("common.refresh"), "admin_refresh")
+    .row()
+    .text(settingsLabel, "admin_open_settings")
     .row()
     .text(dashboardLabel, "admin_open_dashboard");
 }
