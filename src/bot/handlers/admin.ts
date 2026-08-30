@@ -151,17 +151,14 @@ export function createAdminKeyboard(ctx: BotContext, userDao: UserDAO): InlineKe
     )
     .row()
     .text(ctx.t("admin.btn_export_users"), "admin_export_users")
-    .row()
     .text(ctx.t("admin.btn_export_history"), "admin_export_history")
     .row()
-    .text(ctx.t("admin.btn_backup"), "admin_backup")
-    .row()
+    .text(ctx.t("admin.btn_backup"), "admin_backup_sqlite")
     .text(ctx.t("admin.btn_test_alert"), "admin_test_alert")
     .row()
     .text(ctx.t("common.refresh"), "admin_refresh")
     .row()
     .text(settingsLabel, "admin_open_settings")
-    .row()
     .text(dashboardLabel, "admin_open_dashboard");
 }
 

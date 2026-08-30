@@ -106,6 +106,10 @@ export class LiveDashboardManager {
     }
   }
 
+  public async updateView(session: ActiveDashboardEntry): Promise<void> {
+    await this.executeEdit(session);
+  }
+
   private enqueueUpdate(session: ActiveDashboardEntry): void {
     if (!this.queuedChatIds.has(session.chatId)) {
       this.queuedChatIds.add(session.chatId);

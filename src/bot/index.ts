@@ -11,7 +11,6 @@ import { ProxyPool } from "../proxy/proxyPool.js";
 import {
   createMainMenuHierarchy,
   renderDashboardText,
-  renderSettingsText,
   renderHelpText,
 } from "./menus/mainDashboard.js";
 import { renderSubscriptionsText } from "./menus/subscriptions.js";
@@ -61,7 +60,13 @@ export function createTelegramBot(
   activeDashboardDao?: ActiveDashboardDAO,
   donationDao?: DonationDAO,
   outboxDao?: NotificationOutboxDAO
-): { bot: Bot<BotContext>; dispatcher: NotificationDispatcher; liveDashboardManager: LiveDashboardManager; donationDao: DonationDAO; outboxDao: NotificationOutboxDAO } {
+): {
+  bot: Bot<BotContext>;
+  dispatcher: NotificationDispatcher;
+  liveDashboardManager: LiveDashboardManager;
+  donationDao: DonationDAO;
+  outboxDao: NotificationOutboxDAO;
+} {
   const bot = new Bot<BotContext>(token, {
     client: config.TELEGRAM_API_ROOT
       ? {
@@ -225,7 +230,6 @@ export function createTelegramBot(
       if (isBrandNew && !isUserAdmin(ctx.from.id, userDao, ctx.from.username)) {
         const userStats = userDao.getUserStats();
         const usernameStr = ctx.from.username ? `@${escapeHtml(ctx.from.username)}` : "—";
-        const langFlag = getLanguageFlag(ctx.lang);
         const allAdminIds = userDao.getAllAdminTelegramIds(config.ADMIN_USER_IDS);
 
         for (const adminId of allAdminIds) {
@@ -235,10 +239,6 @@ export function createTelegramBot(
           const wantsAlerts = (adminUser?.notify_admin_new_users ?? 1) === 1;
 
           if (wantsAlerts) {
-            const userIcon = `<tg-emoji emoji-id="5373012449597335010">👤</tg-emoji>`;
-            const idIcon = `<tg-emoji emoji-id="5422683699130933153">🪪</tg-emoji>`;
-            const usersIcon = `<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji>`;
-            const langIcon = `<tg-emoji emoji-id="5399898266265475100">🌐</tg-emoji>`;
             const adminLang = (adminUser?.language as SupportedLanguage) || "uk";
             const flag = getLanguageFlag(ctx.lang);
             const langStr = `${ctx.lang.toUpperCase()} ${flag}`;
@@ -394,184 +394,162 @@ export function createTelegramBot(
 
   bot.command("language", createLanguageHandler(languageMenu));
 
-  bot.command("admin", createAdminHandler(userDao, subDao, scraper, proxyPool, dispatcher.getInvertedIndex()));
-  bot.command("stats", createAdminHandler(userDao, subDao, scraper, proxyPool, dispatcher.getInvertedIndex()));
+  bot.command("help", async (ctx) => {
+    const text = renderHelpText(ctx);
+    const keyboard = new InlineKeyboard().text(
+      ctx.t("common.back_to_menu"),
+      "nav_dashboard"
+    );
+    await ctx.reply(text, {
+      parse_mode: "HTML",
+      reply_markup: keyboard,
+      link_preview_options: { is_disabled: true },
+    });
+  });
+
+  bot.command("donate", async (ctx) => {
+    if (!ctx.from) return;
+    const profile = dispatcher.getInvertedIndex().getProfileByTgId(ctx.from.id);
+    const totalStars = profile?.totalDonatedStars || 0;
+    const text = renderDonateText(ctx, totalStars);
+    await ctx.reply(text, {
+      parse_mode: "HTML",
+      reply_markup: donateMenu,
+      link_preview_options: { is_disabled: true },
+    });
+  });
+
+  bot.command(
+    "admin",
+    createAdminHandler(
+      userDao,
+      subDao,
+      scraper,
+      proxyPool,
+      dispatcher.getInvertedIndex()
+    )
+  );
+
+  bot.command("stats", async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    const handler = createAdminHandler(
+      userDao,
+      subDao,
+      scraper,
+      proxyPool,
+      dispatcher.getInvertedIndex()
+    );
+    await handler(ctx);
+  });
+
   bot.command("backup", createBackupHandler(userDao.db, userDao, subDao, userActivitySyncer));
   bot.command("export_users", createUsersExportHandler(userDao.db, userDao, subDao, userActivitySyncer));
   bot.command("export_history", createHistoryExportHandler(userDao.db, userDao));
 
-  // 11. Admin Interactive Callback Handlers (Protected by requireAdmin)
-  bot.callbackQuery("admin_open_dashboard", async (ctx) => {
+  bot.command("testalert", async (ctx) => {
     if (!(await requireAdmin(ctx))) return;
-    await ctx.answerCallbackQuery().catch(() => {});
-    const msgId = ctx.callbackQuery?.message?.message_id;
-    if (ctx.chat && msgId) {
-      activeDashboardRegistry.register(ctx.chat.id, msgId, ctx.user.id, ctx.lang, "dashboard");
-    }
-    const rendered = renderDashboardText(ctx, poolStateDao, historyDao, scraper);
-    await safeEditMessageText(ctx, rendered, { reply_markup: mainDashboardMenu });
+    if (!ctx.from) return;
+    await dispatcher.sendTestAlert(ctx.from.id, ctx.lang, "bundle");
+    await ctx.reply("🚀 Test alert dispatched!").catch(() => {});
   });
 
-  bot.callbackQuery("admin_open_settings", async (ctx) => {
-    if (!(await requireAdmin(ctx))) return;
+  bot.callbackQuery("nav_dashboard", async (ctx) => {
     await ctx.answerCallbackQuery().catch(() => {});
-    const msgId = ctx.callbackQuery?.message?.message_id;
-    if (ctx.chat && msgId) {
-      activeDashboardRegistry.updateView(ctx.chat.id, "settings", undefined, ctx.lang, msgId, ctx.user?.id);
-    }
-    const rendered = renderSettingsText(ctx);
-    await safeEditMessageText(ctx, rendered, { reply_markup: settingsMenu });
+    const text = renderDashboardText(ctx, poolStateDao, resolvedHistoryDao, scraper);
+    await safeEditMessageText(ctx, text, {
+      reply_markup: mainDashboardMenu,
+      link_preview_options: { is_disabled: true },
+    });
+  });
+
+  // 11. Admin Panel & Broadcast Callbacks
+  bot.callbackQuery(["admin_refresh", "admin_bc_cancel"], async (ctx) => {
+    await ctx.answerCallbackQuery().catch(() => {});
+    if (!(await requireAdmin(ctx))) return;
+    const text = renderAdminText(ctx, userDao, subDao, scraper, proxyPool);
+    const keyboard = createAdminKeyboard(ctx, userDao);
+    await safeEditMessageText(ctx, text, { reply_markup: keyboard });
+  });
+
+  bot.callbackQuery(["admin_backup", "admin_backup_sqlite"], async (ctx) => {
+    await ctx.answerCallbackQuery().catch(() => {});
+    if (!(await requireAdmin(ctx))) return;
+    const handler = createBackupHandler(userDao.db, userDao, subDao, userActivitySyncer);
+    await handler(ctx);
+  });
+
+  bot.callbackQuery("admin_export_users", async (ctx) => {
+    await ctx.answerCallbackQuery().catch(() => {});
+    if (!(await requireAdmin(ctx))) return;
+    const handler = createUsersExportHandler(userDao.db, userDao, subDao, userActivitySyncer);
+    await handler(ctx);
+  });
+
+  bot.callbackQuery("admin_export_history", async (ctx) => {
+    await ctx.answerCallbackQuery().catch(() => {});
+    if (!(await requireAdmin(ctx))) return;
+    const handler = createHistoryExportHandler(userDao.db, userDao);
+    await handler(ctx);
   });
 
   bot.callbackQuery("admin_toggle_new_users", async (ctx) => {
     if (!(await requireAdmin(ctx))) return;
-    const newVal = userDao.toggleAdminNewUsers(ctx.from!.id);
-    const toast =
-      newVal === 1
-        ? ctx.t("admin.toast_new_users_on")
-        : ctx.t("admin.toast_new_users_off");
-    await ctx.answerCallbackQuery(toast).catch(() => {});
+    if (!ctx.from) return;
+    const newVal = userDao.toggleAdminNewUsers(ctx.from.id);
+    await ctx.answerCallbackQuery({
+      text: newVal === 1 ? ctx.t("admin.toast_new_users_on") : ctx.t("admin.toast_new_users_off"),
+    }).catch(() => {});
     const text = renderAdminText(ctx, userDao, subDao, scraper, proxyPool);
     const keyboard = createAdminKeyboard(ctx, userDao);
-    await ctx.editMessageText(text, { parse_mode: "HTML", reply_markup: keyboard }).catch(() => {});
-  });
-
-  bot.callbackQuery("admin_refresh", async (ctx) => {
-    if (!(await requireAdmin(ctx))) return;
-    await ctx.answerCallbackQuery({ text: ctx.t("common.refreshed_toast"), show_alert: false }).catch(() => {});
-    const text = renderAdminText(ctx, userDao, subDao, scraper, proxyPool);
-    const keyboard = createAdminKeyboard(ctx, userDao);
-    await ctx.editMessageText(text, { parse_mode: "HTML", reply_markup: keyboard }).catch(() => {});
-  });
-
-  bot.callbackQuery("admin_export_users", async (ctx) => {
-    if (!(await requireAdmin(ctx))) return;
-    await ctx.answerCallbackQuery().catch(() => {});
-    await createUsersExportHandler(userDao.db, userDao, subDao, userActivitySyncer)(ctx);
-  });
-
-  bot.callbackQuery("admin_export_history", async (ctx) => {
-    if (!(await requireAdmin(ctx))) return;
-    await ctx.answerCallbackQuery().catch(() => {});
-    await createHistoryExportHandler(userDao.db, userDao)(ctx);
-  });
-
-  bot.callbackQuery("admin_backup", async (ctx) => {
-    if (!(await requireAdmin(ctx))) return;
-    await ctx.answerCallbackQuery().catch(() => {});
-    await createBackupHandler(userDao.db, userDao, subDao, userActivitySyncer)(ctx);
+    await safeEditMessageText(ctx, text, { reply_markup: keyboard });
   });
 
   bot.callbackQuery("admin_test_alert", async (ctx) => {
     if (!(await requireAdmin(ctx))) return;
-    await ctx.answerCallbackQuery({ text: ctx.t("admin.toast_test_alert_sent"), show_alert: false }).catch(() => {});
-    await dispatcher.sendTestAlert(ctx.from!.id, ctx.lang, "slot");
+    if (!ctx.from) return;
+    await ctx.answerCallbackQuery({ text: ctx.t("admin.toast_test_alert_sent") }).catch(() => {});
+    await dispatcher.sendTestAlert(ctx.from.id, ctx.lang, "bundle");
   });
 
-  // 11.1 Admin Multi-Language Broadcast Callbacks
-  bot.callbackQuery("admin_open_broadcast", async (ctx) => {
-    if (!(await requireAdmin(ctx))) return;
+  bot.callbackQuery("admin_open_settings", async (ctx) => {
     await ctx.answerCallbackQuery().catch(() => {});
-    if (ctx.chat) {
-      activeDashboardRegistry.updateView(ctx.chat.id, "other");
-    }
-    const { text, keyboard } = renderBroadcastStagingText(ctx, userDao, dispatcher);
-    await safeEditMessageText(ctx, text, keyboard);
+    const text = ctx.t("settings.title", {
+      current_lang: ctx.lang.toUpperCase(),
+      telegram_id: String(ctx.from?.id || "N/A"),
+    });
+    await safeEditMessageText(ctx, text, { reply_markup: settingsMenu });
   });
 
-  bot.callbackQuery("admin_bc_hub", async (ctx) => {
-    if (!(await requireAdmin(ctx))) return;
+  bot.callbackQuery("admin_open_dashboard", async (ctx) => {
     await ctx.answerCallbackQuery().catch(() => {});
+    const text = renderDashboardText(ctx, poolStateDao, resolvedHistoryDao, scraper);
+    await safeEditMessageText(ctx, text, {
+      reply_markup: mainDashboardMenu,
+      link_preview_options: { is_disabled: true },
+    });
+  });
+
+  // Admin Broadcast FSM & Callback Routers
+  bot.callbackQuery(["admin_broadcast", "admin_open_broadcast", "admin_bc_hub"], async (ctx) => {
+    await ctx.answerCallbackQuery().catch(() => {});
+    if (!(await requireAdmin(ctx))) return;
     const session = getOrCreateBroadcastSession(ctx);
     session.stage = "language_select";
-    const { text, keyboard } = renderBroadcastStagingText(ctx, userDao, dispatcher);
-    await safeEditMessageText(ctx, text, keyboard);
+    const staging = renderBroadcastStagingText(ctx, userDao, dispatcher);
+    await safeEditMessageText(ctx, staging.text, { reply_markup: staging.keyboard });
   });
 
-  bot.callbackQuery(/^admin_bc_edit:(uk|en|ru)$/, async (ctx) => {
+  bot.callbackQuery(/^admin_bc_edit:([a-z]{2})$/, async (ctx) => {
+    await ctx.answerCallbackQuery().catch(() => {});
     if (!(await requireAdmin(ctx))) return;
     const lang = ctx.match[1] as SupportedLanguage;
-    await ctx.answerCallbackQuery().catch(() => {});
     const session = getOrCreateBroadcastSession(ctx);
-    session.stage = "awaiting_text";
     session.activeEditLang = lang;
+    session.stage = "awaiting_text";
 
     const promptText = renderBroadcastPromptText(lang, ctx);
-    const cancelKeyboard = new InlineKeyboard().text(ctx.t("admin.broadcast.btn_cancel_input"), "admin_bc_hub");
-    await safeEditMessageText(ctx, promptText, cancelKeyboard);
-  });
-
-  bot.callbackQuery(/^admin_bc_confirm_draft:(uk|en|ru)$/, async (ctx) => {
-    if (!(await requireAdmin(ctx))) return;
-    const lang = ctx.match[1] as SupportedLanguage;
-    const session = getOrCreateBroadcastSession(ctx);
-    if (session.drafts[lang]) {
-      session.drafts[lang]!.isConfirmed = true;
-    }
-    session.stage = "language_select";
-    await ctx.answerCallbackQuery({ text: ctx.t("admin.broadcast.toast_draft_saved", { lang: lang.toUpperCase() }) }).catch(() => {});
-    const { text, keyboard } = renderBroadcastStagingText(ctx, userDao, dispatcher);
-    await safeEditMessageText(ctx, text, keyboard);
-  });
-
-  bot.callbackQuery(/^admin_bc_test_self:(uk|en|ru)$/, async (ctx) => {
-    if (!(await requireAdmin(ctx))) return;
-    const lang = ctx.match[1] as SupportedLanguage;
-    const session = getOrCreateBroadcastSession(ctx);
-    const draft = session.drafts[lang];
-    if (draft && (draft.htmlText || draft.fileId)) {
-      if (draft.mediaType === "photo" && draft.fileId) {
-        await ctx.replyWithPhoto(draft.fileId, { caption: draft.htmlText, parse_mode: "HTML" }).catch(() => {});
-      } else if (draft.mediaType === "video" && draft.fileId) {
-        await ctx.replyWithVideo(draft.fileId, { caption: draft.htmlText, parse_mode: "HTML" }).catch(() => {});
-      } else if (draft.mediaType === "document" && draft.fileId) {
-        await ctx.replyWithDocument(draft.fileId, { caption: draft.htmlText, parse_mode: "HTML" }).catch(() => {});
-      } else if (draft.mediaType === "animation" && draft.fileId) {
-        await ctx.replyWithAnimation(draft.fileId, { caption: draft.htmlText, parse_mode: "HTML" }).catch(() => {});
-      } else {
-        await ctx.reply(draft.htmlText, {
-          parse_mode: "HTML",
-          link_preview_options: { is_disabled: true },
-        }).catch(() => {});
-      }
-      await ctx.answerCallbackQuery({ text: ctx.t("admin.broadcast.toast_test_sent", { lang: lang.toUpperCase() }) }).catch(() => {});
-    } else {
-      await ctx.answerCallbackQuery({ text: ctx.t("admin.broadcast.toast_draft_empty"), show_alert: true }).catch(() => {});
-    }
-  });
-
-  bot.callbackQuery("admin_bc_test_all", async (ctx) => {
-    if (!(await requireAdmin(ctx))) return;
-    const session = getOrCreateBroadcastSession(ctx);
-    const langs: SupportedLanguage[] = ["uk", "en", "ru"];
-    let sentCount = 0;
-    for (const l of langs) {
-      const draft = session.drafts[l];
-      if (draft && (draft.htmlText || draft.fileId)) {
-        const prefix = `[${l.toUpperCase()}]\n\n`;
-        const isMedia = draft.mediaType && draft.mediaType !== "text";
-        const captionText = isMedia
-          ? `${prefix}${draft.htmlText}`.slice(0, 1024)
-          : `${prefix}${draft.htmlText}`;
-
-        if (draft.mediaType === "photo" && draft.fileId) {
-          await ctx.replyWithPhoto(draft.fileId, { caption: captionText, parse_mode: "HTML" }).catch(() => {});
-        } else if (draft.mediaType === "video" && draft.fileId) {
-          await ctx.replyWithVideo(draft.fileId, { caption: captionText, parse_mode: "HTML" }).catch(() => {});
-        } else if (draft.mediaType === "document" && draft.fileId) {
-          await ctx.replyWithDocument(draft.fileId, { caption: captionText, parse_mode: "HTML" }).catch(() => {});
-        } else if (draft.mediaType === "animation" && draft.fileId) {
-          await ctx.replyWithAnimation(draft.fileId, { caption: captionText, parse_mode: "HTML" }).catch(() => {});
-        } else {
-          await ctx.reply(`${prefix}${draft.htmlText}`, {
-            parse_mode: "HTML",
-            link_preview_options: { is_disabled: true },
-          }).catch(() => {});
-        }
-        sentCount++;
-      }
-    }
-    await ctx.answerCallbackQuery({ text: ctx.t("admin.broadcast.toast_test_all_sent", { count: String(sentCount) }) }).catch(() => {});
+    const cancelKb = new InlineKeyboard().text(ctx.t("common.back"), "admin_bc_hub");
+    await safeEditMessageText(ctx, promptText, { reply_markup: cancelKb });
   });
 
   bot.callbackQuery("admin_bc_toggle_silent", async (ctx) => {
@@ -579,20 +557,74 @@ export function createTelegramBot(
     const session = getOrCreateBroadcastSession(ctx);
     session.sendSilent = !session.sendSilent;
     await ctx.answerCallbackQuery({
-      text: session.sendSilent ? ctx.t("admin.broadcast.toast_silent_on") : ctx.t("admin.broadcast.toast_silent_off"),
+      text: session.sendSilent
+        ? ctx.t("admin.broadcast.toast_silent_on")
+        : ctx.t("admin.broadcast.toast_silent_off"),
     }).catch(() => {});
-    const { text, keyboard } = renderBroadcastStagingText(ctx, userDao, dispatcher);
-    await safeEditMessageText(ctx, text, keyboard);
+    const staging = renderBroadcastStagingText(ctx, userDao, dispatcher);
+    await safeEditMessageText(ctx, staging.text, { reply_markup: staging.keyboard });
+  });
+
+  bot.callbackQuery(/^admin_bc_confirm_draft:([a-z]{2})$/, async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    const lang = ctx.match[1] as SupportedLanguage;
+    const session = getOrCreateBroadcastSession(ctx);
+    if (session.drafts[lang]) {
+      session.drafts[lang]!.isConfirmed = true;
+      await ctx.answerCallbackQuery({
+        text: ctx.t("admin.broadcast.toast_draft_saved", { lang: lang.toUpperCase() }),
+      }).catch(() => {});
+    }
+    const staging = renderBroadcastStagingText(ctx, userDao, dispatcher);
+    await safeEditMessageText(ctx, staging.text, { reply_markup: staging.keyboard });
+  });
+
+  bot.callbackQuery(/^admin_bc_test_self:([a-z]{2})$/, async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    const lang = ctx.match[1] as SupportedLanguage;
+    const session = getOrCreateBroadcastSession(ctx);
+    const draft = session.drafts[lang];
+    if (!draft || !ctx.from) return;
+    await ctx.answerCallbackQuery({
+      text: ctx.t("admin.broadcast.toast_test_sent", { lang: lang.toUpperCase() }),
+    }).catch(() => {});
+    if (draft.mediaType === "photo" && draft.fileId) {
+      await bot.api.sendPhoto(ctx.from.id, draft.fileId, { caption: draft.htmlText, parse_mode: "HTML" }).catch(() => {});
+    } else if (draft.mediaType === "video" && draft.fileId) {
+      await bot.api.sendVideo(ctx.from.id, draft.fileId, { caption: draft.htmlText, parse_mode: "HTML" }).catch(() => {});
+    } else {
+      await bot.api.sendMessage(ctx.from.id, draft.htmlText, { parse_mode: "HTML" }).catch(() => {});
+    }
+  });
+
+  bot.callbackQuery("admin_bc_test_all", async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    const session = getOrCreateBroadcastSession(ctx);
+    if (!ctx.from) return;
+    let count = 0;
+    for (const lang of ["uk", "en", "ru"] as SupportedLanguage[]) {
+      const draft = session.drafts[lang];
+      if (draft) {
+        const prefix = `[Test ${lang.toUpperCase()}]\n\n`;
+        if (draft.mediaType === "photo" && draft.fileId) {
+          await bot.api.sendPhoto(ctx.from.id, draft.fileId, { caption: prefix + draft.htmlText, parse_mode: "HTML" }).catch(() => {});
+        } else {
+          await bot.api.sendMessage(ctx.from.id, prefix + draft.htmlText, { parse_mode: "HTML" }).catch(() => {});
+        }
+        count++;
+      }
+    }
+    await ctx.answerCallbackQuery({
+      text: ctx.t("admin.broadcast.toast_test_all_sent", { count: String(count) }),
+    }).catch(() => {});
   });
 
   bot.callbackQuery("admin_bc_clear", async (ctx) => {
     if (!(await requireAdmin(ctx))) return;
-    const session = getOrCreateBroadcastSession(ctx);
-    session.drafts = {};
-    session.stage = "language_select";
+    resetBroadcastSession(ctx);
     await ctx.answerCallbackQuery({ text: ctx.t("admin.broadcast.toast_cleared") }).catch(() => {});
-    const { text, keyboard } = renderBroadcastStagingText(ctx, userDao, dispatcher);
-    await safeEditMessageText(ctx, text, keyboard);
+    const staging = renderBroadcastStagingText(ctx, userDao, dispatcher);
+    await safeEditMessageText(ctx, staging.text, { reply_markup: staging.keyboard });
   });
 
   bot.callbackQuery("admin_bc_staging_noop", async (ctx) => {
@@ -603,174 +635,59 @@ export function createTelegramBot(
   });
 
   bot.callbackQuery("admin_bc_preflight", async (ctx) => {
-    if (!(await requireAdmin(ctx))) return;
     await ctx.answerCallbackQuery().catch(() => {});
-    const { text, keyboard } = renderBroadcastPreflight(ctx, dispatcher);
-    await safeEditMessageText(ctx, text, keyboard);
+    if (!(await requireAdmin(ctx))) return;
+    const session = getOrCreateBroadcastSession(ctx);
+    session.stage = "preview";
+    const preflight = renderBroadcastPreflight(ctx, dispatcher);
+    await safeEditMessageText(ctx, preflight.text, { reply_markup: preflight.keyboard });
   });
 
   bot.callbackQuery("admin_bc_modal_confirm", async (ctx) => {
-    if (!(await requireAdmin(ctx))) return;
     await ctx.answerCallbackQuery().catch(() => {});
-    const { text, keyboard } = renderBroadcastModalConfirm(ctx, dispatcher);
-    await safeEditMessageText(ctx, text, keyboard);
+    if (!(await requireAdmin(ctx))) return;
+    const modal = renderBroadcastModalConfirm(ctx, dispatcher);
+    await safeEditMessageText(ctx, modal.text, { reply_markup: modal.keyboard });
   });
 
   bot.callbackQuery("admin_bc_execute", async (ctx) => {
+    await ctx.answerCallbackQuery({ text: ctx.t("admin.broadcast.toast_broadcast_started") }).catch(() => {});
     if (!(await requireAdmin(ctx))) return;
+
     const session = getOrCreateBroadcastSession(ctx);
-    const drafts = {
-      uk: session.drafts.uk?.isConfirmed ? {
-        text: session.drafts.uk.htmlText,
-        mediaType: session.drafts.uk.mediaType,
-        fileId: session.drafts.uk.fileId,
-      } : undefined,
-      en: session.drafts.en?.isConfirmed ? {
-        text: session.drafts.en.htmlText,
-        mediaType: session.drafts.en.mediaType,
-        fileId: session.drafts.en.fileId,
-      } : undefined,
-      ru: session.drafts.ru?.isConfirmed ? {
-        text: session.drafts.ru.htmlText,
-        mediaType: session.drafts.ru.mediaType,
-        fileId: session.drafts.ru.fileId,
-      } : undefined,
-    };
-
-    await ctx.answerCallbackQuery({ text: ctx.t("admin.broadcast.toast_dispatched") }).catch(() => {});
-
-    const result = await dispatcher.dispatchBroadcastBatch(drafts, {
+    const res = await dispatcher.dispatchBroadcastBatch(session.drafts, {
       sendSilent: session.sendSilent,
       filter: session.filter || "active_only",
     });
 
-    // 100% Reset session draft state after dispatch
     resetBroadcastSession(ctx);
 
-    const completionText =
-      `${ctx.t("admin.broadcast.completion_title")}\n\n` +
-      `${ctx.t("admin.broadcast.completion_stats_header")}\n` +
-      `${ctx.t("admin.broadcast.completion_total", { total: String(result.totalEnqueued) })}\n` +
-      `${ctx.t("admin.broadcast.completion_uk", { count: String(result.statsByLang.uk || 0) })}\n` +
-      `${ctx.t("admin.broadcast.completion_en", { count: String(result.statsByLang.en || 0) })}\n` +
-      `${ctx.t("admin.broadcast.completion_ru", { count: String(result.statsByLang.ru || 0) })}\n` +
-      `${ctx.t("admin.broadcast.completion_speed")}\n` +
-      `${ctx.t("admin.broadcast.completion_priority")}\n\n` +
-      `${ctx.t("admin.broadcast.completion_footer")}`;
-
-    const keyboard = new InlineKeyboard().text(ctx.t("admin.broadcast.btn_to_admin"), "admin_refresh");
-    await safeEditMessageText(ctx, completionText, keyboard);
+    const finishText = ctx.t("admin.broadcast.toast_success", { count: String(res.totalEnqueued) });
+    const kb = new InlineKeyboard().text(ctx.t("common.back"), "admin_refresh");
+    await safeEditMessageText(ctx, finishText, { reply_markup: kb });
   });
 
-  bot.command("help", async (ctx) => {
-    const keyboard = new InlineKeyboard()
-      .url(ctx.t("help.btn_open_site"), "https://cheapestinference.com/pools")
-      .row()
-      .url(ctx.t("help.btn_github"), "https://github.com/grizlizora/cheapestinference-bot");
-    await ctx.reply(
-      renderHelpText(ctx),
-      {
-        parse_mode: "HTML",
-        reply_markup: keyboard,
-        link_preview_options: { is_disabled: true },
-      }
-    );
-  });
-
-  // Test notification command (Admin Only)
-  bot.command("testalert", async (ctx) => {
-    if (!ctx.from) return;
-    if (!isUserAdmin(ctx.from.id, userDao, ctx.from.username)) {
-      await ctx.reply(
-        ctx.t("admin.unauthorized", { telegram_id: String(ctx.from.id) }),
-        { parse_mode: "HTML" }
-      );
-      return;
-    }
-
-    await ctx.reply(ctx.t("admin.test_alert_sending"), {
-      parse_mode: "HTML",
-    });
-
-    await dispatcher.sendTestAlert(ctx.from.id, ctx.lang, "slot");
-  });
-
-  // Localized command scopes in Telegram UI
-  bot.api
-    .setMyCommands(
-      [
-        { command: "start", description: "Головне меню та моніторинг слотів" },
-        { command: "menu", description: "Відкрити дашборд доступності" },
-        { command: "alerts", description: "Керування підписками та фільтрами" },
-        { command: "language", description: "Змінити мову інтерфейсу" },
-        { command: "help", description: "Інструкція та контакт автора" },
-        { command: "admin", description: "Панель адміністратора & керування" },
-        { command: "stats", description: "Телеметрія системи (Admin)" },
-        { command: "backup", description: "Завантажити бекап бази (Admin)" },
-      ],
-      { language_code: "uk" }
-    )
-    .catch(() => {});
-
-  bot.api
-    .setMyCommands(
-      [
-        { command: "start", description: "Главное меню и мониторинг слотов" },
-        { command: "menu", description: "Открыть дашборд доступности" },
-        { command: "alerts", description: "Управление подписками и фильтрами" },
-        { command: "language", description: "Сменить язык интерфейса" },
-        { command: "help", description: "Инструкция и контакт автора" },
-        { command: "admin", description: "Панель администратора & управление" },
-        { command: "stats", description: "Телеметрия системы (Admin)" },
-        { command: "backup", description: "Скачать бэкап базы (Admin)" },
-      ],
-      { language_code: "ru" }
-    )
-    .catch(() => {});
-
-  bot.api
-    .setMyCommands([
-      { command: "start", description: "Main dashboard & live slot monitor" },
-      { command: "menu", description: "Open slot availability dashboard" },
-      { command: "alerts", description: "Manage subscriptions & alert filters" },
-      { command: "language", description: "Change language / Змінити мову" },
-      { command: "help", description: "How the bot works & author contact" },
-      { command: "admin", description: "Administrator control panel" },
-      { command: "stats", description: "System telemetry (Admin)" },
-      { command: "backup", description: "Download SQLite database backup (Admin)" },
-    ])
-    .catch(() => {});
-
-  // 12. Telegram Stars (XTR) Payment Handlers
+  // 12. Telegram Stars Payment Pipeline
   bot.on("pre_checkout_query", async (ctx) => {
     try {
       await ctx.answerPreCheckoutQuery(true);
-    } catch (err) {
-      console.error("❌ [Telegram Stars Pre-Checkout Error]:", err);
+    } catch (err: any) {
+      console.error("❌ [Payment Error] pre_checkout_query answer failed:", err);
       await ctx.answerPreCheckoutQuery(false, {
-        error_message:
-          ctx.lang === "uk"
-            ? "Помилка обробки платежу. Спробуйте знову."
-            : ctx.lang === "ru"
-            ? "Ошибка обработки платежа. Попробуйте снова."
-            : "Payment processing error. Please retry.",
+        error_message: ctx.t("donate.checkout_failed"),
       }).catch(() => {});
     }
   });
 
-  bot.on("message:successful_payment", async (ctx) => {
+  bot.on(":successful_payment", async (ctx) => {
     const payment = ctx.message?.successful_payment;
-    if (!payment || !ctx.from) return;
+    if (!payment || !ctx.from || !ctx.user) return;
 
     const stars = payment.total_amount;
+    const currency = payment.currency;
     const chargeId = payment.telegram_payment_charge_id;
     const providerChargeId = payment.provider_payment_charge_id;
 
-    console.log(
-      `⭐ [Telegram Stars Payment Received] User @${ctx.from.username || ctx.from.id} (${ctx.from.id}) paid ${stars} Stars! Charge ID: ${chargeId}`
-    );
-
-    // 1. Persist to SQLite & Turso cloud sync atomically
     resolvedDonationDao.recordDonation(
       ctx.user.id,
       ctx.from.id,
@@ -779,40 +696,37 @@ export function createTelegramBot(
       providerChargeId
     );
 
-    // 2. Synchronize Inverted Index RAM priority immediately
-    dispatcher.getInvertedIndex().addDonationStars(ctx.from.id, stars);
+    userDao.addDonatedStars(ctx.user.id, stars);
+    dispatcher.getInvertedIndex().addDonationStars(ctx.user.id, stars);
 
-    const userTotalStars = resolvedDonationDao.getUserTotalDonated(ctx.user.id);
+    const userRecord = userDao.getByTelegramId(ctx.from.id);
+    const userTotalStars = userRecord?.total_donated_stars || stars;
 
-    // 3. Send personal gratitude message
-    const thanksTitle = ctx.t("donate.thanks_title");
-    const thanksBody = ctx.t("donate.thanks_body", {
-      stars: String(stars),
-      total_stars: String(userTotalStars),
+    await ctx.reply(ctx.t("donate.success_message", { stars: String(stars), total_stars: String(userTotalStars) }), {
+      parse_mode: "HTML",
     });
-    const thanksText = `${icon("coffee")} ${thanksTitle}\n\n${thanksBody}`;
 
-    await ctx.reply(thanksText, { parse_mode: "HTML" }).catch(() => {});
-
-    // 4. Notify admins about received donation
     const allAdmins = userDao.getAllAdminTelegramIds(config.ADMIN_USER_IDS);
     const userName = ctx.from.username
       ? `@${ctx.from.username}`
       : `${escapeHtml(ctx.from.first_name || "")}`;
 
-    for (const adminTgId of allAdmins) {
+    const adminNoticePromises = allAdmins.map(async (adminTgId) => {
+      if (adminTgId === ctx.from?.id) return;
       const adminRecord = userDao.getByTelegramId(adminTgId);
       if (adminRecord && adminRecord.notify_admin_new_users === 1) {
         const adminText = translate(adminRecord.language, "donate.admin_alert", {
           user_name: userName,
-          telegram_id: String(ctx.from.id),
+          telegram_id: String(ctx.from?.id),
           stars: String(stars),
           total_stars: String(userTotalStars),
           charge_id: chargeId,
         });
         await bot.api.sendMessage(adminTgId, adminText, { parse_mode: "HTML" }).catch(() => {});
       }
-    }
+    });
+
+    await Promise.allSettled(adminNoticePromises);
   });
 
   // 12.1 Admin Broadcast Message Input Interceptor
@@ -833,7 +747,6 @@ export function createTelegramBot(
           return;
         }
 
-        // Caption length guard for media (photo, video, document, animation)
         if (extracted.mediaType !== "text" && extracted.rawText.length > 1024) {
           await ctx.reply(
             ctx.t("admin.broadcast.error_caption_too_long", { len: String(extracted.rawText.length) }),
@@ -911,14 +824,13 @@ export function createTelegramBot(
     ctx.session.pendingCustomStars = undefined;
 
     try {
-      // Remove inline keyboard to prevent double clicks
       await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {});
 
       const title = ctx.t("donate.invoice_title", { stars: String(stars) });
       const desc = ctx.t("donate.invoice_desc", { stars: String(stars) });
       const payload = JSON.stringify({
         userId: ctx.user.id,
-        telegramId: ctx.from.id,
+        telegramId: ctx.from?.id,
         stars,
         ts: Date.now(),
       });
@@ -943,12 +855,12 @@ export function createTelegramBot(
       activeDashboardRegistry.updateView(ctx.chat.id, "other");
     }
 
-    const profile = dispatcher.getInvertedIndex().getProfileByTgId(ctx.from.id);
+    const profile = dispatcher.getInvertedIndex().getProfileByTgId(ctx.from?.id || 0);
     const totalStars = profile?.totalDonatedStars || 0;
     await safeEditMessageText(ctx, renderDonateText(ctx, totalStars), { reply_markup: donateMenu });
   });
 
-  // Wire Scraper diff_events to dispatcher
+  // 14. Wire Scraper diff_events to dispatcher
   scraper.on("diff_events", async (events) => {
     try {
       await dispatcher.handleDiffEvents(events);

@@ -13,12 +13,16 @@ const dictionaries: Record<SupportedLanguage, typeof uk> = {
   ru: ru as typeof uk,
 };
 
+const HTML_ESCAPE_MAP: Record<string, string> = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+};
+
 export function escapeHtml(str: string): string {
   if (!str) return "";
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  return String(str).replace(/[&<>"]/g, (char) => HTML_ESCAPE_MAP[char] || char);
 }
 
 /**

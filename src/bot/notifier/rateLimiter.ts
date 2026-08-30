@@ -24,6 +24,7 @@ export class NotificationRateLimiter {
 
   // Telegram ID -> performance.now() timestamp of last dispatched message
   private lastUserDispatchTime = new Map<number, number>();
+  private cleanupInterval?: NodeJS.Timeout;
 
   constructor(config?: RateLimiterConfig) {
     this.targetRatePerSec = config?.targetRatePerSec ?? 27;
@@ -33,6 +34,12 @@ export class NotificationRateLimiter {
     this.userDispatchGapMs = config?.userDispatchGapMs ?? 1050;
     this.staleTimestampTtlMs = config?.staleTimestampTtlMs ?? 5 * 60 * 1000;
     this.lastTokenRefill = performance.now();
+
+    // Background sweep every 60s to prevent unbounded memory growth
+    this.cleanupInterval = setInterval(() => {
+      this.pruneStaleUserTimestamps();
+    }, 60_000);
+    this.cleanupInterval.unref?.();
   }
 
   /**
@@ -51,6 +58,22 @@ export class NotificationRateLimiter {
   public hasGlobalToken(): boolean {
     this.refillTokens();
     return this.tokens >= 1;
+  }
+
+  public hasAvailableTokens(): boolean {
+    if (this.isGlobalPaused()) return false;
+    return this.hasGlobalToken();
+  }
+
+  public getTimeUntilNextToken(): number {
+    if (this.isGlobalPaused()) {
+      return this.getPauseRemainingMs();
+    }
+    this.refillTokens();
+    if (this.tokens >= 1) return 0;
+    const now = performance.now();
+    const elapsed = now - this.lastTokenRefill;
+    return Math.max(10, Math.ceil(this.tokenIntervalMs - elapsed));
   }
 
   public consumeGlobalToken(): boolean {
@@ -86,6 +109,10 @@ export class NotificationRateLimiter {
   public canDispatchToUser(telegramId: number, now: number = performance.now()): boolean {
     const lastSent = this.lastUserDispatchTime.get(telegramId) || 0;
     return now - lastSent >= this.userDispatchGapMs;
+  }
+
+  public canSendToUser(telegramId: number): boolean {
+    return this.canDispatchToUser(telegramId);
   }
 
   public recordUserDispatch(telegramId: number, now: number = performance.now()): void {
@@ -127,5 +154,12 @@ export class NotificationRateLimiter {
     this.isPaused = false;
     this.pauseUntil = 0;
     this.lastUserDispatchTime.clear();
+  }
+
+  public close(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = undefined;
+    }
   }
 }

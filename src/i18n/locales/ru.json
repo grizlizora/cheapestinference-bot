@@ -22,6 +22,7 @@
     "btn_contact_author": "👨‍💻 Написать автору (@grizlizora)",
     "open_site": "🌐 Открыть CheapestInference",
     "custom_models": "Кастомные модели",
+    "back_to_menu": "⬅️ Назад в меню",
     "unknown": "Неизвестно"
   },
   "onboarding": {
@@ -65,6 +66,8 @@
     "invoice_title": "☕ Благодарность автору ({stars} ⭐)",
     "invoice_desc": "Благодарность автору за создание и поддержку бота CheapestInference ({stars} ⭐ Telegram Stars).",
     "invoice_label": "Спасибо {stars} Stars",
+    "checkout_failed": "Ошибка обработки платежа. Пожалуйста, попробуйте еще раз.",
+    "success_message": "🎉 Спасибо за поддержку! Вы задонатили {stars} ⭐ Telegram Stars (Всего: {total_stars} ⭐).",
     "thanks_title": "🎉 <b>Огромное спасибо за вашу поддержку!</b>",
     "thanks_body": "Вы задонатили <b>{stars} ⭐ Telegram Stars</b>!\n\n⭐️ Ваша общая поддержка: <b>{total_stars} ⭐</b>\n🚀 <b>Приоритет в очереди уведомлений активирован!</b>\nТеперь вы будете получать уведомления о свободных слотах в числе самых первых!",
     "admin_alert": "🌟 <b>Получен новый донат Telegram Stars!</b>\n\n• <b>Пользователь:</b> {user_name} (<code>{telegram_id}</code>)\n• <b>Сумма:</b> <b>{stars} ⭐ Stars</b>\n• <b>Всего от пользователя:</b> <b>{total_stars} ⭐</b>\n• <b>ID транзакции:</b> <code>{charge_id}</code>"
@@ -266,7 +269,7 @@
       "sound_silent": "🔕 Без звука",
       "sound_with_sound": "🔔 Со звуком",
       "preflight_warning": "⚠️ <b>ВНИМАНИЕ:</b> После подтверждения сообщение будет немедленно разослано всем активным пользователям.",
-      "btn_preflight_confirm": "🚀 ПОДТВЕРДИТЬ И ЗАПУСТИТИ",
+      "btn_preflight_confirm": "🚀 ПОДТВЕРДИТЬ И ЗАПУСТИТЬ",
       "btn_preflight_test_all": "🧪 Тест всех 3-х языков мне",
       "btn_preflight_back": "◀️ Вернуться к черновикам",
       "modal_title": "⚠️ <b>ПОДТВЕРЖДЕНИЕ ЗАПУСКА РАССЫЛКИ</b>",
@@ -282,6 +285,8 @@
       "toast_cleared": "🗑 Все черновики очищены",
       "toast_noop_warning": "⏳ Подготовьте хотя бы один черновик (UK или EN) для запуска рассылки.",
       "toast_dispatched": "🚀 Рассылка запущена в фоновом режиме!",
+      "toast_broadcast_started": "🚀 Рассылка запущена в фоновом режиме!",
+      "toast_success": "✅ Рассылка успешно добавлена в очередь для {count} пользователей!",
       "completion_title": "✅ <b>Массовая рассылка успешно передана в очередь отправки!</b>",
       "completion_stats_header": "📊 <b>Статистика очереди:</b>",
       "completion_total": "• 👥 Всего адресатов: <b>{total}</b>",

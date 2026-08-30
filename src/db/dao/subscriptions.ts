@@ -20,6 +20,7 @@ export class SubscriptionDAO {
   private stmtGetSubsForUser: Database.Statement;
   private stmtGetAllSubs: Database.Statement;
   private stmtGetAnyPoolSub: Database.Statement;
+  private stmtGetSubscriptionStats: Database.Statement;
   private stmtUpdateGlobalAvail: Database.Statement;
   private stmtUpdateGlobalSold: Database.Statement;
   private stmtUpdateGlobalModels: Database.Statement;
@@ -35,6 +36,13 @@ export class SubscriptionDAO {
     this.stmtUpdateGlobalSold = db.prepare(`UPDATE subscriptions SET notify_on_sold_out = ? WHERE user_id = ?`);
     this.stmtUpdateGlobalModels = db.prepare(`UPDATE subscriptions SET notify_on_models = ? WHERE user_id = ?`);
     this.stmtUpdateGlobalPrices = db.prepare(`UPDATE subscriptions SET notify_on_prices = ? WHERE user_id = ?`);
+
+    this.stmtGetSubscriptionStats = db.prepare(`
+      SELECT 
+        COUNT(*) as total_rules,
+        COUNT(DISTINCT user_id) as subscribed_users
+      FROM subscriptions
+    `);
 
     this.stmtGetSub = db.prepare(`
       SELECT * FROM subscriptions WHERE user_id = ? AND pool_slug = ? AND block_id = ?
@@ -323,12 +331,7 @@ export class SubscriptionDAO {
   }
 
   getSubscriptionStats(): { totalRules: number; subscribedUsers: number } {
-    const row = this.db.prepare(`
-      SELECT 
-        COUNT(*) as total_rules,
-        COUNT(DISTINCT user_id) as subscribed_users
-      FROM subscriptions
-    `).get() as any;
+    const row = this.stmtGetSubscriptionStats.get() as any;
     return {
       totalRules: Number(row?.total_rules || 0),
       subscribedUsers: Number(row?.subscribed_users || 0),

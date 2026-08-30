@@ -34,6 +34,39 @@ describe("ModelSemanticMatcher", () => {
     expect(diff.removed).toHaveLength(0);
   });
 
+  it("should recognize model upgrade during coexistence window when both versions exist on site (e.g. GLM 5.2 and GLM 5.3 simultaneously)", () => {
+    // Tick 1: Site adds glm-5.3 but keeps glm-5.2 in the list
+    const diff = ModelSemanticMatcher.diffModelLists(
+      "frontier",
+      "Frontier Speed",
+      ["minimax-m3", "glm-5.2"],
+      ["minimax-m3", "glm-5.2", "glm-5.3"]
+    );
+
+    expect(diff.hasChanges).toBe(true);
+    expect(diff.upgraded).toHaveLength(1);
+    expect(diff.upgraded[0].modelName).toBe("glm-5.3");
+    expect(diff.upgraded[0].previousModelName).toBe("glm-5.2");
+    expect(diff.upgraded[0].changeNote).toBe("glm-5.2 ➡️ glm-5.3");
+    expect(diff.added).toHaveLength(0);
+    expect(diff.removed).toHaveLength(0);
+  });
+
+  it("should silently handle subsequent removal of superseded predecessor (GLM 5.2) without emitting false model loss alert", () => {
+    // Tick 2: Site subsequently removes glm-5.2 while glm-5.3 is active
+    const diff = ModelSemanticMatcher.diffModelLists(
+      "frontier",
+      "Frontier Speed",
+      ["minimax-m3", "glm-5.2", "glm-5.3"],
+      ["minimax-m3", "glm-5.3"]
+    );
+
+    expect(diff.hasChanges).toBe(false);
+    expect(diff.upgraded).toHaveLength(0);
+    expect(diff.added).toHaveLength(0);
+    expect(diff.removed).toHaveLength(0);
+  });
+
   it("should detect newly added models", () => {
     const diff = ModelSemanticMatcher.diffModelLists(
       "flagship",

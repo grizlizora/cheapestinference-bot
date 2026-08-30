@@ -9,16 +9,28 @@ import { SubscriberInvertedIndex } from "./subscriberIndex.js";
 export class UserActivitySyncer {
   private pendingTouches = new Map<number, { timer: NodeJS.Timeout; timestamp: number }>();
   private readonly QUIET_THRESHOLD_MS = 30_000; // 30 seconds debounce window
+  private readonly MAX_PENDING_TOUCHES = 20_000; // Hard bounded high-watermark
+  private onExitHandler: () => void;
 
   constructor(
     private userDao: UserDAO,
     private invertedIndex: SubscriberInvertedIndex
   ) {
     // Graceful process exit handler
-    const onExit = () => this.flushAll();
-    process.on("SIGINT", onExit);
-    process.on("SIGTERM", onExit);
-    process.on("beforeExit", onExit);
+    this.onExitHandler = () => this.flushAll();
+    process.on("SIGINT", this.onExitHandler);
+    process.on("SIGTERM", this.onExitHandler);
+    process.on("beforeExit", this.onExitHandler);
+  }
+
+  /**
+   * Cleans up all process event listeners and flushes pending touches
+   */
+  public dispose(): void {
+    process.off("SIGINT", this.onExitHandler);
+    process.off("SIGTERM", this.onExitHandler);
+    process.off("beforeExit", this.onExitHandler);
+    this.flushAll();
   }
 
   /**
@@ -41,7 +53,15 @@ export class UserActivitySyncer {
       if (profile) profile.lastDbTouchAt = now;
     }
 
-    // 3. Clear existing trailing timer and schedule fresh 30-second trailing sync
+    // 3. Enforce high-watermark ceiling
+    if (this.pendingTouches.size >= this.MAX_PENDING_TOUCHES && !this.pendingTouches.has(telegramId)) {
+      const oldestKey = this.pendingTouches.keys().next().value;
+      if (oldestKey !== undefined) {
+        this.flushUser(oldestKey);
+      }
+    }
+
+    // 4. Clear existing trailing timer and schedule fresh 30-second trailing sync
     const existing = this.pendingTouches.get(telegramId);
     if (existing) {
       clearTimeout(existing.timer);

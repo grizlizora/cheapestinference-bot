@@ -263,4 +263,11 @@ export class ActiveDashboardRegistry {
   public size(): number {
     return this.activeSessions.size;
   }
+
+  public close(): void {
+    if (this.sweepTimer) {
+      clearInterval(this.sweepTimer);
+      this.sweepTimer = undefined;
+    }
+  }
 }

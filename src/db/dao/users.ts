@@ -21,6 +21,8 @@ export class UserDAO {
   private stmtSetAdminByUsername: Database.Statement;
   private stmtIsAdmin: Database.Statement;
   private stmtGetAllAdmins: Database.Statement;
+  private stmtGetAllActive: Database.Statement;
+  private stmtAddDonatedStars?: Database.Statement;
   private txDeactivateBatch: (ids: number[]) => void;
 
   constructor(public readonly db: Database.Database) {
@@ -98,6 +100,12 @@ export class UserDAO {
         COUNT(CASE WHEN is_active = 0 THEN 1 END) as blocked
       FROM users
     `);
+    this.stmtGetAllActive = db.prepare("SELECT * FROM users WHERE is_active = 1");
+    try {
+      this.stmtAddDonatedStars = db.prepare(
+        "UPDATE users SET total_donated_stars = COALESCE(total_donated_stars, 0) + ? WHERE id = ?"
+      );
+    } catch {}
 
     this.txDeactivateBatch = this.db.transaction((ids: number[]) => {
       for (const id of ids) {
@@ -108,6 +116,10 @@ export class UserDAO {
 
   getByTelegramId(tgId: number): UserRecord | undefined {
     return this.stmtGetByTgId.get(tgId) as UserRecord | undefined;
+  }
+
+  getUserByTgId(tgId: number): UserRecord | undefined {
+    return this.getByTelegramId(tgId);
   }
 
   getById(id: number): UserRecord | undefined {
@@ -309,5 +321,23 @@ export class UserDAO {
       if (r.telegram_id) allIds.add(r.telegram_id);
     }
     return Array.from(allIds);
+  }
+
+  getAllActiveUsers(): UserRecord[] {
+    return this.stmtGetAllActive.all() as UserRecord[];
+  }
+
+  addDonatedStars(userId: number, stars: number): void {
+    if (!this.stmtAddDonatedStars) {
+      this.stmtAddDonatedStars = this.db.prepare(
+        "UPDATE users SET total_donated_stars = COALESCE(total_donated_stars, 0) + ? WHERE id = ?"
+      );
+    }
+    this.stmtAddDonatedStars.run(stars, userId);
+    tursoCloudSync.pushMutation(
+      "UPDATE users SET total_donated_stars = COALESCE(total_donated_stars, 0) + ? WHERE id = ?",
+      [stars, userId],
+      true
+    );
   }
 }

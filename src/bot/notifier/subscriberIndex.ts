@@ -547,6 +547,10 @@ export class SubscriberInvertedIndex {
    * Returns all active user profiles partitioned by priority (Admins -> Donors -> Active Users)
    * for broadcast dispatching.
    */
+  public getProfiles(): PackedUserProfile[] {
+    return Array.from(this.profiles.values());
+  }
+
   public getActiveProfiles(filter: "all" | "active_only" | "donors_only" = "active_only"): PackedUserProfile[] {
     const admins: PackedUserProfile[] = [];
     const donors: PackedUserProfile[] = [];
@@ -598,6 +602,10 @@ export class SubscriberInvertedIndex {
     }
 
     return [...admins, ...donors, ...freeUsers];
+  }
+
+  public getUserCount(): number {
+    return this.profiles.size;
   }
 
   public getMemoryStats(): { userCount: number; indexKeys: number; approxBytes: number } {

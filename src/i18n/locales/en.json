@@ -22,6 +22,7 @@
     "btn_contact_author": "👨‍💻 Contact Author (@grizlizora)",
     "open_site": "🌐 Open CheapestInference",
     "custom_models": "Custom models",
+    "back_to_menu": "⬅️ Back to Menu",
     "unknown": "Unknown"
   },
   "onboarding": {
@@ -65,6 +66,8 @@
     "invoice_title": "☕ Tip to Author ({stars} ⭐)",
     "invoice_desc": "Tip to the author for creating and maintaining CheapestInference bot ({stars} ⭐ Telegram Stars).",
     "invoice_label": "Tip {stars} Stars",
+    "checkout_failed": "Payment processing failed. Please try again.",
+    "success_message": "🎉 Thank you for your support! You donated {stars} ⭐ Telegram Stars (Total: {total_stars} ⭐).",
     "thanks_title": "🎉 <b>Thank you so much for your support!</b>",
     "thanks_body": "You donated <b>{stars} ⭐ Telegram Stars</b>!\n\n⭐️ Your lifetime support: <b>{total_stars} ⭐</b>\n🚀 <b>Priority Notification Queue activated!</b>\nYou will now receive slot availability alerts among the very first subscribers!",
     "admin_alert": "🌟 <b>New Telegram Stars donation received!</b>\n\n• <b>User:</b> {user_name} (<code>{telegram_id}</code>)\n• <b>Amount:</b> <b>{stars} ⭐ Stars</b>\n• <b>User Total:</b> <b>{total_stars} ⭐</b>\n• <b>Transaction ID:</b> <code>{charge_id}</code>"
@@ -282,6 +285,8 @@
       "toast_cleared": "🗑 All drafts cleared",
       "toast_noop_warning": "⏳ Please prepare at least one draft (UK or EN) before launching broadcast.",
       "toast_dispatched": "🚀 Broadcast dispatched in background mode!",
+      "toast_broadcast_started": "🚀 Broadcast dispatched in background mode!",
+      "toast_success": "✅ Broadcast successfully queued for {count} users!",
       "completion_title": "✅ <b>Mass broadcast successfully queued for dispatch!</b>",
       "completion_stats_header": "📊 <b>Queue Statistics:</b>",
       "completion_total": "• 👥 Total recipients: <b>{total}</b>",

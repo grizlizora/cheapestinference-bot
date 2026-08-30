@@ -59,6 +59,7 @@ export function initSchema(db: Database.Database): void {
       notify_prices_global INTEGER NOT NULL DEFAULT 1,
       notify_admin_new_users INTEGER NOT NULL DEFAULT 1,
       is_admin INTEGER NOT NULL DEFAULT 0,
+      total_donated_stars INTEGER NOT NULL DEFAULT 0,
       last_active_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -230,6 +231,8 @@ export function initSchema(db: Database.Database): void {
       pool_slug TEXT,
       block_id TEXT,
       is_broadcast INTEGER NOT NULL DEFAULT 0,
+      media_type TEXT,
+      file_id TEXT,
       language TEXT NOT NULL DEFAULT 'en',
       status TEXT NOT NULL DEFAULT 'pending',
       attempts INTEGER NOT NULL DEFAULT 0,
