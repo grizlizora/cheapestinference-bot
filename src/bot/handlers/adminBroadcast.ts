@@ -118,7 +118,7 @@ export function renderBroadcastStagingText(
     );
   }
 
-  if (confirmedCount > 0) {
+  if (Object.keys(session.drafts).length > 0) {
     keyboard.row().text(ctx.t("admin.broadcast.btn_clear_drafts"), "admin_bc_clear");
   }
 
@@ -167,13 +167,18 @@ export function renderBroadcastPreview(
   const totalCount = activeProfiles.length;
   const pct = totalCount > 0 ? Math.round((recipientsCount / totalCount) * 100) : 0;
 
+  const isMedia = draft.mediaType && draft.mediaType !== "text";
+  const lengthText = isMedia
+    ? ctx.t("admin.broadcast.preview_length_media", { len: String(draft.rawText.length) })
+    : ctx.t("admin.broadcast.preview_length", { len: String(draft.rawText.length) });
+
   const header =
     `${ctx.t("admin.broadcast.preview_header", { target_flag: flags[lang] })}\n` +
     `──────────────────────────\n\n` +
     `${draft.htmlText}\n\n` +
     `──────────────────────────\n` +
     `${ctx.t("admin.broadcast.preview_recipients", { count: String(recipientsCount), pct: String(pct) })}\n` +
-    `${ctx.t("admin.broadcast.preview_length", { len: String(draft.rawText.length) })}\n` +
+    `${lengthText}\n` +
     `${ctx.t("admin.broadcast.preview_html_valid")}`;
 
   const keyboard = new InlineKeyboard()

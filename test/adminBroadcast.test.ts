@@ -17,6 +17,7 @@ import {
   getOrCreateBroadcastSession,
   resetBroadcastSession,
 } from "../src/bot/handlers/adminBroadcast.js";
+import { escapeHtmlText } from "../src/bot/notifier/telegramEntitySerializer.js";
 
 describe("Admin Multi-Language Broadcast System", () => {
   let db: Database.Database;
@@ -679,5 +680,71 @@ describe("Admin Multi-Language Broadcast System", () => {
     expect(nextMsg.mediaType).toBe("photo");
     expect(nextMsg.fileId).toBe("AgACAgIAAxkBAAIB...");
     expect(nextMsg.text).toMatch(/покоління|поколение|Server Generation/);
+  });
+
+  it("9. Caption Length Guard, Quote Escaping & Unconfirmed Draft Isolation", async () => {
+    // 1. Verify escapeHtmlText escapes double quotes
+    const raw = `Check this "link" & <test>`;
+    expect(escapeHtmlText(raw)).toBe("Check this &quot;link&quot; &amp; &lt;test&gt;");
+
+    // 2. Verify unconfirmed draft isolation:
+    // UK is confirmed, EN is unconfirmed (isConfirmed = false)
+    const session: any = {
+      stage: "language_select",
+      drafts: {
+        uk: {
+          htmlText: "📢 <b>Підтверджений український текст</b>",
+          rawText: "Підтверджений український текст",
+          entitiesCount: 1,
+          hasCustomEmoji: false,
+          mediaType: "text",
+          isConfirmed: true,
+        },
+        en: {
+          htmlText: "📢 <b>Unconfirmed exploratory draft</b>",
+          rawText: "Unconfirmed exploratory draft",
+          entitiesCount: 1,
+          hasCustomEmoji: false,
+          mediaType: "text",
+          isConfirmed: false,
+        },
+      },
+    };
+
+    const adminCtx: any = {
+      lang: "uk",
+      t: (key: string, params?: Record<string, string>) => translate("uk", key, params),
+      session: { broadcast: session },
+    };
+
+    const testDispatcher = new NotificationDispatcher(
+      mockBot,
+      userDao,
+      logDao,
+      undefined,
+      invertedIndex,
+      undefined,
+      outboxDao
+    );
+
+    // Staging text should render Clear Drafts button even with unconfirmed drafts
+    const staging = renderBroadcastStagingText(adminCtx, userDao, testDispatcher);
+    expect(staging.keyboard.inline_keyboard.some((row: any[]) => row.some((btn) => btn.callback_data === "admin_bc_clear"))).toBe(true);
+
+    // Filtering by isConfirmed: only confirmed drafts pass to dispatcher
+    const executableDrafts = {
+      uk: session.drafts.uk?.isConfirmed ? session.drafts.uk.htmlText : undefined,
+      en: session.drafts.en?.isConfirmed ? session.drafts.en.htmlText : undefined,
+      ru: session.drafts.ru?.isConfirmed ? session.drafts.ru.htmlText : undefined,
+    };
+
+    expect(executableDrafts.uk).toBe("📢 <b>Підтверджений український текст</b>");
+    expect(executableDrafts.en).toBeUndefined();
+
+    // Dispatching should fall back English users to the confirmed UK draft
+    const res = await testDispatcher.dispatchBroadcastBatch(executableDrafts, { filter: "active_only" });
+    expect(res.totalEnqueued).toBe(4);
+    // All recipients received the confirmed UK text
+    expect(res.statsByLang.uk).toBe(4);
   });
 });

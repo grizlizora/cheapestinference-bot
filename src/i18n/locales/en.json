@@ -245,6 +245,8 @@
       "preview_header": "👁 <b>BROADCAST PREVIEW • [ {target_flag} ]</b>",
       "preview_recipients": "👥 <b>Recipients of this language:</b> <code>{count}</code> users ({pct}%)",
       "preview_length": "📏 <b>Length:</b> {len} / 4096 chars",
+      "preview_length_media": "📏 <b>Caption length:</b> {len} / 1024 chars (Media)",
+      "error_caption_too_long": "⚠️ <b>Caption is too long!</b>\n\nTelegram restricts captions on photo/video/documents to <b>1024 characters</b> (current: <code>{len}</code>).\nPlease shorten the caption and send again.",
       "preview_html_valid": "🛡 <b>HTML validation:</b> ✅ All tags correctly balanced",
       "btn_confirm_draft": "✅ Confirm draft",
       "btn_rewrite_text": "🔄 Rewrite text",

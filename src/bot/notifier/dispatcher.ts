@@ -79,7 +79,7 @@ export class NotificationDispatcher {
   private hydratePendingFromOutbox(): void {
     if (!this.outboxDao) return;
     try {
-      const pendingItems = this.outboxDao.getPending(1000);
+      const pendingItems = this.outboxDao.getPending(10000);
       if (pendingItems.length === 0) return;
       console.log(`📦 [NotificationDispatcher] Hydrated ${pendingItems.length} pending alerts from SQLite outbox.`);
 

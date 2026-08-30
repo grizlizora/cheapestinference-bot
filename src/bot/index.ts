@@ -239,19 +239,16 @@ export function createTelegramBot(
             const idIcon = `<tg-emoji emoji-id="5422683699130933153">🪪</tg-emoji>`;
             const usersIcon = `<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji>`;
             const langIcon = `<tg-emoji emoji-id="5399898266265475100">🌐</tg-emoji>`;
-            const flagMap: Record<string, string> = {
-              uk: `Українська <tg-emoji emoji-id="5447309366568953338">🇺🇦</tg-emoji>`,
-              en: `English <tg-emoji emoji-id="5202196682497859879">🇬🇧</tg-emoji>`,
-              ru: `Русский <tg-emoji emoji-id="5449408995691341691">🇷🇺</tg-emoji>`,
-            };
-            const langStr = flagMap[ctx.lang] || ctx.lang;
-
-            const adminMsg = `${userIcon} <b>Новий користувач у боті!</b>\n\n` +
-              `• <b>Ім'я:</b> <code>${escapeHtml(ctx.from.first_name)}</code>\n` +
-              `• <b>Username:</b> ${usernameStr}\n` +
-              `• ${idIcon} <b>Telegram ID:</b> <code>${ctx.from.id}</code>\n` +
-              `• ${langIcon} <b>Мова інтерфейсу:</b> ${langStr}\n` +
-              `• ${usersIcon} <b>Всього користувачів:</b> <code>${userStats.total}</code>`;
+            const adminLang = (adminUser?.language as SupportedLanguage) || "uk";
+            const flag = getLanguageFlag(ctx.lang);
+            const langStr = `${ctx.lang.toUpperCase()} ${flag}`;
+            const adminMsg = translate(adminLang, "admin.new_user_alert", {
+              first_name: escapeHtml(ctx.from.first_name),
+              username: usernameStr,
+              telegram_id: String(ctx.from.id),
+              language: langStr,
+              total_users: String(userStats.total),
+            });
 
             bot.api
               .sendMessage(adminId, adminMsg, { parse_mode: "HTML" })
@@ -552,14 +549,19 @@ export function createTelegramBot(
       const draft = session.drafts[l];
       if (draft && (draft.htmlText || draft.fileId)) {
         const prefix = `[${l.toUpperCase()}]\n\n`;
+        const isMedia = draft.mediaType && draft.mediaType !== "text";
+        const captionText = isMedia
+          ? `${prefix}${draft.htmlText}`.slice(0, 1024)
+          : `${prefix}${draft.htmlText}`;
+
         if (draft.mediaType === "photo" && draft.fileId) {
-          await ctx.replyWithPhoto(draft.fileId, { caption: `${prefix}${draft.htmlText}`, parse_mode: "HTML" }).catch(() => {});
+          await ctx.replyWithPhoto(draft.fileId, { caption: captionText, parse_mode: "HTML" }).catch(() => {});
         } else if (draft.mediaType === "video" && draft.fileId) {
-          await ctx.replyWithVideo(draft.fileId, { caption: `${prefix}${draft.htmlText}`, parse_mode: "HTML" }).catch(() => {});
+          await ctx.replyWithVideo(draft.fileId, { caption: captionText, parse_mode: "HTML" }).catch(() => {});
         } else if (draft.mediaType === "document" && draft.fileId) {
-          await ctx.replyWithDocument(draft.fileId, { caption: `${prefix}${draft.htmlText}`, parse_mode: "HTML" }).catch(() => {});
+          await ctx.replyWithDocument(draft.fileId, { caption: captionText, parse_mode: "HTML" }).catch(() => {});
         } else if (draft.mediaType === "animation" && draft.fileId) {
-          await ctx.replyWithAnimation(draft.fileId, { caption: `${prefix}${draft.htmlText}`, parse_mode: "HTML" }).catch(() => {});
+          await ctx.replyWithAnimation(draft.fileId, { caption: captionText, parse_mode: "HTML" }).catch(() => {});
         } else {
           await ctx.reply(`${prefix}${draft.htmlText}`, {
             parse_mode: "HTML",
@@ -618,17 +620,17 @@ export function createTelegramBot(
     if (!(await requireAdmin(ctx))) return;
     const session = getOrCreateBroadcastSession(ctx);
     const drafts = {
-      uk: session.drafts.uk ? {
+      uk: session.drafts.uk?.isConfirmed ? {
         text: session.drafts.uk.htmlText,
         mediaType: session.drafts.uk.mediaType,
         fileId: session.drafts.uk.fileId,
       } : undefined,
-      en: session.drafts.en ? {
+      en: session.drafts.en?.isConfirmed ? {
         text: session.drafts.en.htmlText,
         mediaType: session.drafts.en.mediaType,
         fileId: session.drafts.en.fileId,
       } : undefined,
-      ru: session.drafts.ru ? {
+      ru: session.drafts.ru?.isConfirmed ? {
         text: session.drafts.ru.htmlText,
         mediaType: session.drafts.ru.mediaType,
         fileId: session.drafts.ru.fileId,
@@ -828,6 +830,15 @@ export function createTelegramBot(
 
         if (!extracted.rawText || extracted.rawText.trim().length === 0) {
           await ctx.reply(ctx.t("admin.broadcast.toast_empty_input"));
+          return;
+        }
+
+        // Caption length guard for media (photo, video, document, animation)
+        if (extracted.mediaType !== "text" && extracted.rawText.length > 1024) {
+          await ctx.reply(
+            ctx.t("admin.broadcast.error_caption_too_long", { len: String(extracted.rawText.length) }),
+            { parse_mode: "HTML" }
+          );
           return;
         }
 
