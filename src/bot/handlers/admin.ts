@@ -81,8 +81,8 @@ export function renderAdminText(
   const adminUser = ctx.from ? userDao.getByTelegramId(ctx.from.id) : undefined;
   const newUsersEnabled = (adminUser?.notify_admin_new_users ?? 1) === 1;
 
-  const usersIcon = `<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji>`;
-  const spiderIcon = `<tg-emoji emoji-id="5445149053853637789">🕷</tg-emoji>`;
+  const usersIcon = icon("admin_users");
+  const spiderIcon = icon("admin_spider");
   const brainRamIcon = icon("pool_core");
   const onText = ctx.lang === "uk" ? `УВІМКНЕНО ${icon("toggle_on")}` : ctx.lang === "ru" ? `ВКЛЮЧЕНО ${icon("toggle_on")}` : `ENABLED ${icon("toggle_on")}`;
   const offText = ctx.lang === "uk" ? `ВИМКНЕНО ${icon("toggle_off")}` : ctx.lang === "ru" ? `ВЫКЛЮЧЕНО ${icon("toggle_off")}` : `DISABLED ${icon("toggle_off")}`;

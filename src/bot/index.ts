@@ -12,6 +12,7 @@ import {
   createMainMenuHierarchy,
   renderDashboardText,
   renderHelpText,
+  renderSettingsText,
 } from "./menus/mainDashboard.js";
 import { renderSubscriptionsText } from "./menus/subscriptions.js";
 import { createStartHandler } from "./handlers/start.js";
@@ -514,10 +515,7 @@ export function createTelegramBot(
 
   bot.callbackQuery("admin_open_settings", async (ctx) => {
     await ctx.answerCallbackQuery().catch(() => {});
-    const text = ctx.t("settings.title", {
-      current_lang: ctx.lang.toUpperCase(),
-      telegram_id: String(ctx.from?.id || "N/A"),
-    });
+    const text = renderSettingsText(ctx);
     await safeEditMessageText(ctx, text, { reply_markup: settingsMenu });
   });
 

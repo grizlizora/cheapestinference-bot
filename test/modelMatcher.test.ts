@@ -15,6 +15,10 @@ describe("ModelSemanticMatcher", () => {
     const deepseek = ModelSemanticMatcher.parseModel("deepseek-v4-flash");
     expect(deepseek.family).toBe("deepseek");
     expect(deepseek.variant).toBe("flash");
+
+    const minimax = ModelSemanticMatcher.parseModel("minimax-m3");
+    expect(minimax.family).toBe("minimax");
+    expect(minimax.versionMajor).toBe(3);
   });
 
   it("should accurately detect model upgrades (e.g. GLM 5.2 -> GLM 5.3)", () => {

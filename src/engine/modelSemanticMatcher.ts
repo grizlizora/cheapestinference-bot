@@ -68,12 +68,12 @@ export class ModelSemanticMatcher {
     if (bestMatch) {
       family = bestMatch.family;
       if (bestMatch.match[2]) {
-        versionStr = bestMatch.match[2].replace(/^[vkr]/i, "").replace(/[-_]/g, ".");
+        versionStr = bestMatch.match[2].replace(/^[vkrm]/i, "").replace(/[-_]/g, ".");
       }
     }
 
     if (!versionStr) {
-      const verMatch = clean.match(/(?:v|k|r)?(\d+)(?:[._-](\d+))?/i);
+      const verMatch = clean.match(/(?:v|k|r|m)?(\d+)(?:[._-](\d+))?/i);
       if (verMatch) {
         versionStr = verMatch[2] ? `${verMatch[1]}.${verMatch[2]}` : verMatch[1];
         versionMajor = parseInt(verMatch[1], 10) || 0;

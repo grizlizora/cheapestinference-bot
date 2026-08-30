@@ -274,6 +274,36 @@ export const ICON_REGISTRY = {
     name: "3D Language Globe",
     category: "navigation",
   },
+  flag_uk: {
+    customEmojiId: "5447309366568953338",
+    unicodeFallback: "🇺🇦",
+    name: "Ukrainian Flag",
+    category: "language",
+  },
+  flag_en: {
+    customEmojiId: "5202196682497859879",
+    unicodeFallback: "🇬🇧",
+    name: "British Flag",
+    category: "language",
+  },
+  flag_ru: {
+    customEmojiId: "5449408995691341691",
+    unicodeFallback: "🇷🇺",
+    name: "Russian Flag",
+    category: "language",
+  },
+  admin_users: {
+    customEmojiId: "5372926953978341366",
+    unicodeFallback: "👥",
+    name: "3D Group Users",
+    category: "admin",
+  },
+  admin_spider: {
+    customEmojiId: "5445149053853637789",
+    unicodeFallback: "🕷",
+    name: "3D Web Spider",
+    category: "admin",
+  },
   nav_chart: {
     customEmojiId: "5431577498364158238",
     unicodeFallback: "📊",

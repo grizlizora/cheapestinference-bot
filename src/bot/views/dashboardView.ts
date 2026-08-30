@@ -119,14 +119,10 @@ export function renderDashboardText(
 }
 
 export function renderSettingsText(ctx: BotContext): string {
-  const flagUk = `<tg-emoji emoji-id="5447309366568953338">🇺🇦</tg-emoji>`;
-  const flagEn = `<tg-emoji emoji-id="5202196682497859879">🇬🇧</tg-emoji>`;
-  const flagRu = `<tg-emoji emoji-id="5449408995691341691">🇷🇺</tg-emoji>`;
-
   const langNames: Record<string, string> = {
-    uk: `Українська ${flagUk}`,
-    en: `English ${flagEn}`,
-    ru: `Русский ${flagRu}`,
+    uk: `Українська ${icon("flag_uk")}`,
+    en: `English ${icon("flag_en")}`,
+    ru: `Русский ${icon("flag_ru")}`,
   };
   const currentLang = langNames[ctx.lang] || ctx.lang;
 
