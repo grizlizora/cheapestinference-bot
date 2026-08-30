@@ -80,6 +80,8 @@ describe("UserActivitySyncer: 30-Second Debounced Trailing Activity Sync Suite",
     vi.useRealTimers();
   });
 
+  const toSqliteDate = (ms: number) => new Date(ms).toISOString().replace("T", " ").slice(0, 19);
+
   it("1. should write to SQLite immediately on initial interaction and update RAM", () => {
     const t0 = 1700000000000;
     syncer.touch(12345, t0);
@@ -88,7 +90,7 @@ describe("UserActivitySyncer: 30-Second Debounced Trailing Activity Sync Suite",
     expect(profile?.lastActiveAt).toBe(t0);
 
     const dbUser = userDao.getByTelegramId(12345);
-    expect(dbUser?.last_active_at).toBe(new Date(t0).toISOString());
+    expect(dbUser?.last_active_at).toBe(toSqliteDate(t0));
     expect(syncer.getPendingCount()).toBe(1);
   });
 
@@ -117,7 +119,7 @@ describe("UserActivitySyncer: 30-Second Debounced Trailing Activity Sync Suite",
 
     // SQLite should now have the exact timestamp of t2 (the final click)
     const dbUser = userDao.getByTelegramId(12345);
-    expect(dbUser?.last_active_at).toBe(new Date(t2).toISOString());
+    expect(dbUser?.last_active_at).toBe(toSqliteDate(t2));
   });
 
   it("3. should flushAll immediately on demand before export/backup/shutdown", () => {
@@ -130,6 +132,6 @@ describe("UserActivitySyncer: 30-Second Debounced Trailing Activity Sync Suite",
     expect(syncer.getPendingCount()).toBe(0);
 
     const dbUser = userDao.getByTelegramId(12345);
-    expect(dbUser?.last_active_at).toBe(new Date(t0 + 8000).toISOString());
+    expect(dbUser?.last_active_at).toBe(toSqliteDate(t0 + 8000));
   });
 });

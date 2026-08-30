@@ -174,7 +174,15 @@ export class UserDAO {
 
   touchLastActive(tgId: number, timestampIso?: string): void {
     try {
-      this.stmtTouchLastActive.run(timestampIso || null, tgId);
+      const formatted = timestampIso
+        ? timestampIso.replace("T", " ").replace("Z", "").slice(0, 19)
+        : null;
+      this.stmtTouchLastActive.run(formatted, tgId);
+      tursoCloudSync.pushMutation(
+        `UPDATE users SET last_active_at = COALESCE(?, CURRENT_TIMESTAMP) WHERE telegram_id = ?`,
+        [formatted, tgId],
+        false
+      );
     } catch {}
   }
 
