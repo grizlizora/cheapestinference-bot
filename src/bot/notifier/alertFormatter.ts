@@ -29,6 +29,17 @@ export interface OutgoingAlertMessage {
   fileId?: string;
 }
 
+export function cleanPoolTitle(poolName: string, poolSlug?: string): string {
+  if (!poolName) {
+    if (poolSlug === "flagship") return "Flagship Pool";
+    if (poolSlug === "core") return "Core Pool";
+    if (poolSlug === "frontier") return "Frontier Pool";
+    return "Pool";
+  }
+  const cleaned = poolName.split(/\s*—\s*|\s*–\s*|\s+-\s+/)[0].trim();
+  return cleaned || poolName;
+}
+
 export function cleanPriceString(val: string | number | undefined | null): string {
   if (val === undefined || val === null || val === "") return "0";
   const cleaned = String(val).replace(/,/g, "").replace(/[^0-9.-]/g, "");
@@ -204,8 +215,9 @@ export function formatAlertMessage(
 
     keyboard = new InlineKeyboard().url(btnLabel, checkoutUrl);
   } else if (event.type === "SLOT_DISAPPEARED") {
+    const cleanName = cleanPoolTitle(event.poolName, event.poolSlug);
     const rawHeader = translate(lang, "alerts.slot_disappeared_header", {
-      pool_name: escapeHtml(event.poolName),
+      pool_name: escapeHtml(cleanName),
     });
     const header = `${icon("event_slot_sold")} ${stripLeadingEmoji(rawHeader)}`;
 
@@ -247,10 +259,10 @@ export function formatAlertMessage(
     }
 
     const poolBtnLabel = lang === "uk"
-      ? `🌐 Відкрити ${event.poolName} на сайті`
+      ? `🌐 Відкрити ${cleanName}`
       : lang === "ru"
-      ? `🌐 Открыть ${event.poolName} на сайте`
-      : `🌐 Open ${event.poolName} on Site`;
+      ? `🌐 Открыть ${cleanName}`
+      : `🌐 Open ${cleanName}`;
 
     keyboard = new InlineKeyboard().url(poolBtnLabel, poolUrl);
     text = `${header}\n\n${body}`;
