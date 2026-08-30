@@ -83,7 +83,7 @@ export class UserDAO {
       RETURNING notify_admin_new_users
     `);
     this.stmtTouchLastActive = db.prepare(`
-      UPDATE users SET last_active_at = CURRENT_TIMESTAMP WHERE telegram_id = ?
+      UPDATE users SET last_active_at = COALESCE(?, CURRENT_TIMESTAMP) WHERE telegram_id = ?
     `);
     this.stmtDeactivate = db.prepare(`
       UPDATE users SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?
@@ -172,9 +172,9 @@ export class UserDAO {
     );
   }
 
-  touchLastActive(tgId: number): void {
+  touchLastActive(tgId: number, timestampIso?: string): void {
     try {
-      this.stmtTouchLastActive.run(tgId);
+      this.stmtTouchLastActive.run(timestampIso || null, tgId);
     } catch {}
   }
 

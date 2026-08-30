@@ -9,6 +9,7 @@ import { BotContext } from "../../types/context.js";
 import { config, isUserAdmin } from "../../config/env.js";
 import { UserDAO } from "../../db/dao/users.js";
 import { SubscriptionDAO } from "../../db/dao/subscriptions.js";
+import type { UserActivitySyncer } from "../notifier/userActivitySyncer.js";
 import { escapeHtml, stripLeadingEmoji } from "../../i18n/index.js";
 import { icon } from "../views/iconTheme.js";
 
@@ -31,7 +32,8 @@ function escapeCsv(field: any): string {
 export function createUsersExportHandler(
   db: Database.Database,
   userDao: UserDAO,
-  subDao: SubscriptionDAO
+  subDao: SubscriptionDAO,
+  activitySyncer?: UserActivitySyncer
 ) {
   return async (ctx: BotContext) => {
     if (!ctx.from) return;
@@ -43,6 +45,9 @@ export function createUsersExportHandler(
       );
       return;
     }
+
+    // Flush any pending trailing 30s activity touches before exporting
+    activitySyncer?.flushAll();
 
     const progressText = `${icon("nav_clock")} ${stripLeadingEmoji(ctx.t("admin.export_users_in_progress"))}`;
     const statusMsg = await ctx.reply(progressText, {
@@ -356,7 +361,8 @@ export function createHistoryExportHandler(
 export function createBackupHandler(
   db: Database.Database,
   userDao: UserDAO,
-  subDao: SubscriptionDAO
+  subDao: SubscriptionDAO,
+  activitySyncer?: UserActivitySyncer
 ) {
   return async (ctx: BotContext) => {
     if (!ctx.from) return;
@@ -368,6 +374,9 @@ export function createBackupHandler(
       );
       return;
     }
+
+    // Flush any pending trailing 30s activity touches before snapshotting DB
+    activitySyncer?.flushAll();
 
     const progressText = `${icon("nav_clock")} ${stripLeadingEmoji(ctx.t("admin.backup_in_progress"))}`;
     const statusMsg = await ctx.reply(progressText, {

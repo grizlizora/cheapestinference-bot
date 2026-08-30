@@ -28,6 +28,7 @@ import {
   resetBroadcastSession,
 } from "./handlers/adminBroadcast.js";
 import { extractMessageContent } from "./notifier/telegramEntitySerializer.js";
+import { UserActivitySyncer } from "./notifier/userActivitySyncer.js";
 import { createBackupHandler, createUsersExportHandler, createHistoryExportHandler } from "./handlers/backup.js";
 import { NotificationDispatcher } from "./notifier/dispatcher.js";
 import { config, isUserAdmin } from "../config/env.js";
@@ -113,6 +114,9 @@ export function createTelegramBot(
     resolvedOutboxDao
   );
 
+  // 4b. Debounced Trailing 30-Second Activity Syncer (Immediate RAM + 30s Debounced Disk Write)
+  const userActivitySyncer = new UserActivitySyncer(userDao, dispatcher.getInvertedIndex());
+
   // Helper function: Admin verification guard
   const requireAdmin = async (ctx: BotContext): Promise<boolean> => {
     if (!isUserAdmin(ctx.from?.id, userDao, ctx.from?.username)) {
@@ -123,10 +127,11 @@ export function createTelegramBot(
           ? `⛔ Доступ ограничен. Команда только для администраторов.\nВаш Telegram ID: ${ctx.from?.id || "N/A"}`
           : `⛔ Access restricted to administrators only.\nYour Telegram ID: ${ctx.from?.id || "N/A"}`;
 
-      await ctx.answerCallbackQuery({
-        text: plainUnauthorized,
-        show_alert: true,
-      }).catch(() => {});
+      if (ctx.callbackQuery) {
+        await ctx.answerCallbackQuery({ text: plainUnauthorized, show_alert: true }).catch(() => {});
+      } else {
+        await ctx.reply(plainUnauthorized).catch(() => {});
+      }
       return false;
     }
     return true;
@@ -188,12 +193,8 @@ export function createTelegramBot(
           inMemoryProfile = dispatcher.getInvertedIndex().getProfileByTgId(ctx.from.id);
         }
 
-        // Throttled DB disk touch (every 5 mins) to eliminate SQLite write serialization
-        const lastTouch = inMemoryProfile?.lastDbTouchAt || 0;
-        if (now - lastTouch > 5 * 60 * 1000) {
-          userDao.touchLastActive(ctx.from.id);
-          if (inMemoryProfile) inMemoryProfile.lastDbTouchAt = now;
-        }
+        // 30-Second Debounced Trailing Activity Syncer (Immediate RAM + 30s Trailing Disk Write)
+        userActivitySyncer.touch(ctx.from.id, now);
         dispatcher.getInvertedIndex().updateUserPreferences(ctx.from.id, {
           lastActiveAt: now,
           language: user.language as any,
@@ -398,8 +399,8 @@ export function createTelegramBot(
 
   bot.command("admin", createAdminHandler(userDao, subDao, scraper, proxyPool, dispatcher.getInvertedIndex()));
   bot.command("stats", createAdminHandler(userDao, subDao, scraper, proxyPool, dispatcher.getInvertedIndex()));
-  bot.command("backup", createBackupHandler(userDao.db, userDao, subDao));
-  bot.command("export_users", createUsersExportHandler(userDao.db, userDao, subDao));
+  bot.command("backup", createBackupHandler(userDao.db, userDao, subDao, userActivitySyncer));
+  bot.command("export_users", createUsersExportHandler(userDao.db, userDao, subDao, userActivitySyncer));
   bot.command("export_history", createHistoryExportHandler(userDao.db, userDao));
 
   // 11. Admin Interactive Callback Handlers (Protected by requireAdmin)
@@ -449,7 +450,7 @@ export function createTelegramBot(
   bot.callbackQuery("admin_export_users", async (ctx) => {
     if (!(await requireAdmin(ctx))) return;
     await ctx.answerCallbackQuery().catch(() => {});
-    await createUsersExportHandler(userDao.db, userDao, subDao)(ctx);
+    await createUsersExportHandler(userDao.db, userDao, subDao, userActivitySyncer)(ctx);
   });
 
   bot.callbackQuery("admin_export_history", async (ctx) => {
@@ -461,7 +462,7 @@ export function createTelegramBot(
   bot.callbackQuery("admin_backup", async (ctx) => {
     if (!(await requireAdmin(ctx))) return;
     await ctx.answerCallbackQuery().catch(() => {});
-    await createBackupHandler(userDao.db, userDao, subDao)(ctx);
+    await createBackupHandler(userDao.db, userDao, subDao, userActivitySyncer)(ctx);
   });
 
   bot.callbackQuery("admin_test_alert", async (ctx) => {
