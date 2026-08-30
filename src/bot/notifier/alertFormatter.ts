@@ -62,17 +62,19 @@ export function formatPriceDeltaBadge(
   const absPct = Number.isInteger(roundedPct) ? roundedPct.toFixed(0) : roundedPct.toFixed(1);
 
   if (delta < 0) {
-    return translate(lang, "alerts.price_discount_badge", {
+    const raw = stripLeadingEmoji(translate(lang, "alerts.price_discount_badge", {
       delta: absDelta,
       percentage: absPct,
       currency_month: currencyMonth,
-    });
+    }));
+    return `${icon("status_available")} ${raw}`;
   } else {
-    return translate(lang, "alerts.price_increase_badge", {
+    const raw = stripLeadingEmoji(translate(lang, "alerts.price_increase_badge", {
       delta: absDelta,
       percentage: absPct,
       currency_month: currencyMonth,
-    });
+    }));
+    return `${icon("status_sold_out")} ${raw}`;
   }
 }
 
@@ -563,9 +565,10 @@ export function formatBundledAlertMessage(
   let title = `${icon("event_batch_drop")} ${stripLeadingEmoji(rawTitle)}`;
 
   const allAppeared = matchedEvents.every((e) => e.event.type === "SLOT_APPEARED");
+  const allPriceChanged = matchedEvents.every((e) => e.event.type === "SLOT_PRICE_CHANGED" || e.event.type === "POOL_BASE_PRICE_CHANGED" || e.event.type === "PRICE_CHANGED");
 
   if (allSoldOut && allSamePool) {
-    const pName = escapeHtml(matchedEvents[0].event.poolName);
+    const pName = escapeHtml(cleanPoolTitle(matchedEvents[0].event.poolName, matchedEvents[0].event.poolSlug));
     title = lang === "uk"
       ? `${icon("event_slot_sold")} <b>СЛОТИ РОЗПРОДАНО • ${pName} (${count})</b>`
       : lang === "ru"
@@ -578,12 +581,19 @@ export function formatBundledAlertMessage(
       ? `${icon("event_slot_sold")} <b>СЛОТЫ РАСПРОДАНЫ (${count})</b>`
       : `${icon("event_slot_sold")} <b>SLOTS SOLD OUT (${count})</b>`;
   } else if (allAppeared && allSamePool) {
-    const pName = escapeHtml(matchedEvents[0].event.poolName);
+    const pName = escapeHtml(cleanPoolTitle(matchedEvents[0].event.poolName, matchedEvents[0].event.poolSlug));
     title = lang === "uk"
       ? `${icon("event_slot_drop")} <b>ВІЛЬНІ СЛОТИ • ${pName} (${count})</b>`
       : lang === "ru"
       ? `${icon("event_slot_drop")} <b>СВОБОДНЫЕ СЛОТЫ • ${pName} (${count})</b>`
       : `${icon("event_slot_drop")} <b>AVAILABLE SLOTS • ${pName} (${count})</b>`;
+  } else if (allPriceChanged && allSamePool) {
+    const pName = escapeHtml(cleanPoolTitle(matchedEvents[0].event.poolName, matchedEvents[0].event.poolSlug));
+    title = lang === "uk"
+      ? `${icon("event_price_drop")} <b>ЗМІНА ЦІН • ${pName} (${count})</b>`
+      : lang === "ru"
+      ? `${icon("event_price_drop")} <b>ИЗМЕНЕНИЕ ЦЕН • ${pName} (${count})</b>`
+      : `${icon("event_price_drop")} <b>PRICE UPDATES • ${pName} (${count})</b>`;
   }
 
   for (const { event } of matchedEvents) {
@@ -595,39 +605,48 @@ export function formatBundledAlertMessage(
     const hoursText = hoursLocal ? ` <code>(${escapeHtml(hoursLocal)})</code>` : "";
 
     if (event.type === "SLOT_APPEARED") {
+      const cleanName = cleanPoolTitle(event.poolName, event.poolSlug);
       const cleanPrice = cleanPriceString(event.newPrice);
       const lifespanBadge = event.analytics?.avgLifespanFormatted
         ? ` ${event.analytics.demandCategory === "hot" ? icon("event_hot_slot") : icon("event_slot_drop")} <code>${escapeHtml(event.analytics.avgLifespanFormatted)}</code>`
         : "";
-      sectionLines.push(
-        `${icon("status_available")} <b>${escapeHtml(event.poolName)} • ${escapeHtml(blockName)}</b>${lifespanBadge}\n` +
-        `${icon("price_money")} <code>$${escapeHtml(cleanPrice)}/${currencyMonth}</code> | ${icon("nav_clock")} <code>${escapeHtml(event.hoursUtc)}</code>\n` +
-        `${icon("ai_robot")} ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
-      );
+      
+      if (allSamePool) {
+        sectionLines.push(
+          `${getRegionIcon(event.block)} <b>${escapeHtml(blockName)}</b>${lifespanBadge}\n` +
+          `  • ${icon("price_money")} <b>$${escapeHtml(cleanPrice)}/${currencyMonth}</b> | ${icon("nav_clock")} <code>${escapeHtml(hoursLocal || event.hoursUtc)}</code>`
+        );
+      } else {
+        sectionLines.push(
+          `${getRegionIcon(event.block)} <b>${escapeHtml(cleanName)} • ${escapeHtml(blockName)}</b>${lifespanBadge}\n` +
+          `  • ${icon("price_money")} <b>$${escapeHtml(cleanPrice)}/${currencyMonth}</b> | ${icon("nav_clock")} <code>${escapeHtml(hoursLocal || event.hoursUtc)}</code>`
+        );
+      }
 
       candidates.push({
         priority: 1,
-        label: `⚡ ${event.poolSlug.toUpperCase()} (${blockName}) • $${cleanPrice}`,
+        label: `⚡ ${cleanName} (${blockName}) • $${cleanPrice}`,
         url: checkoutUrl,
         poolSlug: event.poolSlug,
         isSpecificAction: true,
       });
     } else if (event.type === "SLOT_DISAPPEARED") {
+      const cleanName = cleanPoolTitle(event.poolName, event.poolSlug);
       if (allSamePool) {
         sectionLines.push(
           `${getRegionIcon(event.block)} <b>${regionLabel}:</b> ${escapeHtml(blockName)}${hoursText} — ${icon("status_sold_out")} <i>${statusSoldOut}</i>`
         );
       } else {
         sectionLines.push(
-          `${icon("event_slot_sold")} <b>${escapeHtml(event.poolName)}</b>\n` +
+          `${icon("event_slot_sold")} <b>${escapeHtml(cleanName)}</b>\n` +
           `  • ${getRegionIcon(event.block)} <b>${escapeHtml(blockName)}:</b> ${icon("status_sold_out")} <i>${statusSoldOut}</i>`
         );
       }
       const poolBtnLabel = lang === "uk"
-        ? `🌐 Відкрити ${event.poolSlug.toUpperCase()} на сайті`
+        ? `🌐 Відкрити ${cleanName}`
         : lang === "ru"
-        ? `🌐 Открыть ${event.poolSlug.toUpperCase()} на сайте`
-        : `🌐 Open ${event.poolSlug.toUpperCase()} on Site`;
+        ? `🌐 Открыть ${cleanName}`
+        : `🌐 Open ${cleanName}`;
 
       candidates.push({
         priority: 4,
@@ -637,32 +656,43 @@ export function formatBundledAlertMessage(
         isSpecificAction: false,
       });
     } else if (event.type === "MODEL_UPGRADE_EVENT") {
+      const cleanName = cleanPoolTitle(event.poolName, event.poolSlug);
       const upgradeTitle = translate(lang, "alerts.bundle_title_models") || "Model Upgrade";
       sectionLines.push(
-        `${icon("event_model_upgrade")} <b>${escapeHtml(event.poolName)} • ${upgradeTitle}</b>\n` +
+        `${icon("event_model_upgrade")} <b>${escapeHtml(cleanName)} • ${upgradeTitle}</b>\n` +
         `${icon("ai_robot")} ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
       );
       candidates.push({
         priority: 4,
-        label: `🔍 ${event.poolSlug.toUpperCase()}`,
+        label: `🔍 ${cleanName}`,
         url: poolUrl,
         poolSlug: event.poolSlug,
         isSpecificAction: false,
       });
     } else if (event.type === "SLOT_PRICE_CHANGED") {
+      const cleanName = cleanPoolTitle(event.poolName, event.poolSlug);
       const deltaStr = event.slotPrice
         ? ` (${formatPriceDeltaBadge(event.slotPrice.priceDelta, event.slotPrice.percentageDelta, lang)})`
         : "";
       const cleanOld = cleanPriceString(event.previousPrice);
       const cleanNew = cleanPriceString(event.newPrice);
-      const hoursStr = event.hoursUtc ? ` | ${icon("nav_clock")} <code>${escapeHtml(event.hoursUtc)}</code>` : "";
-      sectionLines.push(
-        `${icon("price_tag")} <b>${escapeHtml(event.poolName)} • ${escapeHtml(blockName)}</b>\n` +
-        `${icon("price_money")} <s>$${escapeHtml(cleanOld)}</s> ➔ <b>$${escapeHtml(cleanNew)}/${currencyMonth}</b>${deltaStr}${hoursStr}`
-      );
+      const hoursStr = event.hoursUtc ? `\n  • ${icon("nav_clock")} <code>${escapeHtml(hoursLocal || event.hoursUtc)}</code>` : "";
+
+      if (allSamePool) {
+        sectionLines.push(
+          `${getRegionIcon(event.block)} <b>${escapeHtml(blockName)}</b>\n` +
+          `  • <s>$${escapeHtml(cleanOld)}</s> ➔ <b>$${escapeHtml(cleanNew)}/${currencyMonth}</b>${deltaStr}${hoursStr}`
+        );
+      } else {
+        sectionLines.push(
+          `${getRegionIcon(event.block)} <b>${escapeHtml(cleanName)} • ${escapeHtml(blockName)}</b>\n` +
+          `  • <s>$${escapeHtml(cleanOld)}</s> ➔ <b>$${escapeHtml(cleanNew)}/${currencyMonth}</b>${deltaStr}${hoursStr}`
+        );
+      }
+
       candidates.push({
         priority: 2,
-        label: `🏷 ${event.poolSlug.toUpperCase()} (${blockName}) • $${cleanNew}`,
+        label: `🏷 ${cleanName} (${blockName}) • $${cleanNew}`,
         url: checkoutUrl,
         poolSlug: event.poolSlug,
         isSpecificAction: true,

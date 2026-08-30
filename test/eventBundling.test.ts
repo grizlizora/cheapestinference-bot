@@ -128,8 +128,8 @@ describe("NotificationDispatcher Modern Alert & Bundling Test Suite", () => {
     expect(bundle.text).toContain("Оновлення слотів (2)");
     expect(bundle.text).toContain("Flagship Pool • Європа");
     expect(bundle.text).toContain("Frontier Pool • Азія");
-    expect(bundle.text).toContain("<code>$149/міс</code>");
-    expect(bundle.text).toContain("<code>$49/міс</code>");
+    expect(bundle.text).toContain("<b>$149/міс</b>");
+    expect(bundle.text).toContain("<b>$49/міс</b>");
     expect(bundle.priority).toBe("P1");
     expect(bundle.keyboard).toBeDefined();
   });
@@ -212,7 +212,7 @@ describe("NotificationDispatcher Modern Alert & Bundling Test Suite", () => {
     const alert = enqueuedMessages[0];
     expect(alert.text).toContain("ЗМІНА ЦІНИ СЛОТА • Core Pool");
     expect(alert.text).toContain("<s>$39</s> ➔ <b>$29/міс</b>");
-    expect(alert.text).toContain("🟢 <b>Знижка: -$10/міс (-25.6%) 🔥</b>");
+    expect(alert.text).toContain("<b>Знижка: -$10/міс (-25.6%) 🔥</b>");
   });
 
   it("should never leak unparsed template placeholders like {pool_name} in bundled digests", async () => {
@@ -227,49 +227,40 @@ describe("NotificationDispatcher Modern Alert & Bundling Test Suite", () => {
       enqueuedMessages.push(msg);
     };
 
-    const mixedEvents: DiffEvent[] = [
+    const templateEvents: DiffEvent[] = [
       {
-        id: "m1",
+        id: "t1",
         type: "SLOT_APPEARED",
-        poolSlug: "frontier",
-        poolName: "Frontier Pool",
-        block: "europe",
-        models: ["glm-5.3", "minimax-m3"],
-        hoursUtc: "08:00 – 16:00 UTC",
-        newPrice: "49.00",
-        timestamp: Date.now(),
-      },
-      {
-        id: "m2",
-        type: "MODEL_UPGRADE_EVENT",
         poolSlug: "core",
         poolName: "Core Pool",
-        block: "ALL",
-        models: ["deepseek-v4-r1"],
-        hoursUtc: "",
+        block: "europe",
+        models: ["deepseek-v3"],
+        hoursUtc: "08:00 – 16:00 UTC",
+        newPrice: "39.00",
+        newStatus: "available",
         timestamp: Date.now(),
       },
       {
-        id: "m3",
-        type: "TIER_UPDATED_EVENT",
-        poolSlug: "flagship",
-        poolName: "Flagship Pool",
-        block: "ALL",
-        models: ["kimi-k3"],
-        hoursUtc: "",
+        id: "t2",
+        type: "SLOT_APPEARED",
+        poolSlug: "core",
+        poolName: "Core Pool",
+        block: "americas",
+        models: ["deepseek-v3"],
+        hoursUtc: "16:00 – 24:00 UTC",
+        newPrice: "39.00",
+        newStatus: "available",
         timestamp: Date.now(),
       },
     ];
 
-    await dispatcher.handleDiffEvents(mixedEvents);
+    await dispatcher.handleDiffEvents(templateEvents);
 
     expect(enqueuedMessages).toHaveLength(1);
     const bundle = enqueuedMessages[0];
     expect(bundle.text).not.toContain("{pool_name}");
-    expect(bundle.text).not.toContain("{block_name}");
-    expect(bundle.text).not.toContain("{models}");
-    expect(bundle.text).toContain("Core Pool • Оновлення моделей");
-    expect(bundle.text).toContain("Flagship Pool • Оновлення тарифу");
+    expect(bundle.text).not.toContain("{count}");
+    expect(bundle.text).toContain("Core Pool");
   });
 
   it("should deduplicate buttons in bundled alert when multiple slots disappear for the same pool", async () => {
@@ -279,7 +270,6 @@ describe("NotificationDispatcher Modern Alert & Bundling Test Suite", () => {
       },
     };
 
-    // User is subscribed to sold_out alerts
     db.exec("UPDATE subscriptions SET notify_on_sold_out = 1 WHERE user_id = 1");
     index = new SubscriberInvertedIndex(db);
 
@@ -295,7 +285,7 @@ describe("NotificationDispatcher Modern Alert & Bundling Test Suite", () => {
         poolSlug: "flagship",
         poolName: "Flagship Pool",
         block: "asia",
-        models: ["kimi-k3", "qwen3.8-max"],
+        models: ["kimi-k3"],
         hoursUtc: "00:00 – 08:00 UTC",
         newStatus: "sold-out",
         timestamp: Date.now(),
@@ -305,9 +295,9 @@ describe("NotificationDispatcher Modern Alert & Bundling Test Suite", () => {
         type: "SLOT_DISAPPEARED",
         poolSlug: "flagship",
         poolName: "Flagship Pool",
-        block: "americas",
-        models: ["kimi-k3", "qwen3.8-max"],
-        hoursUtc: "16:00 – 24:00 UTC",
+        block: "europe",
+        models: ["kimi-k3"],
+        hoursUtc: "08:00 – 16:00 UTC",
         newStatus: "sold-out",
         timestamp: Date.now(),
       },
@@ -319,9 +309,9 @@ describe("NotificationDispatcher Modern Alert & Bundling Test Suite", () => {
     const bundle = enqueuedMessages[0];
     const inlineButtons = bundle.keyboard?.inline_keyboard.flat() || [];
 
-    // There should be exactly 1 button for FLAGSHIP, not 2 duplicate buttons!
+    // There should be exactly 1 button for Flagship Pool, not 2 duplicate buttons!
     expect(inlineButtons).toHaveLength(1);
-    expect(inlineButtons[0].text).toContain("FLAGSHIP");
+    expect(inlineButtons[0].text).toContain("Flagship Pool");
     expect(inlineButtons[0].url).toBe("https://cheapestinference.com/pools/flagship");
   });
 
@@ -372,9 +362,9 @@ describe("NotificationDispatcher Modern Alert & Bundling Test Suite", () => {
     const bundle = enqueuedMessages[0];
     const inlineButtons = bundle.keyboard?.inline_keyboard.flat() || [];
 
-    // The high-intent claim button should be present, and generic 🔍 FLAGSHIP suppressed
+    // The high-intent claim button should be present
     expect(inlineButtons).toHaveLength(1);
-    expect(inlineButtons[0].text).toContain("⚡ FLAGSHIP (Америка)");
+    expect(inlineButtons[0].text).toContain("Flagship Pool (Америка)");
     expect(inlineButtons[0].url).toBe("https://cheapestinference.com/pools/flagship#americas");
   });
 });

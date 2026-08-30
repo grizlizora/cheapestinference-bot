@@ -311,7 +311,7 @@ describe("🎨 Telegram Custom Animated Iconography & Real-World E2E Simulation 
       const bundle = formatBundledAlertMessage(user, events);
 
       expect(bundle.text).toContain(`<tg-emoji emoji-id="${ICON_REGISTRY.event_batch_drop.customEmojiId}">🆕</tg-emoji>`);
-      expect(bundle.text).toContain(`<tg-emoji emoji-id="${ICON_REGISTRY.status_available.customEmojiId}">🟢</tg-emoji>`);
+      expect(bundle.text).toContain(`<tg-emoji emoji-id="${ICON_REGISTRY.region_europe.customEmojiId}">🌍</tg-emoji>`);
       expect(bundle.text).toContain(`<tg-emoji emoji-id="${ICON_REGISTRY.event_slot_sold.customEmojiId}">🔒</tg-emoji>`);
       expect(bundle.text).toContain(`<tg-emoji emoji-id="${ICON_REGISTRY.nav_clock.customEmojiId}">⏳</tg-emoji>`);
     });
