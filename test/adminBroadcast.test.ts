@@ -353,7 +353,7 @@ describe("Admin Multi-Language Broadcast System", () => {
 
     const enPrompt = renderBroadcastPromptText("uk", ctxEn);
     expect(enPrompt).toContain("Enter Message Content [ Українська 🇺🇦 ]");
-    expect(enPrompt).toContain("100% Telegram formatting supported:");
+    expect(enPrompt).toContain("Send the text");
 
     // Context with Russian interface language
     const ctxRu: any = {
@@ -368,7 +368,7 @@ describe("Admin Multi-Language Broadcast System", () => {
 
     const ruPrompt = renderBroadcastPromptText("en", ctxRu);
     expect(ruPrompt).toContain("Ввод текста сообщения [ English 🇬🇧 ]");
-    expect(ruPrompt).toContain("Поддерживается 100% форматирование Telegram:");
+    expect(ruPrompt).toContain("Отправьте следующим сообщением текст");
 
     // Context with Ukrainian interface language
     const ctxUk: any = {

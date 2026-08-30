@@ -136,13 +136,7 @@ export function renderBroadcastPromptText(targetLang: SupportedLanguage, ctx: Bo
 
   return (
     `${ctx.t("admin.broadcast.prompt_title", { target_flag: flags[targetLang] })}\n\n` +
-    `${ctx.t("admin.broadcast.prompt_desc")}\n\n` +
-    `${ctx.t("admin.broadcast.prompt_formatting_header")}\n` +
-    `${ctx.t("admin.broadcast.prompt_format_basic")}\n` +
-    `${ctx.t("admin.broadcast.prompt_format_code")}\n` +
-    `${ctx.t("admin.broadcast.prompt_format_spoilers")}\n` +
-    `${ctx.t("admin.broadcast.prompt_format_emoji")}\n\n` +
-    `${ctx.t("admin.broadcast.prompt_footer")}`
+    `${ctx.t("admin.broadcast.prompt_desc")}`
   );
 }
 
