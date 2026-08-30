@@ -17,6 +17,7 @@ import { renderAdminText, createAdminKeyboard } from "../handlers/admin.js";
 import { renderBroadcastStagingText } from "../handlers/adminBroadcast.js";
 import { createBackupHandler, createUsersExportHandler, createHistoryExportHandler } from "../handlers/backup.js";
 import { ActiveDashboardRegistry } from "../liveSync/dashboardRegistry.js";
+import { UserActivitySyncer } from "../notifier/userActivitySyncer.js";
 
 // Re-export presentation functions from view layer for 100% backward compatibility
 export { renderDashboardText, renderSettingsText, renderChangeLanguageText, renderHelpText, computePoolBadgeInfo } from "../views/dashboardView.js";
@@ -37,7 +38,8 @@ export function createMainMenuHierarchy(
   scraper?: ScraperOrchestrator,
   dashboardRegistry?: ActiveDashboardRegistry,
   proxyPool?: ProxyPool,
-  dispatcher?: NotificationDispatcher
+  dispatcher?: NotificationDispatcher,
+  userActivitySyncer?: UserActivitySyncer
 ) {
   const languageMenu = createLanguageMenu(userDao, poolStateDao, invertedIndex, historyDao, scraper, subDao, dashboardRegistry);
   const { poolDetailMenu, poolSettingsMenu } = createPoolDetailMenu(poolStateDao, subDao, invertedIndex, historyDao, scraper, dashboardRegistry);
@@ -104,7 +106,7 @@ export function createMainMenuHierarchy(
           return;
         }
         ctx.answerCallbackQuery().catch(() => {});
-        await createUsersExportHandler(userDao.db, userDao, subDao)(ctx);
+        await createUsersExportHandler(userDao.db, userDao, subDao, userActivitySyncer)(ctx);
       }
     )
     .row()
@@ -128,7 +130,7 @@ export function createMainMenuHierarchy(
           return;
         }
         ctx.answerCallbackQuery().catch(() => {});
-        await createBackupHandler(userDao.db, userDao, subDao)(ctx);
+        await createBackupHandler(userDao.db, userDao, subDao, userActivitySyncer)(ctx);
       }
     )
     .row()
@@ -394,24 +396,26 @@ export function createMainMenuHierarchy(
       (ctx) => ctx.t("common.refresh"),
       async (ctx) => {
         const startTime = Date.now();
-        await ctx.answerCallbackQuery({
-          text: ctx.t("common.refreshed_toast"),
-          show_alert: false,
-        }).catch(() => {});
         if (scraper) {
           await scraper.forceRefresh(3000);
         }
         const telemetry = scraper?.getTelemetry();
-        const scrapeLatency = telemetry?.lastScrapeLatencyMs || 0;
+        const scrapeLatency = telemetry?.lastScrapeLatencyMs || (Date.now() - startTime);
+        const proxyTag = telemetry?.lastUsedProxy
+          ? (telemetry.lastUsedProxy.includes("9050") ? "Tor SOCKS5" : "Proxy")
+          : "Direct";
+        const latencyToast = `⚡ ${ctx.t("common.refreshed_toast")} (${scrapeLatency}ms • ${proxyTag})`;
+        await ctx.answerCallbackQuery({
+          text: latencyToast,
+          show_alert: false,
+        }).catch(() => {});
+
         const rendered = renderDashboardText(ctx, poolStateDao, historyDao, scraper);
         const tgStartTime = Date.now();
         await safeEditMessageText(ctx, rendered);
         const tgEditLatency = Date.now() - tgStartTime;
         const totalE2E = Date.now() - startTime;
         const username = ctx.from?.username ? `@${ctx.from.username}` : `ID:${ctx.from?.id}`;
-        const proxyTag = telemetry?.lastUsedProxy
-          ? (telemetry.lastUsedProxy.includes("9050") ? "Tor SOCKS5" : "Proxy")
-          : "Direct";
         console.log(`🔄 [Manual Refresh] User ${username} on Dashboard -> Scrape: ${scrapeLatency}ms (${proxyTag}) | TG Edit: ${tgEditLatency}ms | Total E2E: ${totalE2E}ms (source: ${telemetry?.lastSource || "cache"})`);
         if (ctx.chat) {
           const msgId = ctx.callbackQuery?.message?.message_id;

@@ -284,7 +284,8 @@ export function createTelegramBot(
       scraper,
       activeDashboardRegistry,
       proxyPool,
-      dispatcher
+      dispatcher,
+      userActivitySyncer
     );
 
   // 8b. Auto-capture & Touch Active Dashboard on any callback query interaction

@@ -247,24 +247,26 @@ export function createPoolDetailMenu(
         (c) => c.t("common.refresh"),
         async (c) => {
           const startTime = Date.now();
-          await c.answerCallbackQuery({
-            text: c.t("common.refreshed_toast"),
-            show_alert: false,
-          }).catch(() => {});
           if (scraper) {
             await scraper.forceRefresh(3000);
           }
           const telemetry = scraper?.getTelemetry();
-          const scrapeLatency = telemetry?.lastScrapeLatencyMs || 0;
+          const scrapeLatency = telemetry?.lastScrapeLatencyMs || (Date.now() - startTime);
+          const proxyTag = telemetry?.lastUsedProxy
+            ? (telemetry.lastUsedProxy.includes("9050") ? "Tor SOCKS5" : "Proxy")
+            : "Direct";
+          const latencyToast = `⚡ ${c.t("common.refreshed_toast")} (${scrapeLatency}ms • ${proxyTag})`;
+          await c.answerCallbackQuery({
+            text: latencyToast,
+            show_alert: false,
+          }).catch(() => {});
+
           const rendered = renderPoolDetailText(c, poolStateDao, historyDao, scraper);
           const tgStartTime = Date.now();
           await safeEditMessageText(c, rendered);
           const tgEditLatency = Date.now() - tgStartTime;
           const totalE2E = Date.now() - startTime;
           const username = c.from?.username ? `@${c.from.username}` : `ID:${c.from?.id}`;
-          const proxyTag = telemetry?.lastUsedProxy
-            ? (telemetry.lastUsedProxy.includes("9050") ? "Tor SOCKS5" : "Proxy")
-            : "Direct";
           console.log(`🔄 [Manual Refresh] User ${username} in pool '${slug}' -> Scrape: ${scrapeLatency}ms (${proxyTag}) | TG Edit: ${tgEditLatency}ms | Total E2E: ${totalE2E}ms (source: ${telemetry?.lastSource || "cache"})`);
           if (c.chat) {
             const msgId = c.callbackQuery?.message?.message_id;

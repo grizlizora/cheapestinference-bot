@@ -31,12 +31,42 @@ export class PriceDiffEvaluator {
    */
   public static parseCleanPrice(val: string | undefined | null): number {
     if (!val) return 0;
-    const sanitized = String(val)
-      .replace(/[^\d.,+-]/g, "")
-      .replace(/,/g, "");
-    const match = sanitized.match(/[-+]?(?:\d+(?:\.\d+)?|\.\d+)/);
-    if (!match) return 0;
-    const num = parseFloat(match[0]);
+    const str = String(val).trim();
+    if (str.length === 0) return 0;
+
+    // Fast-path: direct numeric literal
+    const directNum = Number(str);
+    if (!isNaN(directNum) && Number.isFinite(directNum)) {
+      return Math.round(directNum * 100) / 100;
+    }
+
+    let startIndex = -1;
+    let endIndex = -1;
+    let hasDot = false;
+
+    for (let i = 0; i < str.length; i++) {
+      const code = str.charCodeAt(i);
+      // '0'..'9'
+      if (code >= 48 && code <= 57) {
+        if (startIndex === -1) {
+          if (i > 0 && (str.charCodeAt(i - 1) === 45 || str.charCodeAt(i - 1) === 43)) {
+            startIndex = i - 1;
+          } else {
+            startIndex = i;
+          }
+        }
+        endIndex = i + 1;
+      } else if (code === 46 && startIndex !== -1 && !hasDot) {
+        hasDot = true;
+        endIndex = i + 1;
+      } else if (startIndex !== -1 && code !== 44) {
+        break;
+      }
+    }
+
+    if (startIndex === -1) return 0;
+    const extracted = str.slice(startIndex, endIndex).replace(/,/g, "");
+    const num = parseFloat(extracted);
     if (isNaN(num) || !Number.isFinite(num)) return 0;
     return Math.round(num * 100) / 100;
   }
