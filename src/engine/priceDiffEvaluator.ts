@@ -71,8 +71,7 @@ export class PriceDiffEvaluator {
         stagedSlotPriceChanges.every((c) => c.newPrice === stagedSlotPriceChanges[0].newPrice)) ||
       (pool.blocks.length === 1 && basePriceChanged && stagedSlotPriceChanges.length === 1);
 
-    if (allBlocksHaveSamePrice) {
-      // Case A: Uniform pool base tariff update
+    if (basePriceChanged) {
       const prevPriceNum = PriceDiffEvaluator.parseCleanPrice(prevPool.minPricePerDay);
       const newPriceNum = PriceDiffEvaluator.parseCleanPrice(pool.minPricePerDay);
       const priceDelta = PriceDiffEvaluator.cleanDelta(newPriceNum - prevPriceNum);
@@ -93,6 +92,7 @@ export class PriceDiffEvaluator {
           priceAnalytics,
         };
 
+        // Always persist base price change in catalog_history
         catalogHistoryDao?.recordBasePriceUpdate(
           pool.slug,
           pool.modelName,
@@ -100,50 +100,7 @@ export class PriceDiffEvaluator {
           basePayload
         );
 
-        events.push({
-          id: crypto.randomUUID(),
-          type: "POOL_BASE_PRICE_CHANGED",
-          poolSlug: pool.slug,
-          poolName: pool.modelName,
-          block: "ALL",
-          models: pool.models || [],
-          hoursUtc: "",
-          newStatus: pool.status,
-          previousPrice: prevPool.minPricePerDay,
-          newPrice: pool.minPricePerDay,
-          timestamp,
-          basePrice: basePayload,
-        });
-      }
-    } else {
-      if (basePriceChanged && stagedSlotPriceChanges.length === 0) {
-        const prevPriceNum = PriceDiffEvaluator.parseCleanPrice(prevPool.minPricePerDay);
-        const newPriceNum = PriceDiffEvaluator.parseCleanPrice(pool.minPricePerDay);
-        const priceDelta = PriceDiffEvaluator.cleanDelta(newPriceNum - prevPriceNum);
-        const pctDelta =
-          prevPriceNum > 0 ? PriceDiffEvaluator.cleanDelta((priceDelta / prevPriceNum) * 100) : 0;
-
-        if (priceDelta !== 0) {
-          let priceAnalytics = undefined;
-          if (catalogHistoryDao && newPriceNum > 0) {
-            priceAnalytics = catalogHistoryDao.getPriceAnalytics(pool.slug, "ALL", newPriceNum);
-          }
-
-          const basePayload: PoolBasePricePayload = {
-            previousMinPrice: prevPool.minPricePerDay,
-            newMinPrice: pool.minPricePerDay,
-            priceDelta,
-            percentageDelta: pctDelta,
-            priceAnalytics,
-          };
-
-          catalogHistoryDao?.recordBasePriceUpdate(
-            pool.slug,
-            pool.modelName,
-            pool.models || [],
-            basePayload
-          );
-
+        if (allBlocksHaveSamePrice || stagedSlotPriceChanges.length === 0) {
           events.push({
             id: crypto.randomUUID(),
             type: "POOL_BASE_PRICE_CHANGED",
@@ -160,51 +117,51 @@ export class PriceDiffEvaluator {
           });
         }
       }
+    }
 
-      if (stagedSlotPriceChanges.length > 0) {
-        // Case B: Regional slot price delta
-        for (const change of stagedSlotPriceChanges) {
-          const cleanNew = PriceDiffEvaluator.parseCleanPrice(change.newPrice);
-          let priceAnalytics = undefined;
-          if (catalogHistoryDao && cleanNew > 0) {
-            priceAnalytics = catalogHistoryDao.getPriceAnalytics(pool.slug, change.block, cleanNew);
-          }
-
-          const slotPricePayload: SlotPricePayload = {
-            block: change.block,
-            hoursUtc: change.hoursUtc,
-            previousPrice: change.prevPrice,
-            newPrice: change.newPrice,
-            priceDelta: change.delta,
-            percentageDelta: change.pct,
-            isDiscount: change.delta < 0,
-            priceAnalytics,
-          };
-
-          catalogHistoryDao?.recordSlotPriceChange(
-            pool.slug,
-            change.block,
-            change.prevPrice,
-            change.newPrice,
-            change.delta,
-            change.pct
-          );
-
-          events.push({
-            id: crypto.randomUUID(),
-            type: "SLOT_PRICE_CHANGED",
-            poolSlug: pool.slug,
-            poolName: pool.modelName,
-            block: change.block,
-            models: pool.models || [],
-            hoursUtc: change.hoursUtc,
-            newStatus: change.status,
-            previousPrice: change.prevPrice,
-            newPrice: change.newPrice,
-            timestamp,
-            slotPrice: slotPricePayload,
-          });
+    if (!allBlocksHaveSamePrice && stagedSlotPriceChanges.length > 0) {
+      // Case B: Regional slot price delta
+      for (const change of stagedSlotPriceChanges) {
+        const cleanNew = PriceDiffEvaluator.parseCleanPrice(change.newPrice);
+        let priceAnalytics = undefined;
+        if (catalogHistoryDao && cleanNew > 0) {
+          priceAnalytics = catalogHistoryDao.getPriceAnalytics(pool.slug, change.block, cleanNew);
         }
+
+        const slotPricePayload: SlotPricePayload = {
+          block: change.block,
+          hoursUtc: change.hoursUtc,
+          previousPrice: change.prevPrice,
+          newPrice: change.newPrice,
+          priceDelta: change.delta,
+          percentageDelta: change.pct,
+          isDiscount: change.delta < 0,
+          priceAnalytics,
+        };
+
+        catalogHistoryDao?.recordSlotPriceChange(
+          pool.slug,
+          change.block,
+          change.prevPrice,
+          change.newPrice,
+          change.delta,
+          change.pct
+        );
+
+        events.push({
+          id: crypto.randomUUID(),
+          type: "SLOT_PRICE_CHANGED",
+          poolSlug: pool.slug,
+          poolName: pool.modelName,
+          block: change.block,
+          models: pool.models || [],
+          hoursUtc: change.hoursUtc,
+          newStatus: change.status,
+          previousPrice: change.prevPrice,
+          newPrice: change.newPrice,
+          timestamp,
+          slotPrice: slotPricePayload,
+        });
       }
     }
 

@@ -1,9 +1,14 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { SlotDiffEngine } from "../src/engine/diffEngine.js";
 import { PoolsSnapshot } from "../src/types/domain.js";
+import Database from "better-sqlite3";
+import { initSchema } from "../src/db/index.js";
+import { CatalogHistoryDAO } from "../src/db/dao/catalogHistory.js";
 
 describe("SlotDiffEngine", () => {
   let engine: SlotDiffEngine;
+  let db: Database.Database;
+  let catalogHistoryDao: CatalogHistoryDAO;
 
   const sampleSnapshot: PoolsSnapshot = {
     success: true,
@@ -28,7 +33,14 @@ describe("SlotDiffEngine", () => {
   };
 
   beforeEach(() => {
-    engine = new SlotDiffEngine();
+    db = new Database(":memory:");
+    initSchema(db);
+    catalogHistoryDao = new CatalogHistoryDAO(db);
+    engine = new SlotDiffEngine(undefined, catalogHistoryDao);
+  });
+
+  afterEach(() => {
+    db.close();
   });
 
   it("should bootstrap silently on cold start without emitting events", () => {
@@ -151,6 +163,13 @@ describe("SlotDiffEngine", () => {
     expect(events[0].slotPrice?.priceDelta).toBe(-14.00);
     expect(events[0].slotPrice?.isDiscount).toBe(true);
     expect(events.some((e) => e.type === "POOL_BASE_PRICE_CHANGED")).toBe(false);
+
+    // Verify catalog_history recorded BASE_PRICE and slot_price_history recorded SLOT_PRICE
+    const catalogRows = db.prepare("SELECT * FROM catalog_history WHERE event_type = 'BASE_PRICE'").all();
+    expect(catalogRows.length).toBeGreaterThanOrEqual(1);
+
+    const slotPriceRows = db.prepare("SELECT * FROM slot_price_history WHERE pool_slug = 'flagship' AND block_id = 'americas'").all();
+    expect(slotPriceRows.length).toBeGreaterThanOrEqual(1);
   });
 
   it("should emit 1x POOL_BASE_PRICE_CHANGED and suppress individual slot alerts when ALL slots change uniformly", () => {

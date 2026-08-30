@@ -50,7 +50,7 @@ export class DonationDAO {
     `);
 
     this.stmtGetRecent = db.prepare(`
-      SELECT * FROM donations ORDER BY created_at DESC LIMIT ?
+      SELECT * FROM donations ORDER BY created_at DESC, id DESC LIMIT ?
     `);
 
     // Atomic transaction: Insert donation record AND increment user total_donated_stars
