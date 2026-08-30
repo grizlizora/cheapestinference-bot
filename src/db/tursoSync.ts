@@ -310,6 +310,9 @@ export class TursoCloudSync {
         { type: "execute", stmt: { sql: "SELECT * FROM donations" } },
         { type: "execute", stmt: { sql: "SELECT * FROM pool_state" } },
         { type: "execute", stmt: { sql: "SELECT * FROM active_dashboards WHERE last_interaction_at >= datetime('now', '-48 hours') AND consecutive_errors < 3" } },
+        { type: "execute", stmt: { sql: "SELECT * FROM slot_lifecycle_history ORDER BY id DESC LIMIT 500" } },
+        { type: "execute", stmt: { sql: "SELECT * FROM slot_price_history ORDER BY id DESC LIMIT 500" } },
+        { type: "execute", stmt: { sql: "SELECT * FROM catalog_history ORDER BY id DESC LIMIT 500" } },
       ]);
 
       const usersResult = results[0]?.response?.result;
@@ -317,8 +320,11 @@ export class TursoCloudSync {
       const donationsResult = results[2]?.response?.result;
       const poolStateResult = results[3]?.response?.result;
       const dashboardsResult = results[4]?.response?.result;
+      const slotLifecycleResult = results[5]?.response?.result;
+      const slotPriceResult = results[6]?.response?.result;
+      const catalogHistoryResult = results[7]?.response?.result;
 
-      if (!usersResult && !subsResult && !poolStateResult && !donationsResult && !dashboardsResult) {
+      if (!usersResult && !subsResult && !poolStateResult && !donationsResult && !dashboardsResult && !slotLifecycleResult && !slotPriceResult && !catalogHistoryResult) {
         console.log("☁️ [TursoSync] No remote state found in Turso.");
         return;
       }
@@ -417,11 +423,45 @@ export class TursoCloudSync {
           updated_at = excluded.updated_at
       `);
 
+      const upsertSlotLifecycleStmt = db.prepare(`
+        INSERT INTO slot_lifecycle_history (
+          id, pool_slug, block_id, opened_at, closed_at, duration_seconds, initial_status, price_month
+        ) VALUES (
+          @id, @pool_slug, @block_id, @opened_at, @closed_at, @duration_seconds, @initial_status, @price_month
+        )
+        ON CONFLICT(id) DO UPDATE SET
+          closed_at = excluded.closed_at,
+          duration_seconds = excluded.duration_seconds
+      `);
+
+      const upsertSlotPriceStmt = db.prepare(`
+        INSERT INTO slot_price_history (
+          id, pool_slug, block_id, old_price, new_price, new_price_num, price_delta, percent_delta, changed_at
+        ) VALUES (
+          @id, @pool_slug, @block_id, @old_price, @new_price, @new_price_num, @price_delta, @percent_delta, @changed_at
+        )
+        ON CONFLICT(id) DO NOTHING
+      `);
+
+      const upsertCatalogHistoryStmt = db.prepare(`
+        INSERT INTO catalog_history (
+          id, pool_slug, pool_name, event_type, added_models_json, upgraded_models_json,
+          removed_models_json, all_models_json, previous_min_price, new_min_price, metadata_json, detected_at
+        ) VALUES (
+          @id, @pool_slug, @pool_name, @event_type, @added_models_json, @upgraded_models_json,
+          @removed_models_json, @all_models_json, @previous_min_price, @new_min_price, @metadata_json, @detected_at
+        )
+        ON CONFLICT(id) DO NOTHING
+      `);
+
       let loadedUsers = 0;
       let loadedSubs = 0;
       let loadedDonations = 0;
       let loadedPools = 0;
       let loadedDashboards = 0;
+      let loadedSlotLifecycles = 0;
+      let loadedSlotPrices = 0;
+      let loadedCatalogHistories = 0;
 
       const hydrateTx = db.transaction(() => {
         if (usersResult?.rows) {
@@ -567,11 +607,91 @@ export class TursoCloudSync {
             }
           }
         }
+
+        if (slotLifecycleResult?.rows) {
+          const cols: string[] = slotLifecycleResult.cols.map((c: any) => c.name);
+          for (const row of slotLifecycleResult.rows) {
+            const obj: any = {};
+            cols.forEach((colName, idx) => {
+              obj[colName] = row[idx]?.value !== undefined ? row[idx].value : null;
+            });
+            try {
+              upsertSlotLifecycleStmt.run({
+                id: Number(obj.id),
+                pool_slug: String(obj.pool_slug),
+                block_id: String(obj.block_id),
+                opened_at: String(obj.opened_at),
+                closed_at: obj.closed_at ? String(obj.closed_at) : null,
+                duration_seconds: obj.duration_seconds !== null ? Number(obj.duration_seconds) : null,
+                initial_status: String(obj.initial_status || "available"),
+                price_month: String(obj.price_month || "$0"),
+              });
+              loadedSlotLifecycles++;
+            } catch (err: any) {
+              console.warn("⚠️ [TursoSync] Slot lifecycle row hydration error:", err?.message || err);
+            }
+          }
+        }
+
+        if (slotPriceResult?.rows) {
+          const cols: string[] = slotPriceResult.cols.map((c: any) => c.name);
+          for (const row of slotPriceResult.rows) {
+            const obj: any = {};
+            cols.forEach((colName, idx) => {
+              obj[colName] = row[idx]?.value !== undefined ? row[idx].value : null;
+            });
+            try {
+              upsertSlotPriceStmt.run({
+                id: Number(obj.id),
+                pool_slug: String(obj.pool_slug),
+                block_id: String(obj.block_id),
+                old_price: String(obj.old_price),
+                new_price: String(obj.new_price),
+                new_price_num: Number(obj.new_price_num || 0),
+                price_delta: Number(obj.price_delta || 0),
+                percent_delta: Number(obj.percent_delta || 0),
+                changed_at: String(obj.changed_at || new Date().toISOString()),
+              });
+              loadedSlotPrices++;
+            } catch (err: any) {
+              console.warn("⚠️ [TursoSync] Slot price row hydration error:", err?.message || err);
+            }
+          }
+        }
+
+        if (catalogHistoryResult?.rows) {
+          const cols: string[] = catalogHistoryResult.cols.map((c: any) => c.name);
+          for (const row of catalogHistoryResult.rows) {
+            const obj: any = {};
+            cols.forEach((colName, idx) => {
+              obj[colName] = row[idx]?.value !== undefined ? row[idx].value : null;
+            });
+            try {
+              upsertCatalogHistoryStmt.run({
+                id: Number(obj.id),
+                pool_slug: String(obj.pool_slug),
+                pool_name: String(obj.pool_name),
+                event_type: String(obj.event_type),
+                added_models_json: String(obj.added_models_json || "[]"),
+                upgraded_models_json: String(obj.upgraded_models_json || "[]"),
+                removed_models_json: String(obj.removed_models_json || "[]"),
+                all_models_json: String(obj.all_models_json || "[]"),
+                previous_min_price: obj.previous_min_price ? String(obj.previous_min_price) : null,
+                new_min_price: obj.new_min_price ? String(obj.new_min_price) : null,
+                metadata_json: String(obj.metadata_json || "{}"),
+                detected_at: String(obj.detected_at || new Date().toISOString()),
+              });
+              loadedCatalogHistories++;
+            } catch (err: any) {
+              console.warn("⚠️ [TursoSync] Catalog history row hydration error:", err?.message || err);
+            }
+          }
+        }
       });
 
       hydrateTx();
       const elapsed = (performance.now() - startTime).toFixed(2);
-      console.log(`✅ [TursoSync] Hydrated ${loadedUsers} users, ${loadedSubs} subscriptions, ${loadedDonations} donations, ${loadedPools} pool states, ${loadedDashboards} active dashboards from Turso in ${elapsed}ms`);
+      console.log(`✅ [TursoSync] Hydrated ${loadedUsers} users, ${loadedSubs} subscriptions, ${loadedDonations} donations, ${loadedPools} pool states, ${loadedDashboards} active dashboards, ${loadedSlotPrices} price histories from Turso in ${elapsed}ms`);
     } catch (err: any) {
       console.error("❌ [TursoSync] Failed to pull state from Turso:", err?.message || err);
     }

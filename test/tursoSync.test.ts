@@ -123,6 +123,41 @@ describe("TursoCloudSync Universal Cloud Sync Suite", () => {
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
+      CREATE TABLE IF NOT EXISTS slot_lifecycle_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        pool_slug TEXT NOT NULL,
+        block_id TEXT NOT NULL,
+        opened_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        closed_at DATETIME,
+        duration_seconds INTEGER,
+        initial_status TEXT NOT NULL,
+        price_month TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS slot_price_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        pool_slug TEXT NOT NULL,
+        block_id TEXT NOT NULL,
+        old_price TEXT NOT NULL,
+        new_price TEXT NOT NULL,
+        new_price_num REAL NOT NULL DEFAULT 0.0,
+        price_delta REAL NOT NULL,
+        percent_delta REAL NOT NULL,
+        changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE TABLE IF NOT EXISTS catalog_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        pool_slug TEXT NOT NULL,
+        pool_name TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        added_models_json TEXT NOT NULL DEFAULT '[]',
+        upgraded_models_json TEXT NOT NULL DEFAULT '[]',
+        removed_models_json TEXT NOT NULL DEFAULT '[]',
+        all_models_json TEXT NOT NULL,
+        previous_min_price TEXT,
+        new_min_price TEXT,
+        metadata_json TEXT DEFAULT '{}',
+        detected_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
     `);
 
     vi.spyOn(sync as any, "initRemoteSchema").mockResolvedValue(undefined);
@@ -157,6 +192,9 @@ describe("TursoCloudSync Universal Cloud Sync Suite", () => {
           },
         },
       },
+      { response: { result: { cols: [], rows: [] } } }, // slot_lifecycle_history
+      { response: { result: { cols: [], rows: [] } } }, // slot_price_history
+      { response: { result: { cols: [], rows: [] } } }, // catalog_history
     ]);
 
     await sync.pullStateFromTurso(testDb);
