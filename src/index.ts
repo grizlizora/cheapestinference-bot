@@ -173,26 +173,44 @@ async function bootstrap() {
   scraper.start();
 
   // 9. Process Resilience & Graceful Shutdown
+  let isShuttingDown = false;
   const shutdown = async (signal: string) => {
-    console.log(`\n🛑 [Shutdown] Received ${signal}. Stopping services gracefully...`);
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+
+    const isConflict = signal.includes("409_CONFLICT");
+    if (isConflict) {
+      console.warn(`\n🛑 [409 Conflict] Виявлено підключення нової інстанції бота з цим токеном!`);
+      console.warn(`💀 Старий сервер повністю завершує роботу (аналог натискання Ctrl+C у терміналі), щоб уникнути конфліктів.`);
+    } else {
+      console.log(`\n🛑 [Shutdown] Received ${signal}. Stopping services gracefully...`);
+    }
 
     const forceTimeout = setTimeout(() => {
       console.error("⚠️ [Shutdown] Graceful drain timed out. Forcing process exit.");
-      process.exit(1);
-    }, 5000);
+      process.exit(0);
+    }, 3000);
     forceTimeout.unref();
 
-    scraper.stop();
-    if (runner.isRunning()) {
-      await runner.stop();
+    try {
+      scraper.stop();
+      if (runner.isRunning()) {
+        await runner.stop().catch(() => {});
+      }
+      // Якщо це колізія 409 - НЕ надсилаємо залишкові алерти, оскільки нова інстанція вже активна!
+      if (!isConflict) {
+        await dispatcher.flushPending().catch(() => {});
+      }
+      notificationLogDao.close();
+      httpClient.destroy();
+      healthServer.close();
+      await tursoCloudSync.close().catch(() => {});
+      closeDatabase();
+    } catch (e: any) {
+      console.error("⚠️ [Shutdown] Error during shutdown cleanup:", e.message);
     }
-    await dispatcher.flushPending().catch(() => {});
-    notificationLogDao.close();
-    httpClient.destroy();
-    healthServer.close();
-    await tursoCloudSync.close().catch(() => {});
-    closeDatabase();
-    console.log("👋 [Shutdown] All services stopped. Goodbye!");
+
+    console.log("👋 [Shutdown] Всі сервіси повністю зупинено. Процес завершено.");
     process.exit(0);
   };
 
