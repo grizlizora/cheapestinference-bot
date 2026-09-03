@@ -198,6 +198,31 @@ async function bootstrap() {
 
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("SIGINT", () => shutdown("SIGINT"));
+
+  // 10. Anti-Collision & Mutual Exclusion (Telegram 409 Conflict)
+  // If another server instance launches with the same BOT_TOKEN, Telegram automatically
+  // terminates this instance's getUpdates with 409 Conflict. When that happens, we cleanly
+  // shut down all background services (scraper, DB, health server) and terminate this old
+  // instance completely so it does not linger as a zombie process.
+  runner.task()?.catch(async (err: any) => {
+    const msg = String(err?.message || err?.description || err || "");
+    const code = err?.error_code || err?.code;
+    if (
+      code === 409 ||
+      msg.includes("409") ||
+      msg.includes("terminated by other getUpdates request") ||
+      msg.includes("Conflict")
+    ) {
+      console.warn("⚠️ [Instance Conflict] Another bot instance connected with the same BOT_TOKEN! Terminating this old instance gracefully...");
+      await shutdown("409_CONFLICT_ANOTHER_INSTANCE_STARTED");
+    } else if (code === 401 || msg.includes("401") || msg.includes("Unauthorized")) {
+      console.error("❌ [Bot Unauthorized] BOT_TOKEN is invalid. Terminating process...");
+      await shutdown("401_UNAUTHORIZED");
+    } else {
+      console.error("❌ [Runner Crash] Telegram runner crashed with unexpected error:", err);
+      await shutdown("RUNNER_CRASH");
+    }
+  });
 }
 
 bootstrap().catch((err) => {

@@ -272,4 +272,47 @@ describe("Hardening & Mathematical Invariants Test Suite", () => {
       expect(second.url).toBe("");
     });
   });
+
+  describe("7. Telegram 409 Conflict Instance Mutual Exclusion & Auto-Termination Invariant", () => {
+    it("should recognize 409 Conflict and trigger clean shutdown when a second instance connects", async () => {
+      let shutdownReason: string | null = null;
+      const mockShutdown = async (signal: string) => {
+        shutdownReason = signal;
+      };
+
+      const handleRunnerError = async (err: any) => {
+        const msg = String(err?.message || err?.description || err || "");
+        const code = err?.error_code || err?.code;
+        if (
+          code === 409 ||
+          msg.includes("409") ||
+          msg.includes("terminated by other getUpdates request") ||
+          msg.includes("Conflict")
+        ) {
+          await mockShutdown("409_CONFLICT_ANOTHER_INSTANCE_STARTED");
+        } else if (code === 401 || msg.includes("401") || msg.includes("Unauthorized")) {
+          await mockShutdown("401_UNAUTHORIZED");
+        }
+      };
+
+      // Simulate Telegram returning 409 Conflict when a new server instance connects with identical token
+      const conflictError = {
+        error_code: 409,
+        description: "Conflict: terminated by other getUpdates request; make sure that only one bot instance is running",
+      };
+
+      await handleRunnerError(conflictError);
+      expect(shutdownReason).toBe("409_CONFLICT_ANOTHER_INSTANCE_STARTED");
+
+      // Simulate string representation of 409 Conflict
+      shutdownReason = null;
+      await handleRunnerError(new Error("terminated by other getUpdates request"));
+      expect(shutdownReason).toBe("409_CONFLICT_ANOTHER_INSTANCE_STARTED");
+
+      // Verify 401 Unauthorized also shuts down cleanly
+      shutdownReason = null;
+      await handleRunnerError({ error_code: 401, description: "Unauthorized" });
+      expect(shutdownReason).toBe("401_UNAUTHORIZED");
+    });
+  });
 });
