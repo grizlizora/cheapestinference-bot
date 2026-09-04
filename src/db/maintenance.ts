@@ -6,7 +6,9 @@ export class DatabaseMaintenanceManager {
   private stmtPruneCatalogHistoryBatch: Database.Statement;
   private stmtPruneSlotPriceHistoryBatch: Database.Statement;
   private stmtPruneActiveDashboardsBatch: Database.Statement;
-  private stmtPruneOutboxBatch: Database.Statement;
+  private stmtPruneOutboxDispatched: Database.Statement;
+  private stmtPruneOutboxFailed: Database.Statement;
+  private stmtPruneOutboxStalePending: Database.Statement;
   private stmtFreelistCount: Database.Statement;
 
   constructor(
@@ -60,13 +62,29 @@ export class DatabaseMaintenanceManager {
       )
     `);
 
-    this.stmtPruneOutboxBatch = db.prepare(`
+    this.stmtPruneOutboxDispatched = db.prepare(`
       DELETE FROM notification_outbox 
       WHERE id IN (
         SELECT id FROM notification_outbox 
-        WHERE (status = 'dispatched' AND dispatched_at < datetime('now', '-24 hours'))
-           OR (status = 'failed' AND created_at < datetime('now', '-3 days'))
-           OR (status = 'pending' AND created_at < datetime('now', '-6 hours'))
+        WHERE status = 'dispatched' AND dispatched_at < datetime('now', '-24 hours')
+        LIMIT 2000
+      )
+    `);
+
+    this.stmtPruneOutboxFailed = db.prepare(`
+      DELETE FROM notification_outbox 
+      WHERE id IN (
+        SELECT id FROM notification_outbox 
+        WHERE status = 'failed' AND created_at < datetime('now', '-3 days')
+        LIMIT 2000
+      )
+    `);
+
+    this.stmtPruneOutboxStalePending = db.prepare(`
+      DELETE FROM notification_outbox 
+      WHERE id IN (
+        SELECT id FROM notification_outbox 
+        WHERE status = 'pending' AND created_at < datetime('now', '-6 hours')
         LIMIT 2000
       )
     `);
@@ -127,11 +145,22 @@ export class DatabaseMaintenanceManager {
     } catch {}
 
     // 6. Purge stale outbox records (>24 hours dispatched, >3 days failed, >6 hours pending)
+    // Uses partial indexes: idx_outbox_prune_dispatched, idx_outbox_prune_failed, idx_outbox_pending
     try {
       while (true) {
-        const outboxResult = this.stmtPruneOutboxBatch.run();
-        totalDeleted += outboxResult.changes;
-        if (outboxResult.changes < 2000) break;
+        const dResult = this.stmtPruneOutboxDispatched.run();
+        totalDeleted += dResult.changes;
+        if (dResult.changes < 2000) break;
+      }
+      while (true) {
+        const fResult = this.stmtPruneOutboxFailed.run();
+        totalDeleted += fResult.changes;
+        if (fResult.changes < 2000) break;
+      }
+      while (true) {
+        const pResult = this.stmtPruneOutboxStalePending.run();
+        totalDeleted += pResult.changes;
+        if (pResult.changes < 2000) break;
       }
     } catch {}
 

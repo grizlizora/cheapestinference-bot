@@ -27,9 +27,9 @@ services:
       resources:
         limits:
           cpus: "0.50"
-          memory: 128M
+          memory: 256M
         reservations:
-          memory: 64M
+          memory: 128M
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:7860/health"]
       interval: 30s

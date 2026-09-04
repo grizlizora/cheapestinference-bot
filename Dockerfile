@@ -39,7 +39,7 @@ COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 ENV NODE_ENV=production \
-    NODE_OPTIONS="--max-old-space-size=64 --max-semi-space-size=2" \
+    NODE_OPTIONS="--max-old-space-size=160 --max-semi-space-size=16" \
     PORT=7860 \
     DB_PATH=/app/data/bot.db \
     TOR_ENABLED=true \
@@ -49,6 +49,6 @@ ENV NODE_ENV=production \
     TOR_CONTROL_PORT=9051
 
 VOLUME ["/app/data"]
-EXPOSE 7860
+EXPOSE 7860 10000
 
 ENTRYPOINT ["/sbin/tini", "-g", "--", "/entrypoint.sh"]

@@ -56,7 +56,7 @@ export default {
       );
     }
 
-    let targetUrl;
+    let targetUrl: URL;
     try {
       targetUrl = new URL(targetUrlParam);
     } catch {
@@ -112,7 +112,7 @@ export default {
           polish: "off",
           minify: { javascript: false, css: false, html: false },
         },
-      });
+      } as any);
 
       // 6. Build Downstream Response (Streaming body, zero buffering overhead)
       const responseHeaders = new Headers(originResponse.headers);
@@ -124,9 +124,9 @@ export default {
         statusText: originResponse.statusText,
         headers: responseHeaders,
       });
-    } catch (err) {
+    } catch (err: any) {
       return new Response(
-        JSON.stringify({ error: "Upstream fetch failed", message: err.message }),
+        JSON.stringify({ error: "Upstream fetch failed", message: err?.message || String(err) }),
         { status: 502, headers: { "Content-Type": "application/json" } }
       );
     }

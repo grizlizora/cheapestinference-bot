@@ -95,6 +95,12 @@ export class PriceDiffEvaluator {
     const events: DiffEvent[] = [];
 
     const basePriceChanged = pool.minPricePerDay !== prevPool.minPricePerDay;
+    // Invariant Design:
+    // 1. Uniform Base Price Change: When ALL regional blocks change to the SAME price (or single-block pool),
+    //    emit POOL_BASE_PRICE_CHANGED to notify subscribers once rather than spamming duplicate alerts.
+    // 2. Regional Divergence: When only a subset of blocks change (or blocks change to different prices),
+    //    suppress POOL_BASE_PRICE_CHANGED and emit SLOT_PRICE_CHANGED per block. This prevents duplicate alerts
+    //    for users subscribed to 'ALL' (who receive SLOT_PRICE_CHANGED) while still recording base price history.
     const allBlocksHaveSamePrice =
       (stagedSlotPriceChanges.length === pool.blocks.length &&
         pool.blocks.length > 1 &&

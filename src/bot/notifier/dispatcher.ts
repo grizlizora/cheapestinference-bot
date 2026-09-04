@@ -101,7 +101,7 @@ export class NotificationDispatcher {
     this.index = index ?? new SubscriberInvertedIndex((userDao as any).db);
     this.rateLimiter = rateLimiter ?? new NotificationRateLimiter();
     this.scheduler = new DwrrScheduler(this.rateLimiter);
-    this.outboxManager = new OutboxManager(this.userDao, this.logDao, this.outboxDao, this.index);
+    this.outboxManager = new OutboxManager(this.userDao, this.logDao, this.outboxDao, this.index, this.rateLimiter);
     this.sender = new TelegramSender(this.bot, this.rateLimiter, this.scheduler, this.outboxManager);
 
     this.outboxManager.hydratePendingFromOutbox(this.scheduler);
@@ -251,26 +251,26 @@ export class NotificationDispatcher {
     if (events.length === 0) return;
 
     const now = Date.now();
-    const MIN_REVERSAL_INTERVAL_MS = 60 * 1000;
+    const MIN_REVERSAL_INTERVAL_MS = 10 * 1000;
     const validEvents: DiffEvent[] = [];
 
     for (const event of events) {
       const latchKey = `${event.poolSlug}:${event.block || "ALL"}:${event.type}`;
       const lastSent = this.lastDispatchedEventLatch.get(latchKey);
 
-      // Suppress duplicate identical event within 5 minutes
-      if (lastSent && now - lastSent < 5 * 60 * 1000) {
+      // Suppress duplicate identical event within 15s (duplicate scraper tick race)
+      if (lastSent && now - lastSent < 15 * 1000) {
         console.warn(`🛡️ [Dispatcher Latch] Suppressed duplicate ${event.type} for ${event.poolSlug}:${event.block}`);
         continue;
       }
 
-      // Check opposite latch: if opposite state was dispatched within 60s, suppress rapid flapping
+      // Check opposite latch: if opposite state was dispatched within 10s, suppress rapid flapping
       const oppositeType = event.type === "SLOT_APPEARED" ? "SLOT_DISAPPEARED" : event.type === "SLOT_DISAPPEARED" ? "SLOT_APPEARED" : undefined;
       if (oppositeType) {
         const oppositeKey = `${event.poolSlug}:${event.block || "ALL"}:${oppositeType}`;
         const lastOpposite = this.lastDispatchedEventLatch.get(oppositeKey);
         if (lastOpposite && now - lastOpposite < MIN_REVERSAL_INTERVAL_MS) {
-          console.warn(`🛡️ [Anti-Flap Guard] Suppressed ${event.type} for ${event.poolSlug}:${event.block} (within 60s of ${oppositeType})`);
+          console.warn(`🛡️ [Anti-Flap Guard] Suppressed ${event.type} for ${event.poolSlug}:${event.block} (within 10s of ${oppositeType})`);
           continue;
         }
         this.lastDispatchedEventLatch.delete(oppositeKey);

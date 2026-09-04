@@ -187,12 +187,11 @@ export function createAdminHandler(
         return;
       }
 
-      const matchesBotToken = isTimingSafeSha256Match(secretAttempt, config.BOT_TOKEN);
       const matchesAdminSecret = config.ADMIN_SECRET
         ? isTimingSafeSha256Match(secretAttempt, config.ADMIN_SECRET)
         : false;
 
-      if (matchesBotToken || matchesAdminSecret) {
+      if (matchesAdminSecret) {
         userDao.setAdmin(tgId, true);
         invertedIndex?.updateUserPreferences(tgId, { isAdmin: true });
         failedClaimAttempts.delete(tgId);

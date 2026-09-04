@@ -143,7 +143,7 @@ export class UserDAO {
       `INSERT INTO users (id, telegram_id, username, first_name, language, is_admin) 
        VALUES (?, ?, ?, ?, ?, ?) 
        ON CONFLICT(telegram_id) DO UPDATE SET 
-         id=excluded.id, username=excluded.username, first_name=excluded.first_name, is_admin=excluded.is_admin, updated_at=CURRENT_TIMESTAMP`,
+         username=excluded.username, first_name=excluded.first_name, is_admin=excluded.is_admin, updated_at=CURRENT_TIMESTAMP`,
       [user.id, params.telegram_id, params.username, params.first_name, params.language || "en", user.is_admin ?? 0],
       true
     );

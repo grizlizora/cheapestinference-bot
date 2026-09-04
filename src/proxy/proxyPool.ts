@@ -43,22 +43,22 @@ export class ProxyPool {
       });
     }
 
-    // Tier 2: Direct Fast-Path with In-Memory DNS Cache (Priority 1)
-    if (this.allowDirectFallback) {
+    // Tier 2: Tor SOCKS5 (Priority 1 if available, avoiding real IP leak)
+    if (this.torManager) {
       this.proxies.push({
-        url: "",
-        type: "direct",
+        url: this.torManager.getSocksUrl(),
+        type: "tor",
         priority: 1,
         lastUsedAt: 0,
         consecutiveErrors: 0,
         bannedUntil: null,
-        latencyMs: 80,
+        latencyMs: 500,
         totalSuccesses: 0,
         totalFailures: 0,
       });
     }
 
-    // Tier 2.5: External Proxies (Priority 2)
+    // Tier 3: External Proxies (Priority 2)
     for (const url of externalProxyList) {
       if (url.trim()) {
         this.proxies.push({
@@ -75,16 +75,19 @@ export class ProxyPool {
       }
     }
 
-    // Tier 3: Tor SOCKS5 Standby (Priority 3)
-    if (this.torManager) {
+    // Tier 4: Direct Connection
+    // If Tor or Worker is configured, Direct is assigned Priority 10 (Emergency Fallback)
+    // If no proxies are configured, Direct is Priority 1 (Primary)
+    if (this.allowDirectFallback) {
+      const hasAlternative = Boolean((cfWorkerUrl && cfWorkerUrl.trim()) || this.torManager || externalProxyList.length > 0);
       this.proxies.push({
-        url: this.torManager.getSocksUrl(),
-        type: "tor",
-        priority: 3,
+        url: "",
+        type: "direct",
+        priority: hasAlternative ? 10 : 1,
         lastUsedAt: 0,
         consecutiveErrors: 0,
         bannedUntil: null,
-        latencyMs: 500,
+        latencyMs: 80,
         totalSuccesses: 0,
         totalFailures: 0,
       });
@@ -110,8 +113,12 @@ export class ProxyPool {
     const available = this.proxies.filter((p) => p.bannedUntil === null || p.bannedUntil <= now);
 
     if (available.length === 0) {
-      console.warn("🚨 [ProxyPool] All proxy tiers are quarantined! Forcing Direct fallback.");
-      return this.proxies.find((p) => p.type === "direct") || this.proxies[0];
+      if (this.allowDirectFallback) {
+        console.warn("🚨 [ProxyPool] All proxy tiers are quarantined! Forcing Direct fallback.");
+        return this.proxies.find((p) => p.type === "direct") || this.proxies[0];
+      }
+      console.warn("🚨 [ProxyPool] All proxy tiers are quarantined and direct fallback is disabled!");
+      return this.proxies[0];
     }
 
     // Strict Tier Priority sorting with Error & LRU tiebreakers
@@ -213,7 +220,6 @@ export class ProxyPool {
       proxies: this.proxies.map((p) => ({
         type: p.type,
         priority: p.priority,
-        url: p.url ? p.url.replace(/\/\/.*@/, "//***@") : "direct",
         consecutiveErrors: p.consecutiveErrors,
         isBanned: p.bannedUntil !== null && p.bannedUntil > now,
         latencyMs: p.latencyMs,

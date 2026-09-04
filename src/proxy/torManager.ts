@@ -71,13 +71,18 @@ export class TorManager {
     return false;
   }
 
+  private getAuthCmd(): string {
+    if (!this.controlPassword) {
+      return 'AUTHENTICATE ""\r\n';
+    }
+    const sanitized = this.controlPassword.replace(/[\r\n]/g, "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    return `AUTHENTICATE "${sanitized}"\r\n`;
+  }
+
   private async checkBootstrapStatus(): Promise<boolean> {
     return new Promise((resolve) => {
       const socket = net.createConnection(this.controlPort, this.controlHost, () => {
-        const authCmd = this.controlPassword
-          ? `AUTHENTICATE "${this.controlPassword}"\r\n`
-          : `AUTHENTICATE ""\r\n`;
-        socket.write(authCmd);
+        socket.write(this.getAuthCmd());
       });
 
       socket.setTimeout(2000, () => {
@@ -136,11 +141,7 @@ export class TorManager {
 
     return new Promise((resolve) => {
       const socket = net.createConnection(this.controlPort, this.controlHost, () => {
-        const authCmd = this.controlPassword
-          ? `AUTHENTICATE "${this.controlPassword}"\r\n`
-          : `AUTHENTICATE ""\r\n`;
-
-        socket.write(authCmd);
+        socket.write(this.getAuthCmd());
       });
 
       socket.setTimeout(5000, () => {

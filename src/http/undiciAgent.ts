@@ -79,7 +79,20 @@ export function createDirectUndiciAgent(
       });
       socket.setNoDelay(true);
       socket.setKeepAlive(true, 1000);
-      return callback(null, socket);
+      let plainFired = false;
+      socket.once("connect", () => {
+        if (!plainFired) {
+          plainFired = true;
+          callback(null, socket);
+        }
+      });
+      socket.once("error", (err) => {
+        if (!plainFired) {
+          plainFired = true;
+          callback(err, null);
+        }
+      });
+      return socket;
     }
 
     const cachedSession = tlsCache ? tlsCache.get(host) : undefined;
@@ -106,8 +119,19 @@ export function createDirectUndiciAgent(
       });
     }
 
-    tlsSocket.once("secureConnect", () => callback(null, tlsSocket));
-    tlsSocket.on("error", (err) => callback(err, null));
+    let tlsFired = false;
+    tlsSocket.once("secureConnect", () => {
+      if (!tlsFired) {
+        tlsFired = true;
+        callback(null, tlsSocket);
+      }
+    });
+    tlsSocket.once("error", (err) => {
+      if (!tlsFired) {
+        tlsFired = true;
+        callback(err, null);
+      }
+    });
   };
 
   return new Agent({

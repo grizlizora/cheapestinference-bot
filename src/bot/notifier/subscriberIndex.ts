@@ -326,19 +326,31 @@ export class SubscriberInvertedIndex {
     if (poolSet) for (const id of poolSet) matchedUserIds.add(id);
 
     // 3. Exact Block: 'poolSlug:blockId'
+    const specificBlockSubscribers = new Set<number>();
     if (blockId !== "ALL") {
       const blockSet = this.index.get(`${poolSlug}:${blockId}:${eventType}`);
-      if (blockSet) for (const id of blockSet) matchedUserIds.add(id);
+      if (blockSet) {
+        for (const id of blockSet) {
+          matchedUserIds.add(id);
+          specificBlockSubscribers.add(id);
+        }
+      }
     } else {
       // 4. Pool-wide event: query all known regional blocks in O(1)
       const blocks = this.poolBlocks.get(poolSlug) || new Set(["asia", "europe", "americas"]);
       for (const b of blocks) {
         const regionalSet = this.index.get(`${poolSlug}:${b}:${eventType}`);
-        if (regionalSet) for (const id of regionalSet) matchedUserIds.add(id);
+        if (regionalSet) {
+          for (const id of regionalSet) {
+            matchedUserIds.add(id);
+            specificBlockSubscribers.add(id);
+          }
+        }
       }
     }
 
-    // Apply explicit exclusions (block-specific, pool-specific, or global)
+    // Apply explicit exclusions with specificity hierarchy
+    // Specific block exclusion deletes user unconditionally
     const blockExclusions = blockId !== "ALL" ? this.exclusions.get(`${poolSlug}:${blockId}:${eventType}`) : undefined;
     const poolExclusions = this.exclusions.get(`${poolSlug}:ALL:${eventType}`);
     const globalExclusions = this.exclusions.get(`ALL:ALL:${eventType}`);
@@ -346,11 +358,22 @@ export class SubscriberInvertedIndex {
     if (blockExclusions) {
       for (const id of blockExclusions) matchedUserIds.delete(id);
     }
+    // Pool exclusions apply only if the user didn't specifically subscribe to this exact block
     if (poolExclusions) {
-      for (const id of poolExclusions) matchedUserIds.delete(id);
+      for (const id of poolExclusions) {
+        if (!specificBlockSubscribers.has(id)) {
+          matchedUserIds.delete(id);
+        }
+      }
     }
+    // Global exclusions apply only if the user didn't specifically subscribe to this block or pool
     if (globalExclusions) {
-      for (const id of globalExclusions) matchedUserIds.delete(id);
+      for (const id of globalExclusions) {
+        const isPoolSubscribed = poolSet && poolSet.has(id);
+        if (!specificBlockSubscribers.has(id) && !isPoolSubscribed) {
+          matchedUserIds.delete(id);
+        }
+      }
     }
 
     // 3-Bucket Linear Partition (Dial's Scheme): O(k) linear separation with Inactivity Engine
@@ -522,6 +545,23 @@ export class SubscriberInvertedIndex {
       const profile = this.profiles.get(userId);
       if (profile) {
         profile.isActive = false;
+      }
+    }
+  }
+
+  /**
+   * Complete eviction of a user from memory index (RAM leak prevention on user deletion or permanent block)
+   */
+  public evictUser(telegramId: number): void {
+    const userId = this.tgIdToUserId.get(telegramId);
+    this.tgIdToUserId.delete(telegramId);
+    if (userId) {
+      this.profiles.delete(userId);
+      for (const set of this.index.values()) {
+        set.delete(userId);
+      }
+      for (const set of this.exclusions.values()) {
+        set.delete(userId);
       }
     }
   }

@@ -150,8 +150,8 @@ export function renderPoolDetailText(
 
       if (isAvailable && smart?.predictionTip) {
         row += `\n  ${smart.predictionTip}`;
-      } else if (!isAvailable && smart?.etaTip) {
-        row += `\n  ${smart.etaTip}`;
+      } else if (!isAvailable && (smart?.etaTip || smart?.collectingStatsTip)) {
+        row += `\n  ${smart.etaTip || smart.collectingStatsTip}`;
       }
 
       return row;

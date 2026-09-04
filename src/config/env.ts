@@ -22,7 +22,7 @@ const envSchema = z.object({
       return Array.from(new Set(ids));
     }),
   DB_PATH: z.string().default("./data/bot.db"),
-  TURSO_DATABASE_URL: z.string().default("https://cheapestinference-db-grizlizora.turso.io").optional(),
+  TURSO_DATABASE_URL: z.string().optional(),
   TURSO_AUTH_TOKEN: z.string().optional(),
   TELEGRAM_API_ROOT: z.string().optional(),
   CF_WORKER_URL: z.string().optional(),
@@ -72,16 +72,15 @@ const envSchema = z.object({
     .transform((val) => parseInt(val, 10)),
   ADMIN_USERNAMES: z
     .string()
-    .default("grizlizora")
+    .default("")
     .transform((val) => {
-      const base = ["grizlizora"];
-      if (!val || !val.trim()) return base;
+      if (!val || !val.trim()) return [];
       const cleaned = val.replace(/[\[\]"'\r\n;|\s]+/g, ",");
       const names = cleaned
         .split(",")
         .map((u) => u.trim().replace(/^@/, "").toLowerCase())
         .filter((u) => u.length > 0);
-      return Array.from(new Set([...base, ...names]));
+      return Array.from(new Set(names));
     }),
   ADMIN_SECRET: z.string().optional(),
   SCRAPE_MAX_BACKOFF_SEC: z
@@ -128,11 +127,6 @@ export function isUserAdmin(
   if (username) {
     const clean = username.replace(/^@/, "").toLowerCase();
     if (adminUsernamesSet.has(clean)) {
-      if (userDao && typeof userDao.setAdmin === "function" && !userDao.isAdmin(userId)) {
-        try {
-          userDao.setAdmin(userId, true);
-        } catch {}
-      }
       return true;
     }
   }

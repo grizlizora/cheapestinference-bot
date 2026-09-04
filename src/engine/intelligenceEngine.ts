@@ -2,6 +2,7 @@ import { SlotHistoryDAO, SlotAnalytics } from "../db/dao/slotHistory.js";
 import { PredictiveAnalyticsEngine } from "./predictiveEngine.js";
 import { SupportedLanguage, translate, stripLeadingEmoji } from "../i18n/index.js";
 import { icon } from "../bot/views/iconTheme.js";
+import { PredictionConfidence } from "../types/domain.js";
 
 export interface SmartStatusResult {
   badge: string;
@@ -11,6 +12,14 @@ export interface SmartStatusResult {
   etaTip?: string;
   collectingStatsTip?: string;
   analytics: SlotAnalytics;
+  etaMeta?: {
+    isPredictable: boolean;
+    confidence: PredictionConfidence;
+    sampleCount: number;
+    minRequired: number;
+    detectedCadenceHours: number | null;
+    avgDurationFormatted: string | null;
+  };
 }
 
 export class AvailabilityIntelligenceEngine {
@@ -72,6 +81,14 @@ export class AvailabilityIntelligenceEngine {
         etaTip,
         collectingStatsTip,
         analytics,
+        etaMeta: {
+          isPredictable: enhanced.eta.isPredictable,
+          confidence: enhanced.eta.confidence,
+          sampleCount: enhanced.eta.sampleCount,
+          minRequired: enhanced.eta.minRequired,
+          detectedCadenceHours: enhanced.eta.detectedCadenceHours,
+          avgDurationFormatted: enhanced.avgDurationFormatted,
+        },
       };
     }
 
@@ -97,6 +114,14 @@ export class AvailabilityIntelligenceEngine {
       isHot,
       predictionTip: tip || undefined,
       analytics,
+      etaMeta: {
+        isPredictable: enhanced.eta.isPredictable,
+        confidence: enhanced.eta.confidence,
+        sampleCount: enhanced.eta.sampleCount,
+        minRequired: enhanced.eta.minRequired,
+        detectedCadenceHours: enhanced.eta.detectedCadenceHours,
+        avgDurationFormatted: enhanced.avgDurationFormatted,
+      },
     };
   }
 }

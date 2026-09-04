@@ -200,4 +200,6 @@ CREATE TABLE IF NOT EXISTS notification_outbox (
 CREATE INDEX IF NOT EXISTS idx_outbox_pending ON notification_outbox(status, priority, created_at) WHERE status = 'pending';
 CREATE INDEX IF NOT EXISTS idx_outbox_user ON notification_outbox(user_id);
 CREATE INDEX IF NOT EXISTS idx_outbox_broadcast ON notification_outbox(is_broadcast, language, status);
+CREATE INDEX IF NOT EXISTS idx_outbox_prune_dispatched ON notification_outbox(status, dispatched_at) WHERE status = 'dispatched';
+CREATE INDEX IF NOT EXISTS idx_outbox_prune_failed ON notification_outbox(status, created_at) WHERE status = 'failed';
 

@@ -255,7 +255,7 @@ export class ScraperOrchestrator extends EventEmitter {
         const apiResult = await this.apiEngine.fetch(
           effectiveApiEtag,
           effectiveApiLastModified,
-          4_000
+          6_000
         );
         this.apiConsecutiveErrors = 0;
         if (apiResult.etag) this.apiEtag = apiResult.etag;
@@ -280,7 +280,7 @@ export class ScraperOrchestrator extends EventEmitter {
     const htmlResult = await this.htmlEngine.fetch(
       effectiveHtmlEtag,
       effectiveHtmlLastModified,
-      4_000
+      6_000
     );
     if (htmlResult.etag) this.htmlEtag = htmlResult.etag;
     if (htmlResult.lastModified) this.htmlLastModified = htmlResult.lastModified;

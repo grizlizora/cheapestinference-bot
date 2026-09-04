@@ -12,7 +12,7 @@ import { ActiveDashboardDAO } from "../src/db/dao/activeDashboards.js";
 import { SubscriberInvertedIndex } from "../src/bot/notifier/subscriberIndex.js";
 import { NotificationDispatcher } from "../src/bot/notifier/dispatcher.js";
 import { SlotDiffEngine } from "../src/engine/diffEngine.js";
-import { AvailabilityIntelligenceEngine } from "../src/engine/availabilityEngine.js";
+import { AvailabilityIntelligenceEngine } from "../src/engine/intelligenceEngine.js";
 import { PredictiveAnalyticsEngine } from "../src/engine/predictiveEngine.js";
 import { ActiveDashboardRegistry } from "../src/bot/liveSync/dashboardRegistry.js";
 import { LiveDashboardManager } from "../src/bot/liveSync/liveDashboardManager.js";

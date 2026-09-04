@@ -10,6 +10,7 @@ import { UserDAO } from "../../../db/dao/users.js";
 import { OutgoingAlertMessage, BroadcastPriority } from "../types.js";
 import { DwrrScheduler } from "../queue/dwrrScheduler.js";
 import { SubscriberInvertedIndex } from "../subscriberIndex.js";
+import { NotificationRateLimiter } from "../rateLimiter.js";
 
 export class OutboxManager {
   private readonly MAX_MESSAGE_AGE_MS = 10 * 60 * 1000; // 10 min TTL
@@ -20,9 +21,13 @@ export class OutboxManager {
     private userDao: UserDAO,
     private logDao: NotificationLogDAO,
     private outboxDao?: NotificationOutboxDAO,
-    private index?: SubscriberInvertedIndex
+    private index?: SubscriberInvertedIndex,
+    private rateLimiter?: NotificationRateLimiter
   ) {
-    this.batchFlushTimer = setInterval(() => this.flushBlockedUsersToDb(), 5000);
+    this.batchFlushTimer = setInterval(() => {
+      this.flushBlockedUsersToDb();
+      this.flushDispatchedToDb();
+    }, 5000);
     this.batchFlushTimer.unref?.();
   }
 
@@ -84,9 +89,32 @@ export class OutboxManager {
     }
   }
 
+  private dispatchedBatch: string[] = [];
+  private flushDispatchedTimer?: NodeJS.Timeout;
+
   public markDispatched(msgId: string): void {
+    this.dispatchedBatch.push(msgId);
+    if (this.dispatchedBatch.length >= 25) {
+      this.flushDispatchedToDb();
+    } else if (!this.flushDispatchedTimer) {
+      this.flushDispatchedTimer = setTimeout(() => {
+        this.flushDispatchedTimer = undefined;
+        this.flushDispatchedToDb();
+      }, 1000);
+      this.flushDispatchedTimer.unref?.();
+    }
+  }
+
+  public flushDispatchedToDb(): void {
+    if (this.flushDispatchedTimer) {
+      clearTimeout(this.flushDispatchedTimer);
+      this.flushDispatchedTimer = undefined;
+    }
+    if (this.dispatchedBatch.length === 0 || !this.outboxDao) return;
+    const batch = this.dispatchedBatch;
+    this.dispatchedBatch = [];
     try {
-      this.outboxDao?.markDispatched(msgId);
+      this.outboxDao.markDispatchedBatch(batch);
     } catch {}
   }
 
@@ -104,6 +132,8 @@ export class OutboxManager {
 
   public handleUserBlocked(telegramId: number, msgId?: string): void {
     this.index?.markUserDeactivated(telegramId);
+    this.index?.evictUser(telegramId);
+    this.rateLimiter?.evictUser(telegramId);
     this.blockedUsersBatch.push(telegramId);
     if (msgId) {
       this.markTerminalFailed(msgId, "User deactivated or blocked");
@@ -160,7 +190,7 @@ export class OutboxManager {
           eventType: item.eventType ?? item.event_type ?? "NOTIFICATION",
           text: item.messageText ?? item.message_text ?? "",
           keyboard,
-          isMuted: (item.disableNotification ?? item.disable_notification) === 1,
+          isMuted: Boolean(item.disableNotification ?? item.disable_notification),
           priority: (item.priority as BroadcastPriority) || "P1",
           retries: Number(item.attempts || 0),
           enqueuedAt: itemCreatedMs,

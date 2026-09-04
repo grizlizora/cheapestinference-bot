@@ -128,6 +128,21 @@ export async function safeEditMessageText(
   }
 }
 
+const DTF_CACHE = new Map<string, Intl.DateTimeFormat>();
+function getDtf(timeZone: string): Intl.DateTimeFormat {
+  let dtf = DTF_CACHE.get(timeZone);
+  if (!dtf) {
+    dtf = new Intl.DateTimeFormat("en-GB", {
+      timeZone,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    DTF_CACHE.set(timeZone, dtf);
+  }
+  return dtf;
+}
+
 /**
  * Formats a clear, dynamic telemetry timestamp footer showing live verification and state.
  */
@@ -138,18 +153,12 @@ export function formatMonitoringFooter(
   consecutiveFailures = 0
 ): string {
   const ts = lastVerifiedTs && lastVerifiedTs > 0 ? lastVerifiedTs : Date.now();
-  const utcDateStr = new Date(ts).toISOString().replace("T", " ").substring(0, 19) + " UTC";
+  const utcDateStr = new Date(ts).toISOString().replace("T", " ").substring(0, 16) + " UTC";
 
   const tzConfig = LOCALE_TIMEZONES[lang as SupportedLanguage] || LOCALE_TIMEZONES.en;
   let localDateStr = "";
   if (tzConfig && tzConfig.timeZone !== "UTC") {
-    const dtf = new Intl.DateTimeFormat("en-GB", {
-      timeZone: tzConfig.timeZone,
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-    });
+    const dtf = getDtf(tzConfig.timeZone);
     const cityName = tzConfig.cityName[lang as SupportedLanguage] || tzConfig.cityName.en;
     localDateStr = ` (${dtf.format(new Date(ts))} ${cityName})`;
   }

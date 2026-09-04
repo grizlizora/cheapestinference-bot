@@ -181,4 +181,16 @@ export function isSlotAvailable(status: any): boolean {
   return normalized === "available" || normalized === "limited";
 }
 
+export interface ModelCatalogDiff {
+  poolSlug: string;
+  poolName: string;
+  hasChanges: boolean;
+  added: ModelDiffItem[];
+  upgraded: ModelDiffItem[];
+  removed: ModelDiffItem[];
+  currentModels: string[];
+  previousModels: string[];
+}
+
+
 

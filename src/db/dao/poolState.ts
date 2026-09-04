@@ -137,23 +137,35 @@ export class PoolStateDAO {
     return this.stmtGetBySlug.all(poolSlug) as PoolStateRecord[];
   }
 
+  private cachedLastVerified: { timestamp: number; source: string; latencyMs: number } | null = null;
+  private lastDiskSyncTimestamp = 0;
+
   touchVerified(source = "cache_304", latencyMs = 0): void {
-    const meta = {
-      timestamp: Date.now(),
+    const now = Date.now();
+    this.cachedLastVerified = {
+      timestamp: now,
       source,
       latencyMs,
     };
-    this.stmtUpsertMeta.run({
-      key: "last_verified",
-      value: JSON.stringify(meta),
-    });
+    // Only write to SQLite disk if > 15 minutes have elapsed or if fresh data was scraped
+    if (source !== "cache_304" || now - this.lastDiskSyncTimestamp > 15 * 60 * 1000) {
+      this.lastDiskSyncTimestamp = now;
+      this.stmtUpsertMeta.run({
+        key: "last_verified",
+        value: JSON.stringify(this.cachedLastVerified),
+      });
+    }
   }
 
   getLastVerified(): { timestamp: number; source: string; latencyMs: number } | null {
+    if (this.cachedLastVerified) {
+      return this.cachedLastVerified;
+    }
     const row = this.stmtGetMeta.get("last_verified") as { value: string; updated_at: string } | undefined;
     if (!row) return null;
     try {
-      return JSON.parse(row.value);
+      this.cachedLastVerified = JSON.parse(row.value);
+      return this.cachedLastVerified;
     } catch {
       return null;
     }

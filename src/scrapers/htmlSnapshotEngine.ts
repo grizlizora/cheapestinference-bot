@@ -1,4 +1,3 @@
-import * as cheerio from "cheerio";
 import { RobustHttpClient } from "../http/client.js";
 import { PoolsSnapshot, ScrapeResult, PoolData, normalizeSlotStatus } from "../types/domain.js";
 import { IFetcherEngine } from "./types.js";
@@ -118,19 +117,19 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
       } catch {}
     }
 
-    // 4. Fallback: Cheerio DOM & Schema.org Extraction
-    const $ = cheerio.load(res.body);
+    // 4. Fallback: Lightweight JSON-LD Schema.org Extraction
+    const jsonLdRegex = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+    let jsonLdMatch: RegExpExecArray | null;
     const pools: PoolData[] = [];
 
-    // Attempt to extract structured schema.org or data attributes if present
-    $('script[type="application/ld+json"]').each((_, el) => {
+    while ((jsonLdMatch = jsonLdRegex.exec(res.body)) !== null) {
       try {
-        const json = JSON.parse($(el).text());
+        const json = JSON.parse(jsonLdMatch[1].trim());
         if (json && Array.isArray(json.itemListElement)) {
-          // Process structured microdata
+          // Microdata extraction fallback
         }
       } catch {}
-    });
+    }
 
     if (pools.length === 0) {
       throw new Error("Unable to extract valid pool data from HTML response (RSC flight stream and SSR snapshots unavailable)");
@@ -210,10 +209,14 @@ export class HtmlSnapshotEngine implements IFetcherEngine {
     while ((slugMatch = SLUG_REGEX.exec(combinedFlight)) !== null) {
       let candidateIndex = slugMatch.index;
       let foundValidPool = false;
+      let attempts = 0;
+      const MAX_BACKWARD_ATTEMPTS = 6;
+      const MIN_SEARCH_INDEX = Math.max(0, candidateIndex - 1200);
 
-      while (candidateIndex > 0 && !foundValidPool) {
+      while (candidateIndex > MIN_SEARCH_INDEX && !foundValidPool && attempts < MAX_BACKWARD_ATTEMPTS) {
+        attempts++;
         const braceIndex = combinedFlight.lastIndexOf("{", candidateIndex - 1);
-        if (braceIndex === -1) break;
+        if (braceIndex === -1 || braceIndex < MIN_SEARCH_INDEX) break;
         candidateIndex = braceIndex;
 
         const candidateJson = this.extractBalancedJsonObject(combinedFlight, braceIndex);

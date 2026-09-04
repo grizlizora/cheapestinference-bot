@@ -1,6 +1,5 @@
 import Database from "better-sqlite3";
-import { TierUpdatedPayload, PoolBasePricePayload, PriceAnalyticsPayload, PriceRating } from "../../types/domain.js";
-import { ModelCatalogDiff } from "../../engine/modelSemanticMatcher.js";
+import { TierUpdatedPayload, PoolBasePricePayload, PriceAnalyticsPayload, PriceRating, ModelCatalogDiff } from "../../types/domain.js";
 import { tursoCloudSync } from "../tursoSync.js";
 
 export class CatalogHistoryDAO {

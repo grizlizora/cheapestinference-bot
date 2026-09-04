@@ -31,6 +31,7 @@ export class NotificationOutboxDAO {
   private stmtMarkTerminalFailed: Database.Statement;
   private stmtPruneOld: Database.Statement;
   private txEnqueueBatch: (items: OutboxItem[]) => void;
+  private txMarkDispatchedBatch: (ids: string[]) => void;
 
   constructor(public readonly db: Database.Database) {
     this.stmtEnqueue = db.prepare(`
@@ -99,6 +100,17 @@ export class NotificationOutboxDAO {
         );
       }
     });
+
+    this.txMarkDispatchedBatch = db.transaction((ids: string[]) => {
+      for (const id of ids) {
+        this.stmtMarkDispatched.run(id);
+      }
+    });
+  }
+
+  public markDispatchedBatch(ids: string[]): void {
+    if (ids.length === 0) return;
+    this.txMarkDispatchedBatch(ids);
   }
 
   public enqueueBatch(items: OutboxItem[]): void {

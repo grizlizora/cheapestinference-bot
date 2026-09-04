@@ -101,9 +101,30 @@ export class MutationQueue {
     } catch (err: any) {
       console.warn(`⚠️ [TursoSync] Background batch push warning (${batch.length} mutations):`, err?.message || err);
 
-      // Poison-pill protection: increment retry count and discard mutations failing > 5 times
       const retryableBatch: MutationItem[] = [];
-      for (const item of batch) {
+
+      // If a multi-mutation batch fails, isolate poison pills by executing mutations individually
+      if (batch.length > 1) {
+        for (const item of batch) {
+          try {
+            await this.executePipeline([{
+              type: "execute",
+              stmt: {
+                sql: item.sql,
+                args: item.args,
+              },
+            }]);
+          } catch (singleErr: any) {
+            const count = (item.retryCount || 0) + 1;
+            if (count <= 3) {
+              retryableBatch.push({ ...item, retryCount: count });
+            } else {
+              console.error("❌ [TursoSync] Discarding isolated poison-pill mutation:", item.sql, singleErr?.message);
+            }
+          }
+        }
+      } else if (batch.length === 1) {
+        const item = batch[0];
         const count = (item.retryCount || 0) + 1;
         if (count <= 5) {
           retryableBatch.push({ ...item, retryCount: count });

@@ -1,4 +1,5 @@
-import { ModelDiffItem } from "../types/domain.js";
+import { ModelDiffItem, ModelCatalogDiff } from "../types/domain.js";
+export { ModelCatalogDiff };
 
 export interface ParsedModelToken {
   raw: string;
@@ -9,17 +10,6 @@ export interface ParsedModelToken {
   versionMinor: number;
   variant: string;
   paramSize?: string;
-}
-
-export interface ModelCatalogDiff {
-  poolSlug: string;
-  poolName: string;
-  hasChanges: boolean;
-  added: ModelDiffItem[];
-  upgraded: ModelDiffItem[];
-  removed: ModelDiffItem[];
-  currentModels: string[];
-  previousModels: string[];
 }
 
 export class ModelSemanticMatcher {
@@ -73,7 +63,8 @@ export class ModelSemanticMatcher {
     }
 
     if (!versionStr) {
-      const verMatch = clean.match(/(?:v|k|r|m)?(\d+)(?:[._-](\d+))?/i);
+      const cleanWithoutParam = paramSize ? clean.replace(new RegExp(`\\b${paramSize}\\b`, "i"), "") : clean;
+      const verMatch = cleanWithoutParam.match(/(?:v|k|r|m)?(\d+)(?:[._-](\d+))?/i);
       if (verMatch) {
         versionStr = verMatch[2] ? `${verMatch[1]}.${verMatch[2]}` : verMatch[1];
         versionMajor = parseInt(verMatch[1], 10) || 0;
@@ -83,7 +74,11 @@ export class ModelSemanticMatcher {
 
     if (paramSize && versionStr) {
       const paramNum = paramSize.replace("b", "");
-      if (versionStr.endsWith(`.${paramNum}`)) {
+      if (versionStr === paramNum) {
+        versionStr = "";
+        versionMajor = 0;
+        versionMinor = 0;
+      } else if (versionStr.endsWith(`.${paramNum}`)) {
         versionStr = versionStr.substring(0, versionStr.length - paramNum.length - 1);
       }
     }

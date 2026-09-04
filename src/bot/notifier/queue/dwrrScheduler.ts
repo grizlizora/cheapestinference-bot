@@ -44,9 +44,16 @@ export class DwrrScheduler {
     }
   }
 
+  public onEnqueue?: () => void;
+
   public enqueue(msg: OutgoingAlertMessage): void {
     const queue = this.getQueueByPriority(msg.priority);
     queue.push(msg);
+    if (this.onEnqueue) {
+      try {
+        this.onEnqueue();
+      } catch {}
+    }
   }
 
   public getTotalPending(): number {

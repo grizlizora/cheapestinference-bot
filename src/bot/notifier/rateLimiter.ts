@@ -4,8 +4,8 @@
  */
 
 export interface RateLimiterConfig {
-  targetRatePerSec?: number;       // Default: 27 msg/s
-  maxBurstTokens?: number;         // Default: 25 tokens
+  targetRatePerSec?: number;       // Default: 24 msg/s (safe headroom with live dashboard)
+  maxBurstTokens?: number;         // Default: 20 tokens
   userDispatchGapMs?: number;      // Default: 1050ms (1.05s)
   staleTimestampTtlMs?: number;    // Default: 5 minutes
 }
@@ -27,9 +27,9 @@ export class NotificationRateLimiter {
   private cleanupInterval?: NodeJS.Timeout;
 
   constructor(config?: RateLimiterConfig) {
-    this.targetRatePerSec = config?.targetRatePerSec ?? 27;
-    this.tokenIntervalMs = 1000 / this.targetRatePerSec; // ~37.037ms
-    this.maxTokens = config?.maxBurstTokens ?? 25;
+    this.targetRatePerSec = config?.targetRatePerSec ?? 24;
+    this.tokenIntervalMs = 1000 / this.targetRatePerSec; // ~41.667ms
+    this.maxTokens = config?.maxBurstTokens ?? 20;
     this.tokens = this.maxTokens;
     this.userDispatchGapMs = config?.userDispatchGapMs ?? 1050;
     this.staleTimestampTtlMs = config?.staleTimestampTtlMs ?? 5 * 60 * 1000;
@@ -137,6 +137,13 @@ export class NotificationRateLimiter {
       }
     }
     return pruned;
+  }
+
+  /**
+   * Immediately evicts a user from sliding window tracking (e.g. on block/deletion).
+   */
+  public evictUser(telegramId: number): boolean {
+    return this.lastUserDispatchTime.delete(telegramId);
   }
 
   public getMetrics() {

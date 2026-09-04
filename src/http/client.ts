@@ -150,7 +150,9 @@ export class RobustHttpClient {
 
   public async get(opts: HttpRequestOptions): Promise<HttpResponse> {
     const proxy = this.proxyPool.getNextProxy();
-    const timeoutMs = opts.timeoutMs ?? 15_000;
+    const timeoutMs = proxy.type === "tor"
+      ? Math.max(opts.timeoutMs ?? 12_000, 12_000)
+      : (opts.timeoutMs ?? 10_000);
     const maxRedirects = opts.maxRedirects ?? 5;
     const startTime = Date.now();
 

@@ -55,9 +55,11 @@ export class LiveDashboardManager {
     this.targetRatePerSec = options.maxEditsPerSecond ?? 20;
     this.tokenIntervalMs = 1000 / this.targetRatePerSec;
 
-    // Attach hooks to ScraperOrchestrator
-    this.scraper.on("diff_events", () => this.handleDataChanged());
-    this.scraper.on("heartbeat", (hb: any) => this.handleScraperHeartbeat(Boolean(hb?.modified)));
+    // Attach bound hooks to ScraperOrchestrator for clean disposal
+    this.diffEventsListener = () => this.handleDataChanged();
+    this.heartbeatListener = (hb: any) => this.handleScraperHeartbeat(Boolean(hb?.modified));
+    this.scraper.on("diff_events", this.diffEventsListener);
+    this.scraper.on("heartbeat", this.heartbeatListener);
 
     // Unreferenced watchdog timer to self-heal any dropped event loops
     this.watchdogTimer = setInterval(() => {
@@ -69,10 +71,18 @@ export class LiveDashboardManager {
   }
 
   private watchdogTimer?: NodeJS.Timeout;
+  private diffEventsListener?: () => void;
+  private heartbeatListener?: (hb: any) => void;
 
   public close(): void {
     if (this.watchdogTimer) {
       clearInterval(this.watchdogTimer);
+    }
+    if (this.diffEventsListener) {
+      this.scraper.off("diff_events", this.diffEventsListener);
+    }
+    if (this.heartbeatListener) {
+      this.scraper.off("heartbeat", this.heartbeatListener);
     }
   }
 
@@ -93,16 +103,11 @@ export class LiveDashboardManager {
 
   /**
    * Invoked on routine heartbeat polls and scrape cycles.
-   * Heartbeat routing: Tier 1 (Active <30m) every 10s; Tier 2 (Eco 30m-24h) every 60s.
+   * Only enqueues updates when underlying data was actually modified.
    */
   public handleScraperHeartbeat(isModified: boolean): void {
     if (isModified) {
       this.handleDataChanged();
-      return;
-    }
-    const sessions = this.registry.getSessionsForHeartbeat();
-    for (const session of sessions) {
-      this.enqueueUpdate(session);
     }
   }
 
@@ -124,6 +129,7 @@ export class LiveDashboardManager {
 
     const processTick = async () => {
       if (!this.isDispatching) return;
+      let nextTickDelay = Math.max(15, this.tokenIntervalMs);
       try {
         const now = performance.now();
 
@@ -155,12 +161,14 @@ export class LiveDashboardManager {
           if (session) {
             this.queuedChatIds.delete(session.chatId);
             const chatLastSent = this.lastChatEditTime.get(session.chatId) || 0;
-            if (Date.now() - chatLastSent < this.USER_EDIT_GAP_MS) {
+            const remainingGap = this.USER_EDIT_GAP_MS - (Date.now() - chatLastSent);
+            if (remainingGap > 0) {
               // Requeue at tail if chat rate limit hasn't passed
               if (!this.queuedChatIds.has(session.chatId)) {
                 this.queuedChatIds.add(session.chatId);
                 this.updateQueue.push(session);
               }
+              nextTickDelay = Math.max(nextTickDelay, remainingGap);
             } else {
               this.tokens -= 1;
               await this.executeEdit(session).catch((err) => {
@@ -173,7 +181,7 @@ export class LiveDashboardManager {
         console.error("⚠️ [LiveDashboardManager] Unexpected tick error:", tickErr?.message || tickErr);
       } finally {
         if (this.isDispatching && this.updateQueue.length > 0) {
-          setTimeout(processTick, Math.max(15, this.tokenIntervalMs));
+          setTimeout(processTick, nextTickDelay);
         } else {
           this.isDispatching = false;
         }

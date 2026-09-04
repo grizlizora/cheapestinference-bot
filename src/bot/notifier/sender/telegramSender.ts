@@ -20,7 +20,32 @@ export class TelegramSender {
     private rateLimiter: NotificationRateLimiter,
     private scheduler: DwrrScheduler,
     private outboxManager: OutboxManager
-  ) {}
+  ) {
+    this.scheduler.onEnqueue = () => this.notifyNewItem();
+  }
+
+  private notifyResolve: (() => void) | null = null;
+
+  public notifyNewItem(): void {
+    if (this.notifyResolve) {
+      this.notifyResolve();
+      this.notifyResolve = null;
+    }
+  }
+
+  private waitForNewItem(timeoutMs = 2000): Promise<void> {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        this.notifyResolve = null;
+        resolve();
+      }, timeoutMs);
+      timer.unref?.();
+      this.notifyResolve = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+    });
+  }
 
   public startWorker(): void {
     if (this.isWorkerRunning) return;
@@ -32,6 +57,7 @@ export class TelegramSender {
 
   public stop(): void {
     this.isWorkerRunning = false;
+    this.notifyNewItem();
   }
 
   public getInFlightDispatches(): Set<Promise<void>> {
@@ -42,7 +68,7 @@ export class TelegramSender {
     while (this.isWorkerRunning) {
       try {
         if (this.scheduler.getTotalPending() === 0) {
-          await new Promise((resolve) => setTimeout(resolve, 50));
+          await this.waitForNewItem(2000);
           continue;
         }
 
@@ -158,6 +184,7 @@ export class TelegramSender {
       this.rateLimiter.trigger429Backoff(retryAfter);
       const targetQ = this.scheduler.getQueueByPriority(msg.priority);
       targetQ.unshift(msg); // Push back to head of line
+      this.notifyNewItem();
       return;
     }
 
@@ -183,6 +210,7 @@ export class TelegramSender {
       msg.retries++;
       const targetQ = this.scheduler.getQueueByPriority(msg.priority);
       targetQ.push(msg);
+      this.notifyNewItem();
     } else {
       this.outboxManager.markFailed(msg.id, err.message);
       console.error(`❌ [TelegramSender] Dropping message to ${msg.telegramId} after 3 retries: ${err.message}`);
