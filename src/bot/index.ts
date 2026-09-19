@@ -102,6 +102,16 @@ export function createTelegramBot(
   // 2. Auto-retry plugin for flood control
   bot.api.config.use(autoRetry({ maxRetryAttempts: 3, maxDelaySeconds: 10 }));
 
+  // 2b. Interaction & Update Logging
+  bot.use(async (ctx, next) => {
+    if (ctx.callbackQuery) {
+      console.log(`🔘 [CallbackQuery] Received '${ctx.callbackQuery.data}' from chat ${ctx.chat?.id} (${ctx.from?.id})`);
+    } else if (ctx.message?.text) {
+      console.log(`💬 [Message] Received '${ctx.message.text}' from chat ${ctx.chat?.id} (${ctx.from?.id})`);
+    }
+    await next();
+  });
+
   // 3. In-memory session middleware
   bot.use(
     session({
@@ -291,25 +301,29 @@ export function createTelegramBot(
 
   // 8b. Auto-capture & Touch Active Dashboard on any callback query interaction
   bot.use(async (ctx, next) => {
-    if (ctx.callbackQuery && ctx.chat && ctx.from) {
-      const msgId = ctx.callbackQuery.message?.message_id;
-      if (msgId) {
-        const session = activeDashboardRegistry.get(ctx.chat.id);
-        if (!session) {
-          activeDashboardRegistry.register(
-            ctx.chat.id,
-            msgId,
-            ctx.user?.id || ctx.from.id,
-            ctx.lang,
-            "dashboard"
-          );
-        } else {
-          if (session.messageId !== msgId) {
-            session.messageId = msgId;
+    try {
+      if (ctx.callbackQuery && ctx.chat && ctx.from) {
+        const msgId = ctx.callbackQuery.message?.message_id;
+        if (msgId) {
+          const session = activeDashboardRegistry.get(ctx.chat.id);
+          if (!session) {
+            activeDashboardRegistry.register(
+              ctx.chat.id,
+              msgId,
+              ctx.user?.id || ctx.from.id,
+              ctx.lang,
+              "dashboard"
+            );
+          } else {
+            if (session.messageId !== msgId) {
+              session.messageId = msgId;
+            }
+            activeDashboardRegistry.touchInteraction(ctx.chat.id);
           }
-          activeDashboardRegistry.touchInteraction(ctx.chat.id);
         }
       }
+    } catch (e: any) {
+      console.warn("⚠️ [Dashboard Registry Touch Warning]:", e?.message || e);
     }
     await next();
   });
@@ -913,6 +927,14 @@ export function createTelegramBot(
       { command: "backup", description: "Download SQLite database backup (Admin)" },
     ])
     .catch(() => {});
+
+  // 16. Universal Fallback Callback Query Answerer (Guarantees zero infinite spinning loading states)
+  bot.on("callback_query", async (ctx) => {
+    console.warn(`⚠️ [Unhandled CallbackQuery Fallback] Data: '${ctx.callbackQuery.data}' from chat ${ctx.chat?.id} (${ctx.from?.id})`);
+    try {
+      await ctx.answerCallbackQuery().catch(() => {});
+    } catch {}
+  });
 
   return { bot, dispatcher, liveDashboardManager, donationDao: resolvedDonationDao, outboxDao: resolvedOutboxDao };
 }

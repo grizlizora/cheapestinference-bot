@@ -187,6 +187,17 @@ async function bootstrap() {
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("SIGINT", () => shutdown("SIGINT"));
 
+  const ALLOWED_UPDATES = [
+    "message",
+    "edited_message",
+    "callback_query",
+    "inline_query",
+    "chosen_inline_result",
+    "pre_checkout_query",
+    "my_chat_member",
+    "chat_member",
+  ] as const;
+
   const startBotRunner = async () => {
     if (isShuttingDown) return;
     try {
@@ -196,7 +207,21 @@ async function bootstrap() {
       console.warn(`⚠️ [Bot] deleteWebhook note: ${whErr?.message || whErr}`);
     }
 
-    runner = run(bot);
+    // Force Telegram server-side update filter to include callback_query & all required types
+    try {
+      await bot.api.getUpdates({ limit: 1, timeout: 0, allowed_updates: ALLOWED_UPDATES as any });
+      console.log("📡 [Bot] Telegram allowed_updates filter confirmed:", ALLOWED_UPDATES.join(", "));
+    } catch (guErr: any) {
+      console.warn(`⚠️ [Bot] Initial getUpdates note: ${guErr?.message || guErr}`);
+    }
+
+    runner = run(bot, {
+      runner: {
+        fetch: {
+          allowed_updates: ALLOWED_UPDATES as any,
+        },
+      },
+    });
     console.log("🤖 [Bot] Telegram bot runner is active and listening for updates.");
 
     runner.task()?.catch(async (err: any) => {
