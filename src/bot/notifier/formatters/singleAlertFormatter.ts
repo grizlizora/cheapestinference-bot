@@ -173,6 +173,7 @@ export function formatSingleAlertMessage(
       for (const up of event.modelUpgrade.upgraded) {
         diffLines.push(
           translate(lang, "alerts.model_item_upgraded", {
+            upgrade_icon: icon("zap"),
             old_model: escapeHtml(up.previousModelName || ""),
             new_model: escapeHtml(up.modelName),
           })

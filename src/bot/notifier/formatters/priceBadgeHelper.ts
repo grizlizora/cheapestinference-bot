@@ -51,6 +51,7 @@ export function formatPriceDeltaBadge(
       delta: absDelta,
       percentage: absPct,
       currency_month: currencyMonth,
+      fire_icon: icon("event_hot_slot"),
     }));
     return `${icon("status_available")} ${raw}`;
   } else {

@@ -160,17 +160,24 @@ export class ModelSemanticMatcher {
       );
 
       if (match) {
-        usedRemoved.add(match.normalized);
-        usedAdded.add(added.normalized);
-        upgraded.push({
-          type: "upgraded",
-          modelName: added.raw,
-          previousModelName: match.raw,
-          family: added.family,
-          oldVersion: match.versionStr,
-          newVersion: added.versionStr,
-          changeNote: `${match.raw} ➡️ ${added.raw}`,
-        });
+        const cmp = this.compareVersions(added, match);
+        if (cmp > 0) {
+          usedRemoved.add(match.normalized);
+          usedAdded.add(added.normalized);
+          upgraded.push({
+            type: "upgraded",
+            modelName: added.raw,
+            previousModelName: match.raw,
+            family: added.family,
+            oldVersion: match.versionStr,
+            newVersion: added.versionStr,
+            changeNote: `${match.raw} ➡️ ${added.raw}`,
+          });
+        } else if (cmp < 0) {
+          // Version rollback / temporary cache downgrade: consume candidates to prevent false upgrade alerts
+          usedRemoved.add(match.normalized);
+          usedAdded.add(added.normalized);
+        }
       }
     }
 
@@ -212,17 +219,23 @@ export class ModelSemanticMatcher {
       );
 
       if (match) {
-        usedRemoved.add(match.normalized);
-        usedAdded.add(added.normalized);
-        upgraded.push({
-          type: "upgraded",
-          modelName: added.raw,
-          previousModelName: match.raw,
-          family: added.family,
-          oldVersion: match.versionStr,
-          newVersion: added.versionStr,
-          changeNote: `${match.raw} ➡️ ${added.raw}`,
-        });
+        const cmp = this.compareVersions(added, match);
+        if (cmp > 0) {
+          usedRemoved.add(match.normalized);
+          usedAdded.add(added.normalized);
+          upgraded.push({
+            type: "upgraded",
+            modelName: added.raw,
+            previousModelName: match.raw,
+            family: added.family,
+            oldVersion: match.versionStr,
+            newVersion: added.versionStr,
+            changeNote: `${match.raw} ➡️ ${added.raw}`,
+          });
+        } else if (cmp < 0) {
+          usedRemoved.add(match.normalized);
+          usedAdded.add(added.normalized);
+        }
       }
     }
 

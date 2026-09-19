@@ -97,7 +97,9 @@ export class SlotDiffEngine {
         const infraChanged = (prevPool.infraSpec || "") !== (pool.infraSpec || "");
         const manualProvChanged = (prevPool.manualProvisioning || false) !== (pool.manualProvisioning || false);
 
-        if (descChanged || discountChanged || infraChanged || manualProvChanged) {
+        // Only emit TIER_UPDATED_EVENT if actual contract terms changed, or description changed independently of models
+        const contractTermsChanged = discountChanged || infraChanged || manualProvChanged;
+        if (contractTermsChanged || (descChanged && !modelDiff.hasChanges)) {
           const tierPayload = {
             previousDescription: prevPool.description,
             newDescription: pool.description,

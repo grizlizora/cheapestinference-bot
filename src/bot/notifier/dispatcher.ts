@@ -74,6 +74,7 @@ export class NotificationDispatcher {
 
   // Cross-Tick Idempotency Latch: key -> timestamp (bounded TTL sweep to prevent memory leaks)
   private lastDispatchedEventLatch = new Map<string, number>();
+  private lastDispatchedModelsByPool = new Map<string, { modelKeys: string; timestamp: number }>();
 
   // Expose Ring Buffers for backward compatibility with unit tests
   public get p0Queue(): CircularRingBuffer<OutgoingAlertMessage> {
@@ -274,6 +275,34 @@ export class NotificationDispatcher {
           continue;
         }
         this.lastDispatchedEventLatch.delete(oppositeKey);
+      }
+
+      // Model Catalog Anti-Flap Guard: prevent duplicate model alerts or rapid 10-minute flapping
+      if (event.type === "MODEL_UPGRADE_EVENT") {
+        const sortedModelsKey = (event.models || []).slice().sort().join(",");
+        const lastModelDispatch = this.lastDispatchedModelsByPool.get(event.poolSlug);
+        if (lastModelDispatch) {
+          if (lastModelDispatch.modelKeys === sortedModelsKey) {
+            console.warn(`🛡️ [Anti-Flap Guard] Suppressed duplicate MODEL_UPGRADE_EVENT for ${event.poolSlug}`);
+            continue;
+          }
+          if (now - lastModelDispatch.timestamp < 10 * 60 * 1000) {
+            console.warn(`🛡️ [Anti-Flap Guard] Suppressed flapping MODEL_UPGRADE_EVENT for ${event.poolSlug} (within 10m cooldown)`);
+            continue;
+          }
+        }
+        this.lastDispatchedModelsByPool.set(event.poolSlug, { modelKeys: sortedModelsKey, timestamp: now });
+      }
+
+      // Tier Coalescing Guard: Suppress standalone TIER_UPDATED_EVENT if MODEL_UPGRADE_EVENT is already present for this pool
+      if (event.type === "TIER_UPDATED_EVENT") {
+        const hasModelUpgrade = validEvents.some(
+          (e) => e.poolSlug === event.poolSlug && e.type === "MODEL_UPGRADE_EVENT"
+        );
+        if (hasModelUpgrade) {
+          console.warn(`🛡️ [Coalesce Guard] Merged TIER_UPDATED_EVENT into MODEL_UPGRADE_EVENT for ${event.poolSlug}`);
+          continue;
+        }
       }
 
       this.lastDispatchedEventLatch.set(latchKey, now);

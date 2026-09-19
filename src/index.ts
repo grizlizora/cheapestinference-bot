@@ -138,8 +138,126 @@ async function bootstrap() {
     slotHistoryDao,
     activeDashboardDao
   );
-  const runner = run(bot);
-  console.log("🤖 [Bot] Telegram bot is active and listening for updates.");
+  let runner: ReturnType<typeof run> | null = null;
+  let runnerRestartAttempts = 0;
+  const MAX_RUNNER_RESTARTS = 5;
+
+  // 9. Process Resilience & Graceful Shutdown
+  let isShuttingDown = false;
+  const shutdown = async (signal: string) => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+
+    const isConflict = signal.includes("409_CONFLICT");
+    if (isConflict) {
+      console.warn(`\n🛑 [409 Conflict] Виявлено підключення нової інстанції бота з цим токеном!`);
+      console.warn(`💀 Старий сервер повністю завершує роботу (аналог натискання Ctrl+C у терміналі), щоб уникнути конфліктів.`);
+    } else {
+      console.log(`\n🛑 [Shutdown] Received ${signal}. Stopping services gracefully...`);
+    }
+
+    const forceTimeout = setTimeout(() => {
+      console.error("⚠️ [Shutdown] Graceful drain timed out. Forcing process exit.");
+      process.exit(0);
+    }, 3000);
+    forceTimeout.unref();
+
+    try {
+      scraper.stop();
+      if (runner && runner.isRunning()) {
+        await runner.stop().catch(() => {});
+      }
+      // Якщо це колізія 409 - НЕ надсилаємо залишкові алерти, оскільки нова інстанція вже активна!
+      if (!isConflict) {
+        await dispatcher.flushPending().catch(() => {});
+      }
+      notificationLogDao.close();
+      httpClient.destroy();
+      healthServer.close();
+      await tursoCloudSync.close().catch(() => {});
+      closeDatabase();
+    } catch (e: any) {
+      console.error("⚠️ [Shutdown] Error during shutdown cleanup:", e.message);
+    }
+
+    console.log("👋 [Shutdown] Всі сервіси повністю зупинено. Процес завершено.");
+    process.exit(0);
+  };
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
+
+  const startBotRunner = async () => {
+    if (isShuttingDown) return;
+    try {
+      await bot.api.deleteWebhook({ drop_pending_updates: false });
+      console.log("🔗 [Bot] Telegram webhook successfully cleared for polling mode.");
+    } catch (whErr: any) {
+      console.warn(`⚠️ [Bot] deleteWebhook note: ${whErr?.message || whErr}`);
+    }
+
+    runner = run(bot);
+    console.log("🤖 [Bot] Telegram bot runner is active and listening for updates.");
+
+    runner.task()?.catch(async (err: any) => {
+      if (isShuttingDown) return;
+      const msg = String(err?.message || err?.description || err || "");
+      const code = err?.error_code || err?.code;
+
+      // 1. Webhook Conflict: Telegram reported webhook is active or setWebhook was called
+      if (
+        msg.includes("webhook") ||
+        msg.includes("deleteWebhook") ||
+        msg.includes("terminated by setWebhook request")
+      ) {
+        console.warn("⚠️ [Bot Webhook Conflict] Webhook active on Telegram. Clearing webhook and restarting runner...");
+        try {
+          await bot.api.deleteWebhook({ drop_pending_updates: false });
+          await new Promise((r) => setTimeout(r, 2000));
+          return startBotRunner();
+        } catch (delErr: any) {
+          console.error("❌ [Bot Webhook] Failed to delete webhook during recovery:", delErr);
+        }
+      }
+
+      // 2. Another instance running getUpdates (rolling deploy or second container)
+      if (msg.includes("terminated by other getUpdates request")) {
+        console.warn("⚠️ [Instance Conflict] Received 'terminated by other getUpdates request'. Verifying if replacement instance is permanent...");
+        await new Promise((r) => setTimeout(r, 8000));
+        runnerRestartAttempts++;
+        if (runnerRestartAttempts <= 2) {
+          console.log(`🔄 [Instance Conflict] Re-checking polling runner (${runnerRestartAttempts}/2)...`);
+          try {
+            await bot.api.deleteWebhook({ drop_pending_updates: false }).catch(() => {});
+            return startBotRunner();
+          } catch {}
+        }
+        console.warn("💀 [Instance Conflict] Verified another instance is running with getUpdates. Terminating this instance gracefully.");
+        await shutdown("409_CONFLICT_ANOTHER_INSTANCE_STARTED");
+        return;
+      }
+
+      // 3. 401 Unauthorized
+      if (code === 401 || msg.includes("401") || msg.includes("Unauthorized")) {
+        console.error("❌ [Bot Unauthorized] BOT_TOKEN is invalid. Terminating process...");
+        await shutdown("401_UNAUTHORIZED");
+        return;
+      }
+
+      // 4. Other transient network or gateway errors (502, 504, ECONNRESET)
+      runnerRestartAttempts++;
+      if (runnerRestartAttempts <= MAX_RUNNER_RESTARTS) {
+        console.warn(`⚠️ [Runner Crash] Transient error encountered: ${msg}. Auto-restarting runner in 3s (attempt ${runnerRestartAttempts}/${MAX_RUNNER_RESTARTS})...`);
+        await new Promise((r) => setTimeout(r, 3000));
+        return startBotRunner();
+      } else {
+        console.error("❌ [Runner Crash] Telegram runner exceeded maximum restart attempts. Shutting down.");
+        await shutdown("RUNNER_CRASH_MAX_RETRIES");
+      }
+    });
+  };
+
+  await startBotRunner();
 
   // 7. Perform Tor Verification & Initial Warmup Scrape
   if (torManager) {
@@ -171,76 +289,6 @@ async function bootstrap() {
 
   // 8. Start Scraper Periodic Loop
   scraper.start();
-
-  // 9. Process Resilience & Graceful Shutdown
-  let isShuttingDown = false;
-  const shutdown = async (signal: string) => {
-    if (isShuttingDown) return;
-    isShuttingDown = true;
-
-    const isConflict = signal.includes("409_CONFLICT");
-    if (isConflict) {
-      console.warn(`\n🛑 [409 Conflict] Виявлено підключення нової інстанції бота з цим токеном!`);
-      console.warn(`💀 Старий сервер повністю завершує роботу (аналог натискання Ctrl+C у терміналі), щоб уникнути конфліктів.`);
-    } else {
-      console.log(`\n🛑 [Shutdown] Received ${signal}. Stopping services gracefully...`);
-    }
-
-    const forceTimeout = setTimeout(() => {
-      console.error("⚠️ [Shutdown] Graceful drain timed out. Forcing process exit.");
-      process.exit(0);
-    }, 3000);
-    forceTimeout.unref();
-
-    try {
-      scraper.stop();
-      if (runner.isRunning()) {
-        await runner.stop().catch(() => {});
-      }
-      // Якщо це колізія 409 - НЕ надсилаємо залишкові алерти, оскільки нова інстанція вже активна!
-      if (!isConflict) {
-        await dispatcher.flushPending().catch(() => {});
-      }
-      notificationLogDao.close();
-      httpClient.destroy();
-      healthServer.close();
-      await tursoCloudSync.close().catch(() => {});
-      closeDatabase();
-    } catch (e: any) {
-      console.error("⚠️ [Shutdown] Error during shutdown cleanup:", e.message);
-    }
-
-    console.log("👋 [Shutdown] Всі сервіси повністю зупинено. Процес завершено.");
-    process.exit(0);
-  };
-
-  process.on("SIGTERM", () => shutdown("SIGTERM"));
-  process.on("SIGINT", () => shutdown("SIGINT"));
-
-  // 10. Anti-Collision & Mutual Exclusion (Telegram 409 Conflict)
-  // If another server instance launches with the same BOT_TOKEN, Telegram automatically
-  // terminates this instance's getUpdates with 409 Conflict. When that happens, we cleanly
-  // shut down all background services (scraper, DB, health server) and terminate this old
-  // instance completely so it does not linger as a zombie process.
-  runner.task()?.catch(async (err: any) => {
-    const msg = String(err?.message || err?.description || err || "");
-    const code = err?.error_code || err?.code;
-    if (
-      code === 409 ||
-      msg.includes("409") ||
-      msg.includes("terminated by other getUpdates request") ||
-      msg.includes("Conflict")
-    ) {
-      console.warn("⚠️ [Instance Conflict] Another bot instance connected with the same BOT_TOKEN! Terminating this old instance gracefully...");
-      await shutdown("409_CONFLICT_ANOTHER_INSTANCE_STARTED");
-    } else if (code === 401 || msg.includes("401") || msg.includes("Unauthorized")) {
-      console.error("❌ [Bot Unauthorized] BOT_TOKEN is invalid. Terminating process...");
-      await shutdown("401_UNAUTHORIZED");
-    } else {
-      console.error("❌ [Runner Crash] Telegram runner crashed with unexpected error:", err);
-      await shutdown("RUNNER_CRASH");
-    }
-  });
 }
 
 bootstrap().catch((err) => {

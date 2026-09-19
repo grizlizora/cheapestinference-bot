@@ -128,4 +128,101 @@ describe("ModelSemanticMatcher", () => {
     expect(getModel3DIcon("Claude-3.5-Sonnet")).toContain("5325547803936572038");
     expect(getModel3DIcon("Unknown-Custom-Model-v1")).toContain("5372981976804366741");
   });
+
+  it("should NOT treat a version rollback/downgrade (e.g. DeepSeek v4.1 -> v4) as an upgrade", () => {
+    const diff = ModelSemanticMatcher.diffModelLists(
+      "core",
+      "Core Pool",
+      ["mimo-v2.5", "deepseek-v4.1-flash"],
+      ["mimo-v2.5", "deepseek-v4-flash"]
+    );
+
+    // Downgrades must NOT be put into upgraded list
+    expect(diff.upgraded).toHaveLength(0);
+  });
+
+  it("should render 3D lightning icon in model upgrade alert formatting", async () => {
+    const { formatSingleAlertMessage } = await import("../src/bot/notifier/formatters/singleAlertFormatter.js");
+
+    const event = {
+      id: "test-event",
+      type: "MODEL_UPGRADE_EVENT" as const,
+      poolSlug: "core",
+      poolName: "Core Pool",
+      block: "ALL",
+      models: ["deepseek-v4.1-flash", "mimo-v2.5"],
+      hoursUtc: "",
+      timestamp: Date.now(),
+      modelUpgrade: {
+        added: [],
+        upgraded: [
+          {
+            type: "upgraded" as const,
+            modelName: "deepseek-v4.1-flash",
+            previousModelName: "deepseek-v4-flash",
+            family: "deepseek",
+            oldVersion: "4",
+            newVersion: "4.1",
+            changeNote: "deepseek-v4-flash ➔ deepseek-v4.1-flash",
+          },
+        ],
+        removed: [],
+        allActiveModels: ["deepseek-v4.1-flash", "mimo-v2.5"],
+      },
+    };
+
+    const user = {
+      userId: 1,
+      telegramId: 123456,
+      language: "uk" as const,
+      isAdmin: false,
+      isMuted: false,
+    };
+
+    const msg = formatSingleAlertMessage(user as any, event, "P2");
+    // Must contain 3D animated lightning emoji ID (5456140674028019486)
+    expect(msg.text).toContain("5456140674028019486");
+    // Must NOT contain flat 2D lightning standalone on the upgrade line
+    expect(msg.text).not.toContain("  ⚡ <code>deepseek-v4-flash</code>");
+  });
+
+  it("should render 3D fire icon and no nested parentheses in bundled price discount alert", async () => {
+    const { formatBundledAlertMessage } = await import("../src/bot/notifier/formatters/bundleAlertFormatter.js");
+
+    const event = {
+      id: "price-event",
+      type: "SLOT_PRICE_CHANGED" as const,
+      poolSlug: "flagship",
+      poolName: "Flagship Pool",
+      block: "asia",
+      models: ["qwen-3.8-max"],
+      previousPrice: "363",
+      newPrice: "207",
+      hoursUtc: "00:00-08:00 UTC",
+      timestamp: Date.now(),
+      slotPrice: {
+        priceDelta: -156,
+        percentageDelta: -43,
+        previousPrice: 363,
+        newPrice: 207,
+        isDiscount: true,
+      },
+    };
+
+    const user = {
+      userId: 1,
+      telegramId: 123456,
+      language: "uk" as const,
+      isAdmin: false,
+      isMuted: false,
+    };
+
+    const bundle = formatBundledAlertMessage(user as any, [{ event: event as any, priority: "P2" }]);
+    // Must contain 3D hot flame emoji ID (5420315771991497307)
+    expect(bundle.text).toContain("5420315771991497307");
+    // Must NOT contain double nested parentheses like ( 🟢 ... (-43%) ... )
+    expect(bundle.text).not.toMatch(/\(\s*<tg-emoji[^>]*>.*?\(-43%\).*?\)/);
+    expect(bundle.text).not.toContain("( 🟢 Знижка");
+    expect(bundle.text).toContain("• <tg-emoji");
+  });
 });

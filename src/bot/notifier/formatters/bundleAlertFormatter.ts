@@ -173,9 +173,10 @@ export function formatBundledAlertMessage(
         isSpecificAction: false,
       });
     } else if (event.type === "SLOT_PRICE_CHANGED") {
-      const deltaStr = event.slotPrice
-        ? ` (${formatPriceDeltaBadge(event.slotPrice.priceDelta, event.slotPrice.percentageDelta, lang)})`
+      const deltaBadge = event.slotPrice
+        ? formatPriceDeltaBadge(event.slotPrice.priceDelta, event.slotPrice.percentageDelta, lang)
         : "";
+      const deltaStr = deltaBadge ? ` • ${deltaBadge}` : "";
       const cleanOld = cleanPriceString(event.previousPrice);
       const cleanNew = cleanPriceString(event.newPrice);
       const hoursStr = event.hoursUtc ? `\n  • ${icon("nav_clock")} <code>${escapeHtml(hoursLocal || event.hoursUtc)}</code>` : "";
@@ -200,9 +201,10 @@ export function formatBundledAlertMessage(
         isSpecificAction: true,
       });
     } else if (event.type === "POOL_BASE_PRICE_CHANGED" || event.type === "PRICE_CHANGED") {
-      const deltaStr = event.basePrice
-        ? ` (${formatPriceDeltaBadge(event.basePrice.priceDelta, event.basePrice.percentageDelta, lang)})`
+      const deltaBadge = event.basePrice
+        ? formatPriceDeltaBadge(event.basePrice.priceDelta, event.basePrice.percentageDelta, lang)
         : "";
+      const deltaStr = deltaBadge ? ` • ${deltaBadge}` : "";
       const cleanOld = cleanPriceString(event.previousPrice);
       const cleanNew = cleanPriceString(event.newPrice);
       const tariffBadge = translate(lang, "alerts.bundle_title_base_price") || "Base Tariff";
