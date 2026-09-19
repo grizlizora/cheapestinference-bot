@@ -5,7 +5,7 @@ import { UserDAO } from "../../db/dao/users.js";
 import { PoolStateDAO } from "../../db/dao/poolState.js";
 import { SlotHistoryDAO } from "../../db/dao/slotHistory.js";
 import { SubscriberInvertedIndex } from "../notifier/subscriberIndex.js";
-import { renderDashboardText, safeEditMessageText } from "./mainDashboard.js";
+import { renderDashboardText, safeEditMessageText, safeNavigateAndEdit } from "./mainDashboard.js";
 
 import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
 import { ActiveDashboardRegistry } from "../liveSync/dashboardRegistry.js";
@@ -323,8 +323,7 @@ export function createSubscriptionsMenu(
           const msgId = ctx.callbackQuery?.message?.message_id;
           dashboardRegistry?.updateView(ctx.chat.id, "dashboard", undefined, ctx.lang, msgId, ctx.user?.id);
         }
-        await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao, scraper));
-        return ctx.menu.nav("main-dashboard-menu");
+        await safeNavigateAndEdit(ctx, "main-dashboard-menu", renderDashboardText(ctx, poolStateDao, historyDao, scraper));
       }
     );
 }

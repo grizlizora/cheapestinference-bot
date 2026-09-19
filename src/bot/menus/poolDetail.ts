@@ -23,7 +23,7 @@ import {
   DEFAULT_BLOCK_HOURS,
 } from "../views/poolDetailView.js";
 import { renderDashboardText } from "../views/dashboardView.js";
-import { safeEditMessageText } from "../views/common.js";
+import { safeEditMessageText, safeNavigateAndEdit } from "../views/common.js";
 
 export function createPoolDetailMenu(
   poolStateDao: PoolStateDAO,
@@ -168,8 +168,7 @@ export function createPoolDetailMenu(
         if (ctx.chat) {
           dashboardRegistry?.updateView(ctx.chat.id, "pool_detail", ctx.session?.tempPoolSlug);
         }
-        await safeEditMessageText(ctx, renderPoolDetailText(ctx, poolStateDao, historyDao, scraper));
-        return ctx.menu.nav("pool-detail-menu");
+        await safeNavigateAndEdit(ctx, "pool-detail-menu", renderPoolDetailText(ctx, poolStateDao, historyDao, scraper));
       }
     );
 
@@ -237,8 +236,7 @@ export function createPoolDetailMenu(
           if (c.chat) {
             dashboardRegistry?.updateView(c.chat.id, "other");
           }
-          await safeEditMessageText(c, renderPoolSettingsText(c, poolStateDao, subDao));
-          return c.menu.nav("pool-settings-menu");
+          await safeNavigateAndEdit(c, "pool-settings-menu", renderPoolSettingsText(c, poolStateDao, subDao));
         }
       ).row();
 
@@ -286,8 +284,7 @@ export function createPoolDetailMenu(
           const msgId = ctx.callbackQuery?.message?.message_id;
           dashboardRegistry?.updateView(ctx.chat.id, "dashboard", undefined, ctx.lang, msgId, ctx.user?.id);
         }
-        await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao, scraper));
-        return ctx.menu.nav("main-dashboard-menu");
+        await safeNavigateAndEdit(ctx, "main-dashboard-menu", renderDashboardText(ctx, poolStateDao, historyDao, scraper));
       }
     );
 

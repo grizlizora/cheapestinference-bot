@@ -21,11 +21,11 @@ import { UserActivitySyncer } from "../notifier/userActivitySyncer.js";
 
 // Re-export presentation functions from view layer for 100% backward compatibility
 export { renderDashboardText, renderSettingsText, renderChangeLanguageText, renderHelpText, computePoolBadgeInfo } from "../views/dashboardView.js";
-export { safeEditMessageText } from "../views/common.js";
+export { safeEditMessageText, safeNavigateAndEdit } from "../views/common.js";
 import { renderDashboardText, renderSettingsText, renderChangeLanguageText, renderHelpText, computePoolBadgeInfo } from "../views/dashboardView.js";
 import { renderDonateText } from "../views/donateView.js";
 import { renderPoolDetailText } from "../views/poolDetailView.js";
-import { safeEditMessageText } from "../views/common.js";
+import { safeEditMessageText, safeNavigateAndEdit } from "../views/common.js";
 import { POOL_RANKS } from "../views/poolRanks.js";
 import { icon } from "../views/iconTheme.js";
 
@@ -156,8 +156,7 @@ export function createMainMenuHierarchy(
         if (ctx.chat) {
           dashboardRegistry?.updateView(ctx.chat.id, "settings");
         }
-        await safeEditMessageText(ctx, renderSettingsText(ctx));
-        return ctx.menu.nav("settings-menu");
+        await safeNavigateAndEdit(ctx, "settings-menu", renderSettingsText(ctx));
       }
     );
 
@@ -211,8 +210,7 @@ export function createMainMenuHierarchy(
         }
         const profile = invertedIndex.getProfileByTgId(ctx.from?.id || 0);
         const totalStars = profile?.totalDonatedStars || 0;
-        await safeEditMessageText(ctx, renderDonateText(ctx, totalStars));
-        return ctx.menu.nav("donate-menu");
+        await safeNavigateAndEdit(ctx, "donate-menu", renderDonateText(ctx, totalStars));
       }
     )
     .row()
@@ -224,8 +222,7 @@ export function createMainMenuHierarchy(
         if (ctx.chat) {
           dashboardRegistry?.updateView(ctx.chat.id, "other");
         }
-        await safeEditMessageText(ctx, renderChangeLanguageText(ctx));
-        return ctx.menu.nav("language-menu");
+        await safeNavigateAndEdit(ctx, "language-menu", renderChangeLanguageText(ctx));
       }
     )
     .row()
@@ -236,8 +233,7 @@ export function createMainMenuHierarchy(
         if (ctx.chat) {
           dashboardRegistry?.updateView(ctx.chat.id, "other");
         }
-        await safeEditMessageText(ctx, renderHelpText(ctx));
-        return ctx.menu.nav("help-menu");
+        await safeNavigateAndEdit(ctx, "help-menu", renderHelpText(ctx));
       }
     )
     .row()
@@ -253,8 +249,7 @@ export function createMainMenuHierarchy(
         if (ctx.chat) {
           dashboardRegistry?.updateView(ctx.chat.id, "dashboard");
         }
-        await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao, scraper));
-        return ctx.menu.nav("main-dashboard-menu");
+        await safeNavigateAndEdit(ctx, "main-dashboard-menu", renderDashboardText(ctx, poolStateDao, historyDao, scraper));
       }
     );
 
@@ -325,8 +320,7 @@ export function createMainMenuHierarchy(
         if (ctx.chat) {
           dashboardRegistry?.updateView(ctx.chat.id, "settings");
         }
-        await safeEditMessageText(ctx, renderSettingsText(ctx));
-        return ctx.menu.nav("settings-menu");
+        await safeNavigateAndEdit(ctx, "settings-menu", renderSettingsText(ctx));
       }
     );
 
@@ -348,8 +342,7 @@ export function createMainMenuHierarchy(
         if (ctx.chat) {
           dashboardRegistry?.updateView(ctx.chat.id, "settings");
         }
-        await safeEditMessageText(ctx, renderSettingsText(ctx));
-        return ctx.menu.nav("settings-menu");
+        await safeNavigateAndEdit(ctx, "settings-menu", renderSettingsText(ctx));
       }
     );
 
@@ -370,11 +363,11 @@ export function createMainMenuHierarchy(
               const msgId = c.callbackQuery?.message?.message_id;
               dashboardRegistry?.updateView(c.chat.id, "pool_detail", pool.slug, c.lang, msgId, c.user?.id);
             }
-            await safeEditMessageText(
+            await safeNavigateAndEdit(
               c,
+              "pool-detail-menu",
               renderPoolDetailText(c, poolStateDao, historyDao, scraper)
             );
-            return c.menu.nav("pool-detail-menu");
           })
           .row();
       }
@@ -421,8 +414,7 @@ export function createMainMenuHierarchy(
           const msgId = ctx.callbackQuery?.message?.message_id;
           dashboardRegistry?.updateView(ctx.chat.id, "settings", undefined, ctx.lang, msgId, ctx.user?.id);
         }
-        await safeEditMessageText(ctx, renderSettingsText(ctx));
-        return ctx.menu.nav("settings-menu");
+        await safeNavigateAndEdit(ctx, "settings-menu", renderSettingsText(ctx));
       }
     );
 

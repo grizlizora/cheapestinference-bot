@@ -6,7 +6,7 @@ import { SlotHistoryDAO } from "../../db/dao/slotHistory.js";
 import { SubscriptionDAO } from "../../db/dao/subscriptions.js";
 import { SupportedLanguage } from "../../types/db.js";
 import { SubscriberInvertedIndex } from "../notifier/subscriberIndex.js";
-import { renderDashboardText, renderSettingsText, safeEditMessageText } from "./mainDashboard.js";
+import { renderDashboardText, renderSettingsText, safeEditMessageText, safeNavigateAndEdit } from "./mainDashboard.js";
 import { renderPoolDetailText } from "./poolDetail.js";
 import { renderSubscriptionsText } from "./subscriptions.js";
 import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
@@ -42,16 +42,16 @@ export function createLanguageMenu(
           if (ctx.chat && msgId && dashboardRegistry) {
             dashboardRegistry.register(ctx.chat.id, msgId, ctx.user.id, lang, "pool_detail", slug);
           }
-          await safeEditMessageText(ctx, renderPoolDetailText(ctx, poolStateDao, historyDao, scraper));
-          return ctx.menu.nav("pool-detail-menu");
+          await safeNavigateAndEdit(ctx, "pool-detail-menu", renderPoolDetailText(ctx, poolStateDao, historyDao, scraper));
+          return;
         }
       }
       if ((pendingDeepLink === "alerts" || pendingDeepLink === "subscriptions") && subDao) {
         if (ctx.chat && msgId && dashboardRegistry) {
           dashboardRegistry.register(ctx.chat.id, msgId, ctx.user.id, lang, "subscriptions");
         }
-        await safeEditMessageText(ctx, renderSubscriptionsText(ctx, subDao));
-        return ctx.menu.nav("subscriptions-menu");
+        await safeNavigateAndEdit(ctx, "subscriptions-menu", renderSubscriptionsText(ctx, subDao));
+        return;
       }
     }
 
@@ -61,16 +61,15 @@ export function createLanguageMenu(
       if (ctx.chat && msgId && dashboardRegistry) {
         dashboardRegistry.register(ctx.chat.id, msgId, ctx.user.id, lang, "settings");
       }
-      await safeEditMessageText(ctx, renderSettingsText(ctx));
-      return ctx.menu.nav("settings-menu");
+      await safeNavigateAndEdit(ctx, "settings-menu", renderSettingsText(ctx));
+      return;
     }
 
     if (ctx.chat && msgId && dashboardRegistry) {
       dashboardRegistry.register(ctx.chat.id, msgId, ctx.user.id, lang, "dashboard");
     }
 
-    await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao, scraper));
-    return ctx.menu.nav("main-dashboard-menu");
+    await safeNavigateAndEdit(ctx, "main-dashboard-menu", renderDashboardText(ctx, poolStateDao, historyDao, scraper));
   };
 
   return new Menu<BotContext>("language-menu")
@@ -96,15 +95,14 @@ export function createLanguageMenu(
           if (ctx.chat) {
             dashboardRegistry?.updateView(ctx.chat.id, "settings");
           }
-          await safeEditMessageText(ctx, renderSettingsText(ctx));
-          return ctx.menu.nav("settings-menu");
+          await safeNavigateAndEdit(ctx, "settings-menu", renderSettingsText(ctx));
+          return;
         }
 
         if (ctx.chat) {
           dashboardRegistry?.updateView(ctx.chat.id, "dashboard");
         }
-        await safeEditMessageText(ctx, renderDashboardText(ctx, poolStateDao, historyDao, scraper));
-        return ctx.menu.nav("main-dashboard-menu");
+        await safeNavigateAndEdit(ctx, "main-dashboard-menu", renderDashboardText(ctx, poolStateDao, historyDao, scraper));
       }
     );
 }

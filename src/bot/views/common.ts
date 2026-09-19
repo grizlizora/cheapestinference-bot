@@ -59,6 +59,21 @@ export async function safeReply(
   }
 }
 
+export async function safeNavigateAndEdit(
+  ctx: BotContext,
+  targetMenuId: string,
+  text: string,
+  extra?: any
+): Promise<void> {
+  (ctx as any)._hasNavigated = true;
+  if ((ctx as any).menu && typeof (ctx as any).menu.nav === "function") {
+    try {
+      await (ctx as any).menu.nav(targetMenuId);
+    } catch {}
+  }
+  await safeEditMessageText(ctx, text, extra);
+}
+
 export async function safeEditMessageText(
   ctx: BotContext,
   text: string,
@@ -71,7 +86,12 @@ export async function safeEditMessageText(
         extra.reply_markup !== undefined ||
         typeof extra.pack === "function");
 
-    if (!hasCustomMarkup && (ctx as any).menu && typeof (ctx as any).menu.update === "function") {
+    if (
+      !hasCustomMarkup &&
+      !(ctx as any)._hasNavigated &&
+      (ctx as any).menu &&
+      typeof (ctx as any).menu.update === "function"
+    ) {
       try {
         (ctx as any).menu.update();
       } catch {}
