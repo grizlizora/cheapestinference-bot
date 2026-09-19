@@ -7,7 +7,7 @@ import { DiffEvent } from "../../../types/domain.js";
 import { translate, escapeHtml, stripLeadingEmoji } from "../../../i18n/index.js";
 import { PackedUserProfile } from "../subscriberIndex.js";
 import { truncateToTelegramLimit } from "../htmlTagBalancer.js";
-import { icon } from "../../views/iconTheme.js";
+import { icon, getModel3DIcon } from "../../views/iconTheme.js";
 import { formatBlockHoursWithLocal } from "../../views/timezoneHelper.js";
 import {
   cleanPoolTitle,
@@ -161,9 +161,19 @@ export function formatBundledAlertMessage(
       });
     } else if (event.type === "MODEL_UPGRADE_EVENT") {
       const upgradeTitle = translate(lang, "alerts.bundle_title_models") || "Model Upgrade";
+      let modelDetails = "";
+      if (event.modelUpgrade?.upgraded && event.modelUpgrade.upgraded.length > 0) {
+        modelDetails = event.modelUpgrade.upgraded
+          .map(
+            (u) =>
+              `  • ${icon("zap")} <code>${escapeHtml(u.previousModelName || "")}</code> ➔ <code>${escapeHtml(u.modelName)}</code>`
+          )
+          .join("\n");
+      } else {
+        modelDetails = `  • ${icon("ai_robot")} ${(event.models || []).map((m) => `${getModel3DIcon(m)} <code>${escapeHtml(m)}</code>`).join(", ")}`;
+      }
       sectionLines.push(
-        `${icon("event_model_upgrade")} <b>${escapeHtml(cleanName)} • ${upgradeTitle}</b>\n` +
-        `${icon("ai_robot")} ${(event.models || []).map((m) => `<code>${escapeHtml(m)}</code>`).join(", ")}`
+        `${icon("event_model_upgrade")} <b>${escapeHtml(cleanName)} • ${upgradeTitle}</b>\n${modelDetails}`
       );
       candidates.push({
         priority: 4,

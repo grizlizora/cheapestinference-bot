@@ -35,31 +35,46 @@ export function getCapacityOrbIcon(availableCount: number, totalBlocks: number =
   }
 }
 
-/**
- * Helper to automatically retrieve 3D animated custom emoji for any neural network model
- */
 export function getModel3DIcon(modelName: string): string {
   const parsed = ModelSemanticMatcher.parseModel(modelName);
-  switch (parsed.family) {
-    case "deepseek":
-      return icon("ai_deepseek");
-    case "qwen":
-      return icon("ai_qwen");
-    case "glm":
-      return icon("ai_glm");
-    case "kimi":
-      return icon("ai_kimi");
-    case "mimo":
-      return icon("ai_mimo");
-    case "minimax":
-      return icon("ai_minimax");
-    case "llama":
-      return icon("ai_llama");
-    case "mistral":
-      return icon("ai_mistral");
-    case "claude":
-      return icon("ai_claude");
-    default:
-      return icon("ai_robot");
+  const fam = (parsed.family || "").toLowerCase();
+  const raw = (modelName || "").toLowerCase();
+
+  // 3D custom emoji matching by family keyword
+  if (fam.includes("deepseek") || raw.includes("deepseek")) {
+    return icon("ai_deepseek");
   }
+  if (fam.includes("qwen") || raw.includes("qwen")) {
+    return icon("ai_qwen");
+  }
+  if (fam.includes("glm") || fam.includes("chatglm") || raw.includes("glm")) {
+    return icon("ai_glm");
+  }
+  if (
+    fam.includes("kimi") ||
+    fam.includes("moonshot") ||
+    raw.includes("kimi") ||
+    raw.includes("moonshot")
+  ) {
+    return icon("ai_kimi");
+  }
+  if (fam.includes("mimo") || raw.includes("mimo")) {
+    return icon("ai_mimo");
+  }
+  if (fam.includes("minimax") || raw.includes("minimax")) {
+    return icon("ai_minimax");
+  }
+  if (fam.includes("llama") || raw.includes("llama")) {
+    return icon("ai_llama");
+  }
+  if (fam.includes("mistral") || fam.includes("codestral") || raw.includes("mistral")) {
+    return icon("ai_mistral");
+  }
+  if (fam.includes("claude") || raw.includes("claude")) {
+    return icon("ai_claude");
+  }
+
+  // Dynamic 3D fallback for ANY arbitrary or future neural network
+  return icon("ai_robot");
 }
+

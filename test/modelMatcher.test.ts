@@ -225,4 +225,144 @@ describe("ModelSemanticMatcher", () => {
     expect(bundle.text).not.toContain("( 🟢 Знижка");
     expect(bundle.text).toContain("• <tg-emoji");
   });
+
+  it("should dynamically detect arbitrary unknown/future neural networks without hardcoding", () => {
+    // 1. Completely arbitrary future AI
+    const diff1 = ModelSemanticMatcher.diffModelLists(
+      "custom-pool",
+      "Custom Pool",
+      ["futuristic-neuro-transformer-v1.0"],
+      ["futuristic-neuro-transformer-v2.0"]
+    );
+    expect(diff1.hasChanges).toBe(true);
+    expect(diff1.upgraded).toHaveLength(1);
+    expect(diff1.upgraded[0].previousModelName).toBe("futuristic-neuro-transformer-v1.0");
+    expect(diff1.upgraded[0].modelName).toBe("futuristic-neuro-transformer-v2.0");
+
+    // 2. Grok evolution (grok-2 -> grok-3)
+    const diffGrok = ModelSemanticMatcher.diffModelLists(
+      "xai-pool",
+      "xAI Pool",
+      ["xai/grok-2"],
+      ["xai/grok-3"]
+    );
+    expect(diffGrok.upgraded).toHaveLength(1);
+    expect(diffGrok.upgraded[0].newVersion).toBe("3");
+
+    // 3. Nemotron 340B evolution (nemotron-4-340b -> nemotron-5-340b)
+    const diffNemo = ModelSemanticMatcher.diffModelLists(
+      "nvidia-pool",
+      "Nvidia Pool",
+      ["nvidia/nemotron-4-340b"],
+      ["nvidia/nemotron-5-340b"]
+    );
+    expect(diffNemo.upgraded).toHaveLength(1);
+    expect(diffNemo.upgraded[0].modelName).toBe("nvidia/nemotron-5-340b");
+
+    // 4. Date-based revision upgrades (e.g. 2402 -> 2407)
+    const diffDate = ModelSemanticMatcher.diffModelLists(
+      "mistral-pool",
+      "Mistral Pool",
+      ["mistral-large-2402"],
+      ["mistral-large-2407"]
+    );
+    expect(diffDate.upgraded).toHaveLength(1);
+    expect(diffDate.upgraded[0].modelName).toBe("mistral-large-2407");
+
+    // 5. Hyphenated sub-version parsing (e.g. claude-3-5-sonnet -> claude-3-7-sonnet)
+    const diffHyphen = ModelSemanticMatcher.diffModelLists(
+      "anthropic-pool",
+      "Anthropic Pool",
+      ["claude-3-5-sonnet"],
+      ["claude-3-7-sonnet"]
+    );
+    expect(diffHyphen.upgraded).toHaveLength(1);
+    expect(diffHyphen.upgraded[0].oldVersion).toBe("3.5");
+    expect(diffHyphen.upgraded[0].newVersion).toBe("3.7");
+
+    // 6. Arbitrary semantic patch upgrade (1.2.3 -> 1.2.4)
+    const diffPatch = ModelSemanticMatcher.diffModelLists(
+      "custom-pool",
+      "Custom Pool",
+      ["community/any-model-1.2.3"],
+      ["community/any-model-1.2.4"]
+    );
+    expect(diffPatch.upgraded).toHaveLength(1);
+    expect(diffPatch.upgraded[0].newVersion).toBe("1.2.4");
+  });
+
+  it("should prioritize matching parameter size during coexistence pairing", () => {
+    // Both 8b and 70b exist; 70b gets upgraded to v2. Must pair with 70b, NOT 8b!
+    const diff = ModelSemanticMatcher.diffModelLists(
+      "llama-pool",
+      "Llama Pool",
+      ["custom-llama-v1-8b", "custom-llama-v1-70b"],
+      ["custom-llama-v1-8b", "custom-llama-v1-70b", "custom-llama-v2-70b"]
+    );
+
+    expect(diff.hasChanges).toBe(true);
+    expect(diff.upgraded).toHaveLength(1);
+    expect(diff.upgraded[0].modelName).toBe("custom-llama-v2-70b");
+    expect(diff.upgraded[0].previousModelName).toBe("custom-llama-v1-70b");
+  });
+
+  it("should NOT pair completely unrelated neural network architectures", () => {
+    const diff = ModelSemanticMatcher.diffModelLists(
+      "mixed-pool",
+      "Mixed Pool",
+      ["model-alpha-v1"],
+      ["model-beta-v2"]
+    );
+
+    // Unrelated stems must be reported as 1 removed + 1 added, NOT upgraded
+    expect(diff.upgraded).toHaveLength(0);
+    expect(diff.removed).toHaveLength(1);
+    expect(diff.removed[0].modelName).toBe("model-alpha-v1");
+    expect(diff.added).toHaveLength(1);
+    expect(diff.added[0].modelName).toBe("model-beta-v2");
+  });
+
+  it("should render 3D lightning icon in bundled alert for model upgrades", async () => {
+    const { formatBundledAlertMessage } = await import("../src/bot/notifier/formatters/bundleAlertFormatter.js");
+
+    const event = {
+      id: "bundle-upgrade-event",
+      type: "MODEL_UPGRADE_EVENT" as const,
+      poolSlug: "frontier",
+      poolName: "Frontier Speed",
+      block: "ALL",
+      models: ["glm-5.3"],
+      hoursUtc: "",
+      timestamp: Date.now(),
+      modelUpgrade: {
+        added: [],
+        upgraded: [
+          {
+            type: "upgraded" as const,
+            modelName: "glm-5.3",
+            previousModelName: "glm-5.2",
+            family: "glm",
+            oldVersion: "5.2",
+            newVersion: "5.3",
+            changeNote: "glm-5.2 ➡️ glm-5.3",
+          },
+        ],
+        removed: [],
+        allActiveModels: ["glm-5.3"],
+      },
+    };
+
+    const user = {
+      userId: 1,
+      telegramId: 123456,
+      language: "uk" as const,
+      isAdmin: false,
+      isMuted: false,
+    };
+
+    const bundle = formatBundledAlertMessage(user as any, [{ event: event as any, priority: "P2" }]);
+    // Must contain 3D animated lightning emoji ID (5456140674028019486)
+    expect(bundle.text).toContain("5456140674028019486");
+    expect(bundle.text).toContain("<code>glm-5.2</code> ➔ <code>glm-5.3</code>");
+  });
 });

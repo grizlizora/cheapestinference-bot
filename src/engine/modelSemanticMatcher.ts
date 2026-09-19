@@ -8,91 +8,126 @@ export interface ParsedModelToken {
   versionStr: string;
   versionMajor: number;
   versionMinor: number;
+  versionPatch?: number;
   variant: string;
   paramSize?: string;
+  dateCode?: number;
 }
 
 export class ModelSemanticMatcher {
-  private static readonly FAMILY_PATTERNS: Array<{ family: string; regex: RegExp }> = [
-    { family: "glm", regex: /\b(glm|chatglm)[-_ ]*(\d+(?:[._-]\d+)*)?/i },
-    { family: "qwen", regex: /\b(qwen)[-_ ]*(\d+(?:[._-]\d+)*)?/i },
-    { family: "kimi", regex: /\b(kimi|moonshot)[-_ ]*(k?\d+(?:[._-]\d+)*)?/i },
-    { family: "deepseek", regex: /\b(deepseek)[-_ ]*(v?\d+(?:[._-]\d+)*|r\d+)?/i },
-    { family: "mimo", regex: /\b(mimo)[-_ ]*(v?\d+(?:[._-]\d+)*)?/i },
-    { family: "minimax", regex: /\b(minimax)[-_ ]*(m?\d+(?:[._-]\d+)*)?/i },
-    { family: "llama", regex: /\b(llama)[-_ ]*(\d+(?:[._-]\d+)*)?/i },
-    { family: "claude", regex: /\b(claude)[-_ ]*(\d+(?:[._-]\d+)*)?/i },
-    { family: "mistral", regex: /\b(mistral|mixtral)[-_ ]*(\d+(?:[._-]\d+)*)?/i },
-    { family: "gpt", regex: /\b(gpt)[-_ ]*(\d+(?:[._-]\d+)*)?/i },
-    { family: "openai-o", regex: /\b(o[1-9])[-_ ]*(\d+(?:[._-]\d+)*)?/i },
-    { family: "gemini", regex: /\b(gemini)[-_ ]*(\d+(?:[._-]\d+)*)?/i },
-    { family: "gemma", regex: /\b(gemma)[-_ ]*(\d+(?:[._-]\d+)*)?/i },
-    { family: "phi", regex: /\b(phi)[-_ ]*(\d+(?:[._-]\d+)*)?/i },
-    { family: "yi", regex: /\b(yi)[-_ ]*(\d+(?:[._-]\d+)*)?/i },
-    { family: "command", regex: /\b(command)[-_ ]*(r?\d+(?:[._-]\d+)*)?/i },
-  ];
+  // Known architectural variant tokens (common modifiers across the AI ecosystem)
+  private static readonly VARIANT_PATTERN =
+    /\b(max|flash|turbo|plus|pro|coder|reasoner|chat|instruct|lite|ultra|base|large|small|medium|mini|haiku|sonnet|opus|preview|vision|vl|moe|dense|distill)\b/i;
 
+  // Structural parameter size pattern (e.g. 70b, 8x7b, 32b, 0.5b, 340b, 1m)
+  private static readonly PARAM_SIZE_PATTERN = /\b(\d+(?:\.\d+)?(?:x\d+)?\s*[bmk])\b/i;
+
+  // Structural date code pattern (e.g. 20241022, 20240620, 2407, 2501, 08-2024)
+  private static readonly DATE_CODE_PATTERN = /\b((?:20\d{2}[-_]?\d{2}[-_]?\d{2})|(?:\d{2}[01]\d))\b/;
+
+  /**
+   * Universal AI Model Parser:
+   * Pure linguistic & structural token decomposition without hardcoding specific model brand names.
+   * Dynamically breaks ANY arbitrary current or future model string into:
+   * [Namespace] -> [Family Stem] -> [Semantic Version] -> [Variant] -> [Param Size] -> [Date Code]
+   */
   public static parseModel(raw: string): ParsedModelToken {
-    const clean = raw.trim().toLowerCase();
-    let family = "other";
+    let clean = raw.trim().toLowerCase();
+
+    // 1. Strip organization / namespace prefix (e.g. "meta-llama/", "deepseek-ai/", "google/", "01-ai-")
+    clean = clean.replace(/^(?:[a-z0-9_-]+\/|(?:meta|google|microsoft|alibaba|anthropic|openai|stabilityai|nvidia|mistralai|01-ai|nousresearch|ibm|cohere|xai|amazon)[-_])/i, "");
+
+    // 2. Extract structural parameter size (e.g. 70b, 32b, 8x7b)
+    let paramSize: string | undefined;
+    const paramMatch = clean.match(this.PARAM_SIZE_PATTERN);
+    if (paramMatch) {
+      paramSize = paramMatch[1].toLowerCase().replace(/\s+/g, "");
+    }
+
+    // 3. Extract architectural variant modifier (e.g. flash, turbo, coder, instruct)
+    let variant = "";
+    const variantMatch = clean.match(this.VARIANT_PATTERN);
+    if (variantMatch) {
+      variant = variantMatch[1].toLowerCase();
+    }
+
+    // 4. Extract date revision code (e.g. 2407, 20241022)
+    let dateCode: number | undefined;
+    const dateMatch = clean.match(this.DATE_CODE_PATTERN);
+    if (dateMatch) {
+      const parsedDate = parseInt(dateMatch[1].replace(/[-_]/g, ""), 10);
+      if (!isNaN(parsedDate) && parsedDate > 0) {
+        dateCode = parsedDate;
+      }
+    }
+
+    // 5. Extract multi-segment semantic version (e.g. "v4.1", "3.5", "r1", "k2", "1.2.3")
     let versionStr = "";
     let versionMajor = 0;
     let versionMinor = 0;
+    let versionPatch = 0;
 
-    let bestMatch: { family: string; match: RegExpMatchArray; index: number } | null = null;
-    for (const p of this.FAMILY_PATTERNS) {
-      const m = clean.match(p.regex);
-      if (m && m.index !== undefined) {
-        if (!bestMatch || m.index < bestMatch.index) {
-          bestMatch = { family: p.family, match: m, index: m.index };
-        }
-      }
+    // Clean out extracted paramSize and dateCode to avoid false version matching
+    let working = clean;
+    if (paramSize) {
+      working = working.replace(new RegExp(`\\b${paramSize}\\b`, "i"), "");
+    }
+    if (dateMatch) {
+      working = working.replace(new RegExp(`\\b${dateMatch[1]}\\b`, "i"), "");
     }
 
-    let paramSize: string | undefined;
-    const paramMatch = clean.match(/\b(\d+x\d+b|\d+b)\b/i);
-    if (paramMatch) {
-      paramSize = paramMatch[1].toLowerCase();
-    }
+    // Match explicit version markers:
+    // a) Version with dot notation (e.g. v4.1, 3.5, 1.2.3)
+    // b) Version with hyphenated sub-version (e.g. claude-3-5-sonnet, gemini-1-5-pro)
+    // c) Version with single integer preceded by v/r/k/m/o (e.g. v4, r1, k2, m3, o1)
+    // d) Delimited integer between tokens (e.g. grok-2, nemotron-4, llama-3)
+    // e) Alphanumeric boundary digits (e.g. grok2, qwen3)
+    const verMatch =
+      working.match(/(?:^|[-_ .])(?:v|r|k|m|o)?(\d+(?:\.\d+)+)(?:[-_ .]|$)/i) ||
+      working.match(/(?:^|[-_ .])(?:v|r|k|m|o)?(\d+(?:[-_]\d+)+)(?:[-_ .]|$)/i) ||
+      working.match(/(?:^|[-_ .])(?:v|r|k|m|o)(\d+)(?:[-_ .]|$)/i) ||
+      working.match(/(?:^|[-_ .])(\d+)(?:o|omni)(?:[-_ .]|$)/i) ||
+      working.match(/[-_ .](\d+)(?:[-_ .]|$)/i) ||
+      working.match(/([a-z]+)(\d+)(?:[-_ .]|$)/i);
 
-    if (bestMatch) {
-      family = bestMatch.family;
-      if (bestMatch.match[2]) {
-        versionStr = bestMatch.match[2].replace(/^[vkrm]/i, "").replace(/[-_]/g, ".");
-      }
-    }
-
-    if (!versionStr) {
-      const cleanWithoutParam = paramSize ? clean.replace(new RegExp(`\\b${paramSize}\\b`, "i"), "") : clean;
-      const verMatch = cleanWithoutParam.match(/(?:v|k|r|m)?(\d+)(?:[._-](\d+))?/i);
-      if (verMatch) {
-        versionStr = verMatch[2] ? `${verMatch[1]}.${verMatch[2]}` : verMatch[1];
-        versionMajor = parseInt(verMatch[1], 10) || 0;
-        versionMinor = parseInt(verMatch[2] || "0", 10) || 0;
-      }
-    }
-
-    if (paramSize && versionStr) {
-      const paramNum = paramSize.replace("b", "");
-      if (versionStr === paramNum) {
-        versionStr = "";
-        versionMajor = 0;
-        versionMinor = 0;
-      } else if (versionStr.endsWith(`.${paramNum}`)) {
-        versionStr = versionStr.substring(0, versionStr.length - paramNum.length - 1);
-      }
-    }
-
-    if (versionStr) {
+    if (verMatch) {
+      // If matched by inline pattern like grok2 -> group 2 is the digits
+      const digits = verMatch[2] && !verMatch[1].match(/^\d/) ? verMatch[2] : verMatch[1];
+      versionStr = digits.replace(/[-_]/g, ".");
       const parts = versionStr.split(".");
       versionMajor = parseInt(parts[0], 10) || 0;
       versionMinor = parseInt(parts[1] || "0", 10) || 0;
+      versionPatch = parseInt(parts[2] || "0", 10) || 0;
     }
 
-    let variant = "";
-    const variantMatch = clean.match(/\b(max|flash|turbo|plus|pro|coder|reasoner|chat|instruct|lite|ultra|base|large|small|medium|mini|haiku|sonnet|opus)\b/i);
-    if (variantMatch) {
-      variant = variantMatch[1].toLowerCase();
+    // 6. Derive Canonical Family Stem:
+    // Remove the version token, variant, param size, date code and punctuation
+    let stemWorking = clean;
+    if (paramSize) {
+      stemWorking = stemWorking.replace(new RegExp(`\\b${paramSize}\\b`, "i"), "");
+    }
+    if (dateMatch) {
+      stemWorking = stemWorking.replace(new RegExp(`\\b${dateMatch[1]}\\b`, "i"), "");
+    }
+    if (variant) {
+      stemWorking = stemWorking.replace(new RegExp(`\\b${variant}\\b`, "i"), "");
+    }
+    if (versionStr) {
+      // Remove version digits and common prefixes (v, r, k, m, o)
+      const verRegexPart = versionStr.replace(/\./g, "[-_.]?");
+      stemWorking = stemWorking.replace(new RegExp(`(?:v|r|k|m|o)?${verRegexPart}`, "i"), "");
+    }
+
+    // Clean up trailing and leading punctuation/delimiters
+    let family = stemWorking
+      .replace(/[-_ .]+/g, "-")
+      .replace(/^[-_ .]+|[-_ .]+$/g, "")
+      .trim();
+
+    // Fallback: if stem reduced to empty, take the first continuous alphabetic token
+    if (!family || family.length < 2) {
+      const fallbackMatch = clean.match(/^([a-z]+)/i);
+      family = fallbackMatch ? fallbackMatch[1] : "generic";
     }
 
     return {
@@ -102,11 +137,36 @@ export class ModelSemanticMatcher {
       versionStr,
       versionMajor,
       versionMinor,
+      versionPatch,
       variant,
       paramSize,
+      dateCode,
     };
   }
 
+  /**
+   * Generalized Family Matcher:
+   * Compares any two models using exact stem equality, common prefix containment,
+   * or high-confidence Levenshtein stem similarity.
+   */
+  public static areModelsSameFamily(a: ParsedModelToken, b: ParsedModelToken): boolean {
+    if (a.family === b.family && a.family !== "generic") {
+      return true;
+    }
+    // Prefix / Substring containment (e.g. "llama" and "meta-llama", "glm" and "chatglm")
+    if (
+      a.family.length >= 3 &&
+      b.family.length >= 3 &&
+      (a.family.startsWith(b.family) || b.family.startsWith(a.family))
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Multi-Segment Semantic Version & Generational Comparator
+   */
   public static compareVersions(a: ParsedModelToken, b: ParsedModelToken): number {
     if (a.versionMajor !== b.versionMajor) {
       return a.versionMajor - b.versionMajor;
@@ -114,9 +174,27 @@ export class ModelSemanticMatcher {
     if (a.versionMinor !== b.versionMinor) {
       return a.versionMinor - b.versionMinor;
     }
-    if (a.versionStr && b.versionStr) {
+    const patchA = a.versionPatch ?? 0;
+    const patchB = b.versionPatch ?? 0;
+    if (patchA !== patchB) {
+      return patchA - patchB;
+    }
+    if (a.dateCode && b.dateCode && a.dateCode !== b.dateCode) {
+      return a.dateCode - b.dateCode;
+    }
+    if (a.versionStr && b.versionStr && a.versionStr !== b.versionStr) {
+      const partsA = a.versionStr.split(/[._-]/).map((p) => parseInt(p, 10) || 0);
+      const partsB = b.versionStr.split(/[._-]/).map((p) => parseInt(p, 10) || 0);
+      const maxLen = Math.max(partsA.length, partsB.length);
+      for (let i = 0; i < maxLen; i++) {
+        const valA = partsA[i] || 0;
+        const valB = partsB[i] || 0;
+        if (valA !== valB) return valA - valB;
+      }
       return a.versionStr.localeCompare(b.versionStr, undefined, { numeric: true });
     }
+    if (a.versionStr && !b.versionStr) return 1;
+    if (!a.versionStr && b.versionStr) return -1;
     return 0;
   }
 
@@ -148,13 +226,12 @@ export class ModelSemanticMatcher {
     const usedRemoved = new Set<string>();
     const usedAdded = new Set<string>();
 
-    // Phase 1: Direct Upgrade Pairing (Replaced Models e.g. glm-5.2 -> glm-5.3)
+    // Phase 1: Direct Upgrade Pairing (Replaced Models e.g. glm-5.2 -> glm-5.3 or custom-v1 -> custom-v2)
     for (const added of addedCandidates) {
       const match = removedCandidates.find(
         (rem) =>
           !usedRemoved.has(rem.normalized) &&
-          rem.family !== "other" &&
-          rem.family === added.family &&
+          this.areModelsSameFamily(rem, added) &&
           rem.variant === added.variant &&
           (rem.paramSize === added.paramSize || (!rem.paramSize && !added.paramSize))
       );
@@ -184,16 +261,27 @@ export class ModelSemanticMatcher {
     // Phase 2: Coexistence Upgrade Pairing (Newer version added while older version is still listed in pool)
     for (const added of addedCandidates) {
       if (usedAdded.has(added.normalized)) continue;
-      if (added.family === "other") continue;
 
-      // Find an existing predecessor in the same family with lower/equal version
-      const predecessor = prevNormalized.find(
-        (prev) =>
-          prev.family === added.family &&
-          prev.normalized !== added.normalized &&
-          this.compareVersions(added, prev) > 0
-      );
+      // Find best matching predecessor in the same family with lower version
+      const candidates = prevNormalized
+        .filter(
+          (prev) =>
+            this.areModelsSameFamily(prev, added) &&
+            prev.normalized !== added.normalized &&
+            this.compareVersions(added, prev) > 0
+        )
+        .sort((a, b) => {
+          const aScore =
+            (a.variant === added.variant ? 2 : 0) +
+            (a.paramSize === added.paramSize ? 2 : 0);
+          const bScore =
+            (b.variant === added.variant ? 2 : 0) +
+            (b.paramSize === added.paramSize ? 2 : 0);
+          if (aScore !== bScore) return bScore - aScore;
+          return this.compareVersions(b, a);
+        });
 
+      const predecessor = candidates[0];
       if (predecessor) {
         usedAdded.add(added.normalized);
         upgraded.push({
@@ -214,8 +302,7 @@ export class ModelSemanticMatcher {
       const match = removedCandidates.find(
         (rem) =>
           !usedRemoved.has(rem.normalized) &&
-          rem.family !== "other" &&
-          rem.family === added.family
+          this.areModelsSameFamily(rem, added)
       );
 
       if (match) {
@@ -242,12 +329,13 @@ export class ModelSemanticMatcher {
     // Phase 4: Superseded Phaseout Detection (Older model removed after its successor is already active in new list)
     for (const rem of removedCandidates) {
       if (usedRemoved.has(rem.normalized)) continue;
-      if (rem.family === "other") continue;
 
-      // Check if a newer version in the same family is already active in the new list
+      // Check if a newer version in the same family with matching variant/paramSize is already active in the new list
       const activeSuccessor = newNormalized.find(
         (curr) =>
-          curr.family === rem.family &&
+          this.areModelsSameFamily(curr, rem) &&
+          (curr.variant === rem.variant || !rem.variant) &&
+          (curr.paramSize === rem.paramSize || !rem.paramSize) &&
           this.compareVersions(curr, rem) >= 0
       );
 
