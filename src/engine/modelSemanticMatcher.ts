@@ -17,7 +17,7 @@ export interface ParsedModelToken {
 export class ModelSemanticMatcher {
   // Known architectural variant tokens (common modifiers across the AI ecosystem)
   private static readonly VARIANT_PATTERN =
-    /\b(max|flash|turbo|plus|pro|coder|reasoner|chat|instruct|lite|ultra|base|large|small|medium|mini|haiku|sonnet|opus|preview|vision|vl|moe|dense|distill)\b/i;
+    /\b(max|flash|turbo|plus|pro|coder|reasoner|chat|instruct|lite|ultra|base|large|small|medium|mini|haiku|sonnet|opus|preview|vision|vl|moe|dense|distill|air|longcontext)\b/i;
 
   // Structural parameter size pattern (e.g. 70b, 8x7b, 32b, 0.5b, 340b, 1m)
   private static readonly PARAM_SIZE_PATTERN = /\b(\d+(?:\.\d+)?(?:x\d+)?\s*[bmk])\b/i;
@@ -35,20 +35,25 @@ export class ModelSemanticMatcher {
     let clean = raw.trim().toLowerCase();
 
     // 1. Strip organization / namespace prefix (e.g. "meta-llama/", "deepseek-ai/", "google/", "01-ai-")
-    clean = clean.replace(/^(?:[a-z0-9_-]+\/|(?:meta|google|microsoft|alibaba|anthropic|openai|stabilityai|nvidia|mistralai|01-ai|nousresearch|ibm|cohere|xai|amazon)[-_])/i, "");
+    clean = clean.replace(/^[a-z0-9_.-]+\//i, "");
 
-    // 2. Extract structural parameter size (e.g. 70b, 32b, 8x7b)
+    // 2. Normalize compound names and typographical variants before token splitting
+    clean = clean.replace(/\bmini[-_ ]?max\b/gi, "minimax");
+    clean = clean.replace(/\bchat[-_]?glm\b/gi, "glm");
+    clean = clean.replace(/\bmino\b/gi, "mimo");
+
+    // 3. Extract structural parameter size (e.g. 70b, 32b, 8x7b)
     let paramSize: string | undefined;
     const paramMatch = clean.match(this.PARAM_SIZE_PATTERN);
     if (paramMatch) {
       paramSize = paramMatch[1].toLowerCase().replace(/\s+/g, "");
     }
 
-    // 3. Extract architectural variant modifier (e.g. flash, turbo, coder, instruct)
+    // 4. Extract architectural variant modifier (e.g. flash, turbo, coder, instruct)
     let variant = "";
-    const variantMatch = clean.match(this.VARIANT_PATTERN);
-    if (variantMatch) {
-      variant = variantMatch[1].toLowerCase();
+    const variantMatches = clean.match(new RegExp(this.VARIANT_PATTERN.source, "gi"));
+    if (variantMatches && variantMatches.length > 0) {
+      variant = variantMatches[0].toLowerCase();
     }
 
     // 4. Extract date revision code (e.g. 2407, 20241022)
@@ -109,9 +114,9 @@ export class ModelSemanticMatcher {
     if (dateMatch) {
       stemWorking = stemWorking.replace(new RegExp(`\\b${dateMatch[1]}\\b`, "i"), "");
     }
-    if (variant) {
-      stemWorking = stemWorking.replace(new RegExp(`\\b${variant}\\b`, "i"), "");
-    }
+    // Globally strip all architectural variant tokens from stem
+    stemWorking = stemWorking.replace(new RegExp(this.VARIANT_PATTERN.source, "gi"), "");
+
     if (versionStr) {
       // Remove version digits and common prefixes (v, r, k, m, o)
       const verRegexPart = versionStr.replace(/\./g, "[-_.]?");
@@ -146,14 +151,21 @@ export class ModelSemanticMatcher {
 
   /**
    * Generalized Family Matcher:
-   * Compares any two models using exact stem equality, common prefix containment,
-   * or high-confidence Levenshtein stem similarity.
+   * Compares any two models using exact stem equality, ecosystem aliases,
+   * or common prefix/containment matching.
    */
   public static areModelsSameFamily(a: ParsedModelToken, b: ParsedModelToken): boolean {
     if (a.family === b.family && a.family !== "generic") {
       return true;
     }
-    // Prefix / Substring containment (e.g. "llama" and "meta-llama", "glm" and "chatglm")
+    // Ecosystem Aliases (Moonshot AI / Kimi)
+    if (
+      (a.family === "kimi" && b.family === "moonshot") ||
+      (a.family === "moonshot" && b.family === "kimi")
+    ) {
+      return true;
+    }
+    // Prefix / Substring containment (e.g. "llama" and "meta-llama", "glm" and "glm-coder")
     if (
       a.family.length >= 3 &&
       b.family.length >= 3 &&

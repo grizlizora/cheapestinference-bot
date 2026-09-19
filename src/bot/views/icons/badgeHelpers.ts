@@ -58,10 +58,20 @@ export function getModel3DIcon(modelName: string): string {
   ) {
     return icon("ai_kimi");
   }
-  if (fam.includes("mimo") || raw.includes("mimo")) {
+  if (
+    fam.includes("mimo") ||
+    fam.includes("mino") ||
+    raw.includes("mimo") ||
+    raw.includes("mino")
+  ) {
     return icon("ai_mimo");
   }
-  if (fam.includes("minimax") || raw.includes("minimax")) {
+  if (
+    fam.includes("minimax") ||
+    raw.includes("minimax") ||
+    raw.includes("mini max") ||
+    raw.includes("mini-max")
+  ) {
     return icon("ai_minimax");
   }
   if (fam.includes("llama") || raw.includes("llama")) {

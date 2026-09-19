@@ -365,4 +365,87 @@ describe("ModelSemanticMatcher", () => {
     expect(bundle.text).toContain("5456140674028019486");
     expect(bundle.text).toContain("<code>glm-5.2</code> ➔ <code>glm-5.3</code>");
   });
+
+  it("should seamlessly handle all core models requested by user: Kimi, Qwen, GLM, MiniMax, DeepSeek, MiMo", () => {
+    // 1. Kimi / Moonshot ecosystem alias upgrade
+    const diffKimi = ModelSemanticMatcher.diffModelLists(
+      "kimi-pool",
+      "Kimi Pool",
+      ["moonshot-v1-32k"],
+      ["kimi-k1.5"]
+    );
+    expect(diffKimi.upgraded).toHaveLength(1);
+    expect(diffKimi.upgraded[0].changeNote).toBe("moonshot-v1-32k ➡️ kimi-k1.5");
+
+    // 2. Kimi version bump (k1.5 -> k2)
+    const diffKimi2 = ModelSemanticMatcher.diffModelLists(
+      "kimi-pool",
+      "Kimi Pool",
+      ["kimi-k1.5"],
+      ["kimi-k2"]
+    );
+    expect(diffKimi2.upgraded).toHaveLength(1);
+    expect(diffKimi2.upgraded[0].newVersion).toBe("2");
+
+    // 3. MiniMax with compound spacing ("mini max-m3" -> "minimax-m4")
+    const diffMiniMax = ModelSemanticMatcher.diffModelLists(
+      "minimax-pool",
+      "MiniMax Pool",
+      ["mini max-m3"],
+      ["minimax-m4"]
+    );
+    expect(diffMiniMax.upgraded).toHaveLength(1);
+    expect(diffMiniMax.upgraded[0].changeNote).toBe("mini max-m3 ➡️ minimax-m4");
+
+    // 4. GLM & ChatGLM unification (chatglm-3 -> glm-4)
+    const diffGLM = ModelSemanticMatcher.diffModelLists(
+      "glm-pool",
+      "GLM Pool",
+      ["chatglm-3"],
+      ["glm-4"]
+    );
+    expect(diffGLM.upgraded).toHaveLength(1);
+    expect(diffGLM.upgraded[0].changeNote).toBe("chatglm-3 ➡️ glm-4");
+
+    // 5. MiMo and typographical variant mino ("mino-v2" -> "mimo-v2.5")
+    const diffMiMo = ModelSemanticMatcher.diffModelLists(
+      "mimo-pool",
+      "MiMo Pool",
+      ["mino-v2"],
+      ["mimo-v2.5"]
+    );
+    expect(diffMiMo.upgraded).toHaveLength(1);
+    expect(diffMiMo.upgraded[0].changeNote).toBe("mino-v2 ➡️ mimo-v2.5");
+
+    // 6. Qwen with multi-variant tokens (coder + instruct stripped cleanly)
+    const diffQwen = ModelSemanticMatcher.diffModelLists(
+      "qwen-pool",
+      "Qwen Pool",
+      ["qwen-2.5-coder-32b-instruct"],
+      ["qwen-3-coder-32b-instruct"]
+    );
+    expect(diffQwen.upgraded).toHaveLength(1);
+    expect(diffQwen.upgraded[0].family).toBe("qwen");
+
+    // 7. DeepSeek Distill models stay within their distill sub-family
+    const diffDeepSeekDistill = ModelSemanticMatcher.diffModelLists(
+      "frontier",
+      "Frontier Pool",
+      ["DeepSeek-R1-Distill-Qwen-32B"],
+      ["DeepSeek-R2-Distill-Qwen-32B"]
+    );
+    expect(diffDeepSeekDistill.upgraded).toHaveLength(1);
+    expect(diffDeepSeekDistill.upgraded[0].changeNote).toBe("DeepSeek-R1-Distill-Qwen-32B ➡️ DeepSeek-R2-Distill-Qwen-32B");
+
+    // 8. DeepSeek Distill is NOT falsely paired with plain Qwen
+    const diffNoCrossPair = ModelSemanticMatcher.diffModelLists(
+      "frontier",
+      "Frontier Pool",
+      ["qwen-2.5-32b"],
+      ["DeepSeek-R1-Distill-Qwen-32B"]
+    );
+    expect(diffNoCrossPair.upgraded).toHaveLength(0);
+    expect(diffNoCrossPair.removed).toHaveLength(1);
+    expect(diffNoCrossPair.added).toHaveLength(1);
+  });
 });
