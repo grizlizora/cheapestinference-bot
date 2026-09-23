@@ -595,5 +595,65 @@ describe("ModelSemanticMatcher", () => {
       expect(msg.text).toContain("mimo-v2.6-flash");
       expect(msg.text).toContain("Core Pool");
     });
+
+    it("should seamlessly handle simultaneous multi-upgrades in a single pool and exclude all superseded predecessors", () => {
+      // Both mimo (v2.5 -> v2.6-flash) and deepseek (v4.0 -> v4.1-flash) upgraded simultaneously while site lists all 4
+      const prevList = ["mimo-v2.5", "deepseek-v4.0", "stable-diffusion-xl"];
+      const newList = ["mimo-v2.5", "mimo-v2.6-flash", "deepseek-v4.0", "deepseek-v4.1-flash", "stable-diffusion-xl"];
+
+      const diff = ModelSemanticMatcher.diffModelLists(
+        "multi-pool",
+        "Multi AI Pool",
+        prevList,
+        newList
+      );
+
+      expect(diff.hasChanges).toBe(true);
+      expect(diff.upgraded).toHaveLength(2);
+
+      // Verify activeModels contains ONLY the 2 successors + unaffected model (3 total, NOT 5)
+      expect(diff.activeModels).toHaveLength(3);
+      expect(diff.activeModels).toContain("mimo-v2.6-flash");
+      expect(diff.activeModels).toContain("deepseek-v4.1-flash");
+      expect(diff.activeModels).toContain("stable-diffusion-xl");
+      expect(diff.activeModels).not.toContain("mimo-v2.5");
+      expect(diff.activeModels).not.toContain("deepseek-v4.0");
+    });
+
+    it("should adaptively handle date-based revision coexistence for future models", () => {
+      const prevList = ["future-vision-202401", "other-tool"];
+      const newList = ["future-vision-202401", "future-vision-202406", "other-tool"];
+
+      const diff = ModelSemanticMatcher.diffModelLists(
+        "vision-pool",
+        "Vision Pool",
+        prevList,
+        newList
+      );
+
+      expect(diff.hasChanges).toBe(true);
+      expect(diff.upgraded).toHaveLength(1);
+      expect(diff.upgraded[0].modelName).toBe("future-vision-202406");
+      expect(diff.activeModels).toEqual(["future-vision-202406", "other-tool"]);
+      expect(diff.activeModels).not.toContain("future-vision-202401");
+    });
+
+    it("should adapt to brand-new unseen architecture without any prior knowledge (e.g. bio-nexus-neuro)", () => {
+      const prevList = ["bio-nexus-neuro-1"];
+      const newList = ["bio-nexus-neuro-1", "bio-nexus-neuro-2-ultra"];
+
+      const diff = ModelSemanticMatcher.diffModelLists(
+        "bio-pool",
+        "Bio Pool",
+        prevList,
+        newList
+      );
+
+      expect(diff.hasChanges).toBe(true);
+      expect(diff.upgraded).toHaveLength(1);
+      expect(diff.upgraded[0].previousModelName).toBe("bio-nexus-neuro-1");
+      expect(diff.upgraded[0].modelName).toBe("bio-nexus-neuro-2-ultra");
+      expect(diff.activeModels).toEqual(["bio-nexus-neuro-2-ultra"]);
+    });
   });
 });
