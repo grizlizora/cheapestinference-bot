@@ -190,6 +190,7 @@ export interface ModelCatalogDiff {
   removed: ModelDiffItem[];
   currentModels: string[];
   previousModels: string[];
+  activeModels: string[];
 }
 
 

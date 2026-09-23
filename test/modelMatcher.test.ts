@@ -448,4 +448,152 @@ describe("ModelSemanticMatcher", () => {
     expect(diffNoCrossPair.removed).toHaveLength(1);
     expect(diffNoCrossPair.added).toHaveLength(1);
   });
+
+  describe("filterSupersededModels & Active Models Resolution", () => {
+    it("should generically prune superseded predecessors for arbitrary unknown/future models without hardcoding", () => {
+      const input = ["futureai-v1.0", "futureai-v2.0-turbo", "quantum-net-v4"];
+      const active = ModelSemanticMatcher.filterSupersededModels(input);
+      expect(active).toEqual(["futureai-v2.0-turbo", "quantum-net-v4"]);
+      expect(active).toHaveLength(2);
+    });
+
+    it("should retain distinct specialized variants (e.g. coder vs instruct) in the same family", () => {
+      const input = ["qwen-2.5-coder", "qwen-2.5-instruct", "deepseek-v3"];
+      const active = ModelSemanticMatcher.filterSupersededModels(input);
+      expect(active).toContain("qwen-2.5-coder");
+      expect(active).toContain("qwen-2.5-instruct");
+      expect(active).toContain("deepseek-v3");
+      expect(active).toHaveLength(3);
+    });
+
+    it("should retain distinct parameter size tiers (e.g. 8b vs 70b) in the same family", () => {
+      const input = ["llama-3-8b", "llama-3-70b"];
+      const active = ModelSemanticMatcher.filterSupersededModels(input);
+      expect(active).toContain("llama-3-8b");
+      expect(active).toContain("llama-3-70b");
+      expect(active).toHaveLength(2);
+    });
+
+    it("should exclude superseded mimo-v2.5 when mimo-v2.6-flash is upgraded during coexistence", () => {
+      const prevList = ["deepseek-v4.1-flash", "mimo-v2.5"];
+      const newList = ["deepseek-v4.1-flash", "mimo-v2.5", "mimo-v2.6-flash"];
+
+      const diff = ModelSemanticMatcher.diffModelLists(
+        "core",
+        "Core Pool — DeepSeek V4.1 Flash, MiMo V2.6 Flash",
+        prevList,
+        newList
+      );
+
+      expect(diff.hasChanges).toBe(true);
+      expect(diff.upgraded).toHaveLength(1);
+      expect(diff.upgraded[0].previousModelName).toBe("mimo-v2.5");
+      expect(diff.upgraded[0].modelName).toBe("mimo-v2.6-flash");
+
+      // In activeModels, mimo-v2.5 MUST be pruned out!
+      expect(diff.activeModels).toHaveLength(2);
+      expect(diff.activeModels).toContain("deepseek-v4.1-flash");
+      expect(diff.activeModels).toContain("mimo-v2.6-flash");
+      expect(diff.activeModels).not.toContain("mimo-v2.5");
+    });
+
+    it("should format single alert with exact active model count and without superseded models", async () => {
+      const { formatSingleAlertMessage } = await import("../src/bot/notifier/formatters/singleAlertFormatter.js");
+
+      const user = {
+        userId: 1,
+        telegramId: 12345,
+        language: "uk" as const,
+        isAdmin: false,
+        isMuted: false,
+      };
+
+      const event = {
+        id: "test-event-1",
+        type: "MODEL_UPGRADE_EVENT" as const,
+        poolSlug: "core",
+        poolName: "Core Pool — DeepSeek V4.1 Flash, MiMo V2.6 Flash",
+        block: "ALL",
+        models: ["mimo-v2.5", "mimo-v2.6-flash", "deepseek-v4.1-flash"],
+        hoursUtc: "",
+        timestamp: Date.now(),
+        modelUpgrade: {
+          added: [],
+          upgraded: [
+            {
+              type: "upgraded" as const,
+              modelName: "mimo-v2.6-flash",
+              previousModelName: "mimo-v2.5",
+              family: "mimo",
+              oldVersion: "2.5",
+              newVersion: "2.6",
+              changeNote: "mimo-v2.5 ➡️ mimo-v2.6-flash",
+            },
+          ],
+          removed: [],
+          allActiveModels: ["deepseek-v4.1-flash", "mimo-v2.6-flash"],
+        },
+      };
+
+      const alert = formatSingleAlertMessage(user as any, event as any, "P2");
+
+      // Verify active models count is 2 (NOT 3!)
+      expect(alert.text).toContain("Усі активні моделі (2):");
+      expect(alert.text).not.toContain("Усі активні моделі (3):");
+
+      // Verify diff line has the upgrade
+      expect(alert.text).toContain("mimo-v2.5");
+      expect(alert.text).toContain("mimo-v2.6-flash");
+
+      // Verify in 'Усі активні моделі' section, mimo-v2.5 is NOT listed after the label
+      const activeSection = alert.text.split("Усі активні моделі (2):")[1];
+      expect(activeSection).toBeDefined();
+      expect(activeSection).toContain("mimo-v2.6-flash");
+      expect(activeSection).toContain("deepseek-v4.1-flash");
+      expect(activeSection).not.toContain("mimo-v2.5");
+    });
+
+    it("should format bundled alert without superseded models in fallback", async () => {
+      const { formatBundledAlertMessage } = await import("../src/bot/notifier/formatters/bundleAlertFormatter.js");
+
+      const user = {
+        userId: 1,
+        telegramId: 12345,
+        language: "uk" as const,
+        isAdmin: false,
+        isMuted: false,
+      };
+
+      const event = {
+        id: "test-event-bundle-1",
+        type: "MODEL_UPGRADE_EVENT" as const,
+        poolSlug: "core",
+        poolName: "Core Pool",
+        block: "ALL",
+        models: ["mimo-v2.5", "mimo-v2.6-flash", "deepseek-v4.1-flash"],
+        hoursUtc: "",
+        timestamp: Date.now(),
+        modelUpgrade: {
+          added: [],
+          upgraded: [
+            {
+              type: "upgraded" as const,
+              modelName: "mimo-v2.6-flash",
+              previousModelName: "mimo-v2.5",
+              family: "mimo",
+              oldVersion: "2.5",
+              newVersion: "2.6",
+              changeNote: "mimo-v2.5 ➡️ mimo-v2.6-flash",
+            },
+          ],
+          removed: [],
+          allActiveModels: ["deepseek-v4.1-flash", "mimo-v2.6-flash"],
+        },
+      };
+
+      const msg = formatBundledAlertMessage(user as any, [{ event: event as any, priority: "P2" }]);
+      expect(msg.text).toContain("mimo-v2.6-flash");
+      expect(msg.text).toContain("Core Pool");
+    });
+  });
 });

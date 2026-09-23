@@ -211,6 +211,79 @@ export class ModelSemanticMatcher {
   }
 
   /**
+   * Universal Semantic Model Pruner:
+   * Dynamically filters out older superseded predecessor models from an active model catalog.
+   * Completely generic without hardcoding any neural network brands or names:
+   * 1. Considers explicit upgraded pairs (previousModelName -> modelName)
+   * 2. Evaluates intra-list architectural generational dominance:
+   *    If model B belongs to the same family as model A, has compatible variant/paramSize,
+   *    and strictly higher version/dateCode, model A is flagged as superseded.
+   * 3. Retains distinct specialization variants (e.g. coder vs instruct, 8b vs 70b)
+   * 4. Deduplicates identical normalized tokens while preserving display casing.
+   */
+  public static filterSupersededModels(
+    models: string[],
+    upgradedPairs?: Array<{ modelName: string; previousModelName?: string }>
+  ): string[] {
+    if (!models || models.length <= 1) {
+      return models || [];
+    }
+
+    const parsedTokens = models.map((m) => this.parseModel(m));
+    const supersededNormalized = new Set<string>();
+
+    // 1. Explicit upgraded predecessor identification
+    if (upgradedPairs && upgradedPairs.length > 0) {
+      for (const pair of upgradedPairs) {
+        if (pair.previousModelName) {
+          const prevToken = this.parseModel(pair.previousModelName);
+          supersededNormalized.add(prevToken.normalized);
+        }
+      }
+    }
+
+    // 2. Intra-list semantic generational dominance
+    for (let i = 0; i < parsedTokens.length; i++) {
+      for (let j = 0; j < parsedTokens.length; j++) {
+        if (i === j) continue;
+        const candidate = parsedTokens[i]; // potential older model
+        const successor = parsedTokens[j]; // potential newer model
+
+        // Check if successor dominates candidate
+        if (
+          this.areModelsSameFamily(candidate, successor) &&
+          (candidate.variant === successor.variant || !candidate.variant || !successor.variant) &&
+          (candidate.paramSize === successor.paramSize || !candidate.paramSize || !successor.paramSize)
+        ) {
+          const cmp = this.compareVersions(successor, candidate);
+          if (cmp > 0) {
+            supersededNormalized.add(candidate.normalized);
+          }
+        }
+      }
+    }
+
+    // 3. Filter out superseded models and deduplicate
+    const seenNormalized = new Set<string>();
+    const activeModels: string[] = [];
+
+    for (const m of models) {
+      const parsed = this.parseModel(m);
+      if (!supersededNormalized.has(parsed.normalized) && !seenNormalized.has(parsed.normalized)) {
+        seenNormalized.add(parsed.normalized);
+        activeModels.push(m);
+      }
+    }
+
+    // Safety fallback: if everything somehow got filtered out (should never happen), return the original unique list
+    if (activeModels.length === 0 && models.length > 0) {
+      return Array.from(new Set(models));
+    }
+
+    return activeModels;
+  }
+
+  /**
    * Performs granular bipartite diff matching between two model arrays
    * with full support for model version evolution, coexistence windows, and silent phaseouts.
    */
@@ -378,6 +451,7 @@ export class ModelSemanticMatcher {
       }));
 
     const hasChanges = added.length > 0 || upgraded.length > 0 || removed.length > 0;
+    const activeModels = this.filterSupersededModels(newList, upgraded);
 
     return {
       poolSlug,
@@ -388,6 +462,7 @@ export class ModelSemanticMatcher {
       removed,
       currentModels: newList,
       previousModels: prevList,
+      activeModels,
     };
   }
 }

@@ -69,13 +69,16 @@ export class CatalogHistoryDAO {
   }
 
   public recordModelUpgrade(diff: ModelCatalogDiff): void {
+    const effectiveAllModels =
+      diff.activeModels && diff.activeModels.length > 0 ? diff.activeModels : diff.currentModels;
+
     this.stmtInsertModelUpgrade.run({
       pool_slug: diff.poolSlug,
       pool_name: diff.poolName,
       added: JSON.stringify(diff.added),
       upgraded: JSON.stringify(diff.upgraded),
       removed: JSON.stringify(diff.removed),
-      all_models: JSON.stringify(diff.currentModels),
+      all_models: JSON.stringify(effectiveAllModels),
     });
     tursoCloudSync.pushMutation(
       `INSERT INTO catalog_history (
@@ -87,7 +90,7 @@ export class CatalogHistoryDAO {
         JSON.stringify(diff.added),
         JSON.stringify(diff.upgraded),
         JSON.stringify(diff.removed),
-        JSON.stringify(diff.currentModels),
+        JSON.stringify(effectiveAllModels),
       ],
       true
     );

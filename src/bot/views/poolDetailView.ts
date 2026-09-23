@@ -9,6 +9,7 @@ import { PoolStateDAO } from "../../db/dao/poolState.js";
 import { SubscriptionDAO } from "../../db/dao/subscriptions.js";
 import { SlotHistoryDAO } from "../../db/dao/slotHistory.js";
 import { AvailabilityIntelligenceEngine } from "../../engine/intelligenceEngine.js";
+import { ModelSemanticMatcher } from "../../engine/modelSemanticMatcher.js";
 import { ScraperOrchestrator } from "../../engine/scraperOrchestrator.js";
 import { escapeHtml, formatRelativeTime, stripLeadingEmoji } from "../../i18n/index.js";
 import { clampMessageText, formatMonitoringFooter } from "./common.js";
@@ -112,6 +113,7 @@ export function renderPoolDetailText(
   } catch {
     models = [];
   }
+  models = ModelSemanticMatcher.filterSupersededModels(models);
 
   // Defend against Telegram message length blowout (truncate to top 15 models)
   const maxModels = 15;

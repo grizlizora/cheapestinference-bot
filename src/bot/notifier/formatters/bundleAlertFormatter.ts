@@ -20,6 +20,7 @@ import {
   BundleButtonCandidate,
   buildBundleAlertKeyboard,
 } from "../keyboards/alertKeyboardBuilder.js";
+import { ModelSemanticMatcher } from "../../../engine/modelSemanticMatcher.js";
 import { BroadcastPriority, OutgoingAlertMessage, formatSingleAlertMessage } from "./singleAlertFormatter.js";
 
 export function formatBundledAlertMessage(
@@ -170,7 +171,11 @@ export function formatBundledAlertMessage(
           )
           .join("\n");
       } else {
-        modelDetails = `  • ${icon("ai_robot")} ${(event.models || []).map((m) => `${getModel3DIcon(m)} <code>${escapeHtml(m)}</code>`).join(", ")}`;
+        const activeModels = ModelSemanticMatcher.filterSupersededModels(
+          event.modelUpgrade?.allActiveModels || event.models || [],
+          event.modelUpgrade?.upgraded
+        );
+        modelDetails = `  • ${icon("ai_robot")} ${activeModels.map((m) => `${getModel3DIcon(m)} <code>${escapeHtml(m)}</code>`).join(", ")}`;
       }
       sectionLines.push(
         `${icon("event_model_upgrade")} <b>${escapeHtml(cleanName)} • ${upgradeTitle}</b>\n${modelDetails}`

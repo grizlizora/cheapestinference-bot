@@ -19,6 +19,7 @@ import {
   getRegionIcon,
 } from "./priceBadgeHelper.js";
 import { buildSingleAlertKeyboard } from "../keyboards/alertKeyboardBuilder.js";
+import { ModelSemanticMatcher } from "../../../engine/modelSemanticMatcher.js";
 
 export type BroadcastPriority = "P0" | "P1" | "P2" | "P3";
 
@@ -195,7 +196,17 @@ export function formatSingleAlertMessage(
       }
     }
 
-    const allModelsList = (event.models || []).map((m) => `${getModel3DIcon(m)} <code>${escapeHtml(m)}</code>`).join(", ");
+    const rawActiveModels =
+      event.modelUpgrade?.allActiveModels && event.modelUpgrade.allActiveModels.length > 0
+        ? event.modelUpgrade.allActiveModels
+        : event.models || [];
+
+    const effectiveActiveModels = ModelSemanticMatcher.filterSupersededModels(
+      rawActiveModels,
+      event.modelUpgrade?.upgraded
+    );
+
+    const allModelsList = effectiveActiveModels.map((m) => `${getModel3DIcon(m)} <code>${escapeHtml(m)}</code>`).join(", ");
     const updatedModelsTitle =
       lang === "uk"
         ? `У пулі оновлено конфігурацію нейромереж:`
@@ -204,10 +215,10 @@ export function formatSingleAlertMessage(
         : `Neural network configuration updated:`;
     const allModelsLabel =
       lang === "uk"
-        ? `Усі активні моделі (${(event.models || []).length}):`
+        ? `Усі активні моделі (${effectiveActiveModels.length}):`
         : lang === "ru"
-        ? `Все активные модели (${(event.models || []).length}):`
-        : `All active models (${(event.models || []).length}):`;
+        ? `Все активные модели (${effectiveActiveModels.length}):`
+        : `All active models (${effectiveActiveModels.length}):`;
     const upgradeFreeText =
       lang === "uk"
         ? "Оновлені моделі доступні за поточною підпискою без доплат!"

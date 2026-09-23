@@ -70,6 +70,11 @@ export class SlotDiffEngine {
         );
 
         if (modelDiff.hasChanges) {
+          const effectiveActiveModels =
+            modelDiff.activeModels && modelDiff.activeModels.length > 0
+              ? modelDiff.activeModels
+              : pool.models || [];
+
           this.catalogHistoryDao?.recordModelUpgrade(modelDiff);
           events.push({
             id: crypto.randomUUID(),
@@ -77,7 +82,7 @@ export class SlotDiffEngine {
             poolSlug: pool.slug,
             poolName: pool.modelName,
             block: "ALL",
-            models: pool.models || [],
+            models: effectiveActiveModels,
             hoursUtc: "",
             newStatus: pool.status,
             newPrice: pool.minPricePerDay,
@@ -86,7 +91,7 @@ export class SlotDiffEngine {
               added: modelDiff.added,
               upgraded: modelDiff.upgraded,
               removed: modelDiff.removed,
-              allActiveModels: pool.models || [],
+              allActiveModels: effectiveActiveModels,
             },
           });
         }
